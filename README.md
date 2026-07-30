@@ -14,7 +14,9 @@ programações por área em TVs conectadas a Raspberry Pi.
 - Avisos direcionados por área.
 - Importação por planilha e exportação das configurações.
 - Links específicos para cada estação usando a mesma página hospedada.
-- Persistência local das configurações no navegador.
+- Persistência compartilhada no Supabase.
+- Cópia local para manter as TVs funcionando quando a internet cair.
+- Atualização automática entre dispositivos a cada 10 segundos.
 
 ## Executar
 
@@ -43,12 +45,27 @@ https://seu-dominio.com/?station=station-123
 O arquivo `index.html` pode ser publicado diretamente no GitHub Pages ou em
 outro serviço de hospedagem estática.
 
-As áreas, estações e configurações atualmente são armazenadas no navegador de
-cada dispositivo. Sincronização remota em tempo real exige uma base central em
-nuvem, prevista para uma próxima etapa.
+## Configurar a base compartilhada
+
+1. Abra o projeto no painel do Supabase.
+2. Entre em **SQL Editor**.
+3. Copie e execute o conteúdo de [`supabase/setup.sql`](supabase/setup.sql).
+4. Abra ou recarregue o `index.html`.
+
+Na primeira conexão, a configuração existente no navegador é enviada para a
+base central. Depois disso, qualquer dispositivo que abrir o mesmo endereço
+recebe os dashboards, áreas, estações e avisos salvos.
+
+O perfil selecionado em cada TV continua sendo uma preferência local. Assim,
+alterar a estação de um Raspberry não troca a estação dos demais.
 
 ## Segurança
 
 Evite usar a opção **Publicar na Web** do Power BI para dados confidenciais.
 Utilize somente links e métodos de acesso compatíveis com as políticas da
 empresa.
+
+O modelo atual permite leitura e alteração sem login, conforme o uso interno
+previsto. Por esse motivo, restrinja o endereço do app à rede interna. Se o
+site ficar público na internet, qualquer pessoa que descobrir o endereço poderá
+alterar a programação.
