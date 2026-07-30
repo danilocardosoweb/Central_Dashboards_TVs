@@ -2223,6 +2223,99 @@
                 max-width: calc(100vw - 8rem);
             }
         }
+
+        .cloud-sync-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-top: 0.8rem;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid #dbe7f3;
+            border-radius: 0.75rem;
+            color: #475569;
+            background: rgba(255, 255, 255, 0.72);
+            font-size: 0.68rem;
+        }
+
+        .cloud-sync-state {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 0.5rem;
+        }
+
+        .cloud-sync-dot {
+            width: 0.55rem;
+            height: 0.55rem;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: #f59e0b;
+            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+        }
+
+        .cloud-sync-bar[data-state="online"] .cloud-sync-dot {
+            background: #22c55e;
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.14);
+        }
+
+        .cloud-sync-bar[data-state="saving"] .cloud-sync-dot {
+            background: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+            animation: cloudSyncPulse 1.1s ease-in-out infinite;
+        }
+
+        .cloud-sync-bar[data-state="offline"] .cloud-sync-dot,
+        .cloud-sync-bar[data-state="error"] .cloud-sync-dot {
+            background: #ef4444;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.14);
+        }
+
+        .cloud-sync-copy {
+            min-width: 0;
+        }
+
+        .cloud-sync-copy strong,
+        .cloud-sync-copy span {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .cloud-sync-copy strong {
+            color: #1e293b;
+            font-size: 0.7rem;
+        }
+
+        .cloud-sync-copy span {
+            margin-top: 0.12rem;
+            color: #64748b;
+            font-size: 0.6rem;
+        }
+
+        .cloud-sync-button {
+            flex: 0 0 auto;
+            border: 0;
+            border-radius: 0.55rem;
+            padding: 0.42rem 0.58rem;
+            color: #1d4ed8;
+            background: #dbeafe;
+            font-size: 0.62rem;
+            font-weight: 750;
+            cursor: pointer;
+        }
+
+        .cloud-sync-button:hover {
+            background: #bfdbfe;
+        }
+
+        @keyframes cloudSyncPulse {
+            50% {
+                transform: scale(0.72);
+                opacity: 0.65;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2268,6 +2361,18 @@
             <button type="button" class="btn btn-outline" onclick="copyCurrentStationLink()">
                 <i class="fas fa-link"></i> Copiar link desta estação
             </button>
+            <div id="cloudSyncBar" class="cloud-sync-bar" data-state="connecting">
+                <div class="cloud-sync-state">
+                    <span class="cloud-sync-dot"></span>
+                    <div class="cloud-sync-copy">
+                        <strong id="cloudSyncTitle">Conectando à base central</strong>
+                        <span id="cloudSyncDetail">A configuração local continuará disponível.</span>
+                    </div>
+                </div>
+                <button type="button" class="cloud-sync-button" onclick="forceCloudSync()">
+                    Sincronizar
+                </button>
+            </div>
         </div>
 
         <div class="input-group">
@@ -5586,6 +5691,435 @@
             renderAlertList();
             createSlides();
         });
+    </script>
+
+    <script>
+        (() => {
+            const SUPABASE_PROJECT_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
+            const SUPABASE_PUBLISHABLE_KEY =
+                'sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv';
+            const CLOUD_STATE_ENDPOINT =
+                `${SUPABASE_PROJECT_URL}/rest/v1/tv_app_state`;
+            const CLOUD_ROW_ID = 'central';
+            const CLOUD_POLL_INTERVAL = 10000;
+            const CLOUD_SAVE_DELAY = 850;
+            const CLOUD_TRACKED_KEYS = new Set([
+                'dashboardUrls',
+                'dashboardTvAreas',
+                'dashboardTvStations',
+                'dashboardAlertsV2',
+                'transitionTime',
+                'transitionEffect',
+                'transitionDuration',
+                'refreshInterval',
+                'messageConfig'
+            ]);
+
+            let cloudReady = false;
+            let cloudApplyingState = false;
+            let cloudPendingBeforeReady = false;
+            let cloudSaveTimer = null;
+            let cloudSaveInFlight = false;
+            let cloudSaveQueued = false;
+            let cloudRevision = 0;
+            let cloudPayloadSignature = '';
+            let cloudPollTimer = null;
+
+            const originalStorageSetItem = Storage.prototype.setItem;
+            if (!Storage.prototype.__dashboardCloudPatched) {
+                Storage.prototype.setItem = function(key, value) {
+                    originalStorageSetItem.call(this, key, value);
+                    if (
+                        this === localStorage &&
+                        CLOUD_TRACKED_KEYS.has(String(key)) &&
+                        !cloudApplyingState
+                    ) {
+                        scheduleCloudSave();
+                    }
+                };
+                Object.defineProperty(
+                    Storage.prototype,
+                    '__dashboardCloudPatched',
+                    { value: true }
+                );
+            }
+
+            function cloudHeaders(extra = {}) {
+                return {
+                    apikey: SUPABASE_PUBLISHABLE_KEY,
+                    Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                    'Content-Type': 'application/json',
+                    ...extra
+                };
+            }
+
+            function parseStoredJson(key, fallback) {
+                try {
+                    const value = JSON.parse(localStorage.getItem(key) || 'null');
+                    return value === null ? fallback : value;
+                } catch (error) {
+                    return fallback;
+                }
+            }
+
+            function collectCloudPayload() {
+                return {
+                    version: 1,
+                    urls: parseStoredJson('dashboardUrls', []),
+                    areas: parseStoredJson('dashboardTvAreas', []),
+                    stations: parseStoredJson('dashboardTvStations', []),
+                    alerts: parseStoredJson('dashboardAlertsV2', []),
+                    settings: {
+                        transitionTime:
+                            Number(localStorage.getItem('transitionTime')) || 30000,
+                        transitionEffect:
+                            localStorage.getItem('transitionEffect') || 'fade',
+                        transitionDuration:
+                            Number(localStorage.getItem('transitionDuration')) || 1400,
+                        refreshInterval:
+                            Number(localStorage.getItem('refreshInterval')) || 5
+                    }
+                };
+            }
+
+            function hasCloudContent(payload) {
+                if (!payload || typeof payload !== 'object') return false;
+                return (
+                    (Array.isArray(payload.urls) && payload.urls.length > 0) ||
+                    (Array.isArray(payload.areas) && payload.areas.length > 0) ||
+                    (Array.isArray(payload.stations) && payload.stations.length > 0) ||
+                    (Array.isArray(payload.alerts) && payload.alerts.length > 0)
+                );
+            }
+
+            function payloadSignature(payload) {
+                return JSON.stringify(payload || {});
+            }
+
+            function formatCloudTime(value) {
+                const date = value ? new Date(value) : new Date();
+                if (Number.isNaN(date.getTime())) return 'agora';
+                return date.toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+
+            function setCloudStatus(state, title, detail) {
+                const bar = document.getElementById('cloudSyncBar');
+                const titleElement = document.getElementById('cloudSyncTitle');
+                const detailElement = document.getElementById('cloudSyncDetail');
+                if (bar) bar.dataset.state = state;
+                if (titleElement) titleElement.textContent = title;
+                if (detailElement) detailElement.textContent = detail;
+            }
+
+            function applyCloudPayload(payload) {
+                const state = payload && typeof payload === 'object' ? payload : {};
+                const settings = state.settings || {};
+                cloudApplyingState = true;
+
+                try {
+                    localStorage.setItem(
+                        'dashboardUrls',
+                        JSON.stringify(Array.isArray(state.urls) ? state.urls : [])
+                    );
+                    localStorage.setItem(
+                        'dashboardTvAreas',
+                        JSON.stringify(Array.isArray(state.areas) ? state.areas : [])
+                    );
+                    localStorage.setItem(
+                        'dashboardTvStations',
+                        JSON.stringify(
+                            Array.isArray(state.stations) ? state.stations : []
+                        )
+                    );
+                    localStorage.setItem(
+                        'dashboardAlertsV2',
+                        JSON.stringify(Array.isArray(state.alerts) ? state.alerts : [])
+                    );
+                    localStorage.setItem(
+                        'transitionTime',
+                        String(Number(settings.transitionTime) || 30000)
+                    );
+                    localStorage.setItem(
+                        'transitionEffect',
+                        settings.transitionEffect || 'fade'
+                    );
+                    localStorage.setItem(
+                        'transitionDuration',
+                        String(Number(settings.transitionDuration) || 1400)
+                    );
+                    localStorage.setItem(
+                        'refreshInterval',
+                        String(Number(settings.refreshInterval) || 5)
+                    );
+
+                    urls = Array.isArray(state.urls) ? state.urls : [];
+                    alerts = Array.isArray(state.alerts) ? state.alerts : [];
+                    transitionTime = Number(settings.transitionTime) || 30000;
+                    currentTransitionEffect = settings.transitionEffect || 'fade';
+                    transitionDuration = Number(settings.transitionDuration) || 1400;
+                    refreshInterval =
+                        (Number(settings.refreshInterval) || 5) * 60 * 1000;
+                    areaSystemReady = false;
+
+                    ensureAreaSystem();
+                    const timeSelect = document.getElementById('transitionTime');
+                    const effectSelect =
+                        document.getElementById('transitionEffect');
+                    const durationSelect =
+                        document.getElementById('transitionDuration');
+                    const refreshSelect =
+                        document.getElementById('refreshInterval');
+                    if (timeSelect) {
+                        timeSelect.value = String(transitionTime / 1000);
+                    }
+                    if (effectSelect) {
+                        effectSelect.value = currentTransitionEffect;
+                    }
+                    if (durationSelect) {
+                        durationSelect.value = String(transitionDuration);
+                    }
+                    if (refreshSelect) {
+                        refreshSelect.value =
+                            String(Number(settings.refreshInterval) || 5);
+                    }
+                    applyTransitionDuration();
+                    refreshAreaExperience();
+                } finally {
+                    cloudApplyingState = false;
+                }
+            }
+
+            async function readCloudRow() {
+                const query =
+                    '?select=id,payload,revision,updated_at' +
+                    `&id=eq.${encodeURIComponent(CLOUD_ROW_ID)}&limit=1`;
+                const response = await fetch(`${CLOUD_STATE_ENDPOINT}${query}`, {
+                    method: 'GET',
+                    headers: cloudHeaders(),
+                    cache: 'no-store'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    const databaseMissing =
+                        response.status === 404 ||
+                        error.code === 'PGRST205' ||
+                        error.code === '42P01';
+                    const cloudError = new Error(
+                        databaseMissing
+                            ? 'A tabela central ainda não foi criada.'
+                            : error.message || `Falha na leitura (${response.status}).`
+                    );
+                    cloudError.databaseMissing = databaseMissing;
+                    throw cloudError;
+                }
+
+                const rows = await response.json();
+                return Array.isArray(rows) && rows.length ? rows[0] : null;
+            }
+
+            async function saveCloudState(options = {}) {
+                if (!cloudReady && !options.force) {
+                    cloudPendingBeforeReady = true;
+                    return;
+                }
+                if (cloudSaveInFlight) {
+                    cloudSaveQueued = true;
+                    return;
+                }
+
+                cloudSaveInFlight = true;
+                cloudSaveQueued = false;
+                setCloudStatus(
+                    'saving',
+                    'Salvando na base central',
+                    'Enviando as alterações para todas as TVs.'
+                );
+
+                try {
+                    const payload = collectCloudPayload();
+                    const nextRevision = Math.max(0, cloudRevision) + 1;
+                    const response = await fetch(
+                        `${CLOUD_STATE_ENDPOINT}?on_conflict=id`,
+                        {
+                            method: 'POST',
+                            headers: cloudHeaders({
+                                Prefer:
+                                    'resolution=merge-duplicates,return=representation'
+                            }),
+                            body: JSON.stringify({
+                                id: CLOUD_ROW_ID,
+                                payload,
+                                revision: nextRevision,
+                                updated_at: new Date().toISOString()
+                            })
+                        }
+                    );
+
+                    if (!response.ok) {
+                        const error = await response.json().catch(() => ({}));
+                        throw new Error(
+                            error.message || `Falha ao salvar (${response.status}).`
+                        );
+                    }
+
+                    const rows = await response.json();
+                    const savedRow = Array.isArray(rows) ? rows[0] : null;
+                    cloudRevision = Number(savedRow?.revision) || nextRevision;
+                    cloudPayloadSignature = payloadSignature(payload);
+                    cloudReady = true;
+                    cloudPendingBeforeReady = false;
+                    setCloudStatus(
+                        'online',
+                        'Base central sincronizada',
+                        `Último envio às ${formatCloudTime(savedRow?.updated_at)}.`
+                    );
+                } catch (error) {
+                    console.error('Erro ao salvar configuração central:', error);
+                    setCloudStatus(
+                        navigator.onLine ? 'error' : 'offline',
+                        navigator.onLine
+                            ? 'Não foi possível salvar na nuvem'
+                            : 'Sem conexão com a internet',
+                        'As alterações continuam guardadas neste dispositivo.'
+                    );
+                } finally {
+                    cloudSaveInFlight = false;
+                    if (cloudSaveQueued) {
+                        cloudSaveQueued = false;
+                        scheduleCloudSave(250);
+                    }
+                }
+            }
+
+            function scheduleCloudSave(delay = CLOUD_SAVE_DELAY) {
+                if (cloudApplyingState) return;
+                if (!cloudReady) {
+                    cloudPendingBeforeReady = true;
+                    return;
+                }
+                if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+                cloudSaveTimer = setTimeout(() => {
+                    cloudSaveTimer = null;
+                    saveCloudState();
+                }, delay);
+            }
+
+            async function pollCloudState() {
+                if (!cloudReady || cloudSaveInFlight || cloudSaveTimer) return;
+                try {
+                    const row = await readCloudRow();
+                    if (!row) return;
+                    const remoteRevision = Number(row.revision) || 0;
+                    const remoteSignature = payloadSignature(row.payload);
+                    if (
+                        remoteRevision > cloudRevision &&
+                        remoteSignature !== cloudPayloadSignature
+                    ) {
+                        cloudRevision = remoteRevision;
+                        cloudPayloadSignature = remoteSignature;
+                        applyCloudPayload(row.payload);
+                        setCloudStatus(
+                            'online',
+                            'Atualização recebida',
+                            `Dados atualizados às ${formatCloudTime(row.updated_at)}.`
+                        );
+                    }
+                } catch (error) {
+                    setCloudStatus(
+                        navigator.onLine ? 'error' : 'offline',
+                        navigator.onLine
+                            ? 'Base central indisponível'
+                            : 'Sem conexão com a internet',
+                        'A última configuração local permanece em funcionamento.'
+                    );
+                }
+            }
+
+            async function bootstrapCloudSync() {
+                setCloudStatus(
+                    'connecting',
+                    'Conectando à base central',
+                    'Buscando dashboards e avisos compartilhados.'
+                );
+
+                try {
+                    const row = await readCloudRow();
+                    const localPayload = collectCloudPayload();
+
+                    if (!row) {
+                        cloudReady = true;
+                        cloudRevision = 0;
+                        await saveCloudState({ force: true });
+                    } else {
+                        cloudRevision = Number(row.revision) || 0;
+                        if (hasCloudContent(row.payload)) {
+                            cloudPayloadSignature = payloadSignature(row.payload);
+                            applyCloudPayload(row.payload);
+                            setCloudStatus(
+                                'online',
+                                'Base central sincronizada',
+                                `Dados carregados às ${formatCloudTime(row.updated_at)}.`
+                            );
+                        } else {
+                            cloudReady = true;
+                            cloudPayloadSignature = payloadSignature(localPayload);
+                            await saveCloudState({ force: true });
+                        }
+                    }
+
+                    cloudReady = true;
+                    if (cloudPendingBeforeReady) {
+                        scheduleCloudSave(350);
+                    }
+                    if (!cloudPollTimer) {
+                        cloudPollTimer = setInterval(
+                            pollCloudState,
+                            CLOUD_POLL_INTERVAL
+                        );
+                    }
+                } catch (error) {
+                    console.error('Erro ao iniciar sincronização central:', error);
+                    cloudReady = false;
+                    setCloudStatus(
+                        error.databaseMissing ? 'error' : 'offline',
+                        error.databaseMissing
+                            ? 'Base central ainda não configurada'
+                            : 'Usando configuração local',
+                        error.databaseMissing
+                            ? 'Execute o arquivo supabase/setup.sql no projeto.'
+                            : 'A conexão será tentada novamente ao sincronizar.'
+                    );
+                }
+            }
+
+            window.forceCloudSync = async function() {
+                if (!cloudReady) {
+                    await bootstrapCloudSync();
+                    return;
+                }
+                await saveCloudState({ force: true });
+            };
+
+            window.addEventListener('online', () => {
+                bootstrapCloudSync();
+            });
+            window.addEventListener('offline', () => {
+                setCloudStatus(
+                    'offline',
+                    'Sem conexão com a internet',
+                    'A última configuração local permanece em funcionamento.'
+                );
+            });
+
+            document.addEventListener('DOMContentLoaded', () => {
+                bootstrapCloudSync();
+            });
+        })();
     </script>
 </body>
 </html>
