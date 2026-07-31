@@ -1,0 +1,12 @@
+{
+  "rootDir": ".",
+  "files": [
+    "manifest",
+    "source/**/*",
+    "components/**/*",
+    "images/**/*"
+  ],
+  "stagingDir": "../dist/staging",
+  "retainStagingFolder": true,
+  "createPackage": false
+}

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="MainScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+
+    <children>
+        <Rectangle id="background" width="1920" height="1080" color="0x08111FFF" />
+
+        <Group id="canvas">
+            <Group id="contentGroup">
+                <Poster
+                    id="dashboardImage"
+                    width="1920"
+                    height="1080"
+                    loadWidth="1920"
+                    loadHeight="1080"
+                    loadDisplayMode="scaleToFit"
+                    visible="false" />
+
+                <Group id="messagePanel">
+                    <Rectangle width="1920" height="1080" color="0x08111FFF" />
+                    <Rectangle id="accent" translation="[92,170]" width="12" height="650" color="0x3B82F6FF" />
+                    <Label
+                        id="kicker"
+                        translation="[140,182]"
+                        width="1500"
+                        height="48"
+                        text="CENTRAL DE DASHBOARDS"
+                        color="0x60A5FAFF"
+                        font="font:MediumBoldSystemFont" />
+                    <Label
+                        id="headline"
+                        translation="[140,255]"
+                        width="1550"
+                        height="200"
+                        wrap="true"
+                        color="0xF8FAFCFF"
+                        font="font:LargeBoldSystemFont" />
+                    <Label
+                        id="body"
+                        translation="[140,475]"
+                        width="1540"
+                        height="180"
+                        wrap="true"
+                        color="0xCBD5E1FF"
+                        font="font:LargeSystemFont" />
+                    <Rectangle
+                        id="actionBackground"
+                        translation="[140,690]"
+                        width="1540"
+                        height="112"
+                        color="0x111D31FF" />
+                    <Label
+                        id="action"
+                        translation="[178,716]"
+                        width="1460"
+                        height="68"
+                        wrap="true"
+                        color="0xE2E8F0FF"
+                        font="font:MediumBoldSystemFont" />
+                    <Label
+                        id="meta"
+                        translation="[140,850]"
+                        width="1540"
+                        height="54"
+                        color="0x94A3B8FF"
+                        font="font:MediumSystemFont" />
+                </Group>
+            </Group>
+
+            <Group id="bannerGroup" translation="[0,900]" visible="false">
+                <Rectangle id="bannerBackground" width="1920" height="180" color="0xC2410CFA" />
+                <Label
+                    id="bannerTitle"
+                    translation="[72,28]"
+                    width="450"
+                    height="55"
+                    color="0xFFFFFFFF"
+                    font="font:MediumBoldSystemFont" />
+                <Label
+                    id="bannerBody"
+                    translation="[520,25]"
+                    width="1320"
+                    height="120"
+                    wrap="true"
+                    color="0xFFFFFFFF"
+                    font="font:MediumSystemFont" />
+            </Group>
+
+            <Group id="statusGroup">
+                <Rectangle translation="[0,0]" width="1920" height="66" color="0x050B14E8" />
+                <Label
+                    id="stationLabel"
+                    translation="[42,14]"
+                    width="800"
+                    height="42"
+                    color="0xF8FAFCFF"
+                    font="font:MediumBoldSystemFont" />
+                <Label
+                    id="syncLabel"
+                    translation="[930,14]"
+                    width="930"
+                    height="42"
+                    horizAlign="right"
+                    color="0x94A3B8FF"
+                    font="font:MediumSystemFont" />
+            </Group>
+
+            <Group id="stationOverlay" visible="false">
+                <Rectangle width="1920" height="1080" color="0x050B14F8" />
+                <Rectangle translation="[340,150]" width="1240" height="780" color="0x111D31FF" />
+                <Label
+                    translation="[420,215]"
+                    width="1080"
+                    height="72"
+                    text="Escolha esta TV"
+                    color="0xF8FAFCFF"
+                    font="font:LargeBoldSystemFont" />
+                <Label
+                    id="stationHelp"
+                    translation="[420,300]"
+                    width="1080"
+                    height="64"
+                    text="Use as setas e pressione OK. Depois, use * para trocar."
+                    color="0x94A3B8FF"
+                    font="font:MediumSystemFont" />
+                <LabelList
+                    id="stationList"
+                    translation="[420,390]"
+                    itemSize="[1080,72]"
+                    numRows="6"
+                    width="1080"
+                    height="430"
+                    color="0xE2E8F0FF"
+                    focusedColor="0xFFFFFFFF"
+                    focusBitmapUri="pkg:/images/focus-row.png"
+                    vertFocusAnimationStyle="floatingFocus" />
+                <Label
+                    translation="[420,850]"
+                    width="1080"
+                    height="42"
+                    text="A estação fica salva somente nesta TV."
+                    color="0x64748BFF"
+                    font="font:SmallSystemFont" />
+            </Group>
+
+            <BusySpinner
+                id="loading"
+                translation="[900,490]"
+                posterUri="pkg:/images/spinner.png"
+                control="stop" />
+
+            <Timer id="slideTimer" repeat="false" />
+            <Timer id="syncTimer" duration="10" repeat="true" />
+            <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">
+                <FloatFieldInterpolator
+                    key="[0.0,1.0]"
+                    keyValue="[0.0,1.0]"
+                    fieldToInterp="contentGroup.opacity" />
+            </Animation>
+        </Group>
+    </children>
+</component>

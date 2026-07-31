@@ -238,6 +238,47 @@
             color: white;
         }
 
+        .roku-image-button {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .roku-image-button:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .roku-capture-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-left: auto;
+            padding: 0.25rem 0.55rem;
+            border-radius: 999px;
+            background: #e2e8f0;
+            color: #475569;
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
+
+        .roku-capture-status.ok {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .roku-capture-status.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .toast {
             position: fixed;
             bottom: 1rem;
@@ -2462,6 +2503,17 @@
                    class="input-field" 
                    placeholder="Cole o link de serviço aqui"
                    onkeypress="if(event.key === 'Enter') processLinks()">
+            <label class="transition-setting-label" for="rokuImageUrl">
+                Imagem para o aplicativo Roku (opcional)
+            </label>
+            <input type="url"
+                   id="rokuImageUrl"
+                   class="input-field"
+                   placeholder="https://.../dashboard.png">
+            <div class="refresh-info">
+                O Roku não abre o Power BI diretamente. Use uma imagem PNG, JPEG ou WebP
+                acessível pela internet para testar o player nativo.
+            </div>
             <button class="btn btn-primary" onclick="processLinks()">
                 <i class="fas fa-plus"></i>
                 Adicionar Dashboard
@@ -2915,9 +2967,15 @@
             const dashboardName = document.getElementById('dashboardName').value.trim() || `Dashboard ${urls.length + 1}`;
             const publicUrl = document.getElementById('publicUrl').value.trim();
             const serviceUrl = document.getElementById('serviceUrl').value.trim();
+            const rokuImageUrl = document.getElementById('rokuImageUrl').value.trim();
 
             if (!publicUrl || !serviceUrl) {
                 showToast('Por favor, insira ambos os links (público e serviço)', 'error');
+                return;
+            }
+
+            if (rokuImageUrl && !/^https:\/\//i.test(rokuImageUrl)) {
+                showToast('A imagem do Roku precisa usar um endereço HTTPS.', 'error');
                 return;
             }
 
@@ -2951,6 +3009,7 @@
                     public: publicUrl,
                     service: serviceUrl,
                     combined: combinedUrl,
+                    rokuImageUrl,
                     areaIds: [document.getElementById('dashboardAreaId').value || 'geral']
                 });
                 
@@ -2960,6 +3019,7 @@
                 document.getElementById('dashboardName').value = '';
                 document.getElementById('publicUrl').value = '';
                 document.getElementById('serviceUrl').value = '';
+                document.getElementById('rokuImageUrl').value = '';
                 
                 // Atualizar interface
                 updateUrlList();
@@ -2983,7 +3043,23 @@
                 ${urls.map((url, index) => `
                     <div class="url-item">
                         <span class="url-name" onclick="startEditing(${index})" title="Clique para editar">${url.name}</span>
+                        <span class="roku-capture-status ${url.rokuCaptureStatus || ''}">
+                            <i class="fas ${url.rokuCaptureStatus === 'ok'
+                                ? 'fa-circle-check'
+                                : url.rokuCaptureStatus === 'error'
+                                    ? 'fa-triangle-exclamation'
+                                    : 'fa-clock'}"></i>
+                            ${url.rokuCaptureStatus === 'ok'
+                                ? `Roku ${formatRokuCaptureTime(url.rokuCapturedAt)}`
+                                : url.rokuCaptureStatus === 'error'
+                                    ? 'Falha na captura'
+                                    : 'Aguardando captura'}
+                        </span>
                         <div class="url-actions">
+                            <button class="roku-image-button" onclick="editRokuImage(${index})"
+                                    title="${url.rokuImageUrl ? 'Alterar imagem do Roku' : 'Adicionar imagem do Roku'}">
+                                <i class="fas fa-tv"></i>
+                            </button>
                             <button class="delete-url" onclick="deleteUrl(${index})" title="Remover">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -2991,6 +3067,43 @@
                     </div>
                 `).join('')}
             `;
+        }
+
+        function formatRokuCaptureTime(value) {
+            if (!value) return 'atualizado';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'atualizado';
+            return date.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function editRokuImage(index) {
+            const storedUrls = JSON.parse(localStorage.getItem('dashboardUrls') || '[]');
+            const dashboard = storedUrls[index];
+            if (!dashboard) return;
+
+            const nextValue = window.prompt(
+                'Link direto da imagem para o Roku (PNG, JPEG ou WebP):',
+                dashboard.rokuImageUrl || ''
+            );
+            if (nextValue === null) return;
+
+            const normalized = nextValue.trim();
+            if (normalized && !/^https:\/\//i.test(normalized)) {
+                showToast('A imagem do Roku precisa usar um endereço HTTPS.', 'error');
+                return;
+            }
+
+            dashboard.rokuImageUrl = normalized;
+            urls = storedUrls;
+            localStorage.setItem('dashboardUrls', JSON.stringify(storedUrls));
+            updateUrlList();
+            showToast(
+                normalized ? 'Imagem do Roku atualizada' : 'Imagem do Roku removida',
+                'success'
+            );
         }
 
         // Criar slides
