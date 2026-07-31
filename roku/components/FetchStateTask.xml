@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="FetchStateTask" extends="Task">
+    <interface>
+        <field id="endpoint" type="string" />
+        <field id="apiKey" type="string" />
+        <field id="result" type="assocarray" />
+        <field id="error" type="string" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/FetchStateTask.brs" />
+</component>
