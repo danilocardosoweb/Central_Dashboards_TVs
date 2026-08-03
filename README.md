@@ -166,8 +166,10 @@ em um Chromium automatizado, gera imagens 1920×1080 e atualiza o
 ### Operação final, totalmente em nuvem
 
 A função [`api/capture.mjs`](api/capture.mjs) executa o Chromium dentro da
-Vercel. O Supabase Cron chama essa função a cada cinco minutos. Nenhum PC ou
-Raspberry precisa permanecer ligado.
+Vercel somente quando a Central cria uma solicitação. Na tela **Visão geral**,
+o botão **Atualizar agora** monta a fila de dashboards, mostra o progresso e
+aciona a primeira captura imediatamente. Nenhum PC ou Raspberry precisa
+permanecer ligado.
 
 Fluxo:
 
@@ -184,12 +186,17 @@ Configuração:
    `SUPABASE_RENDERER_KEY` deve ser uma chave secreta do Supabase e nunca uma
    chave pública.
 3. Faça o deploy de produção e confirme que `/api/capture` existe.
-4. Edite e execute [`supabase/cloud_capture_cron.sql`](supabase/cloud_capture_cron.sql)
-   para recriar um único agendamento a cada dois minutos. A função processa
-   no máximo dois dashboards por chamada, prioriza os mais antigos e salva
-   cada resultado imediatamente, evitando perder o ciclo inteiro por timeout.
+4. Edite e execute [`supabase/cloud_capture_cron.sql`](supabase/cloud_capture_cron.sql).
+   O script cria um gatilho assíncrono que inicia a fila imediatamente e um
+   trabalhador de segurança a cada cinco minutos. Sem fila pendente, esse
+   trabalhador apenas consulta o estado e não abre o Chromium.
 5. Use [`supabase/cloud_capture_diagnostics.sql`](supabase/cloud_capture_diagnostics.sql)
    para conferir as execuções do Cron, respostas HTTP e idade das imagens.
+
+Cada chamada captura somente um dashboard. Ao terminar, o próprio estado
+central aciona o item seguinte. Uma concessão temporária impede execuções
+simultâneas; se uma chamada for interrompida, o trabalhador de segurança
+retoma a fila depois que a concessão expirar.
 
 O endpoint aceita somente `POST` autenticado por
 `Authorization: Bearer CAPTURE_API_SECRET`. A chave secreta do Supabase fica

@@ -2358,6 +2358,167 @@
             background: #bfdbfe;
         }
 
+        .capture-request-card {
+            margin-top: 0.8rem;
+            padding: 0.85rem;
+            border: 1px solid #bfdbfe;
+            border-radius: 0.85rem;
+            background: linear-gradient(135deg, #eff6ff, #ffffff 70%);
+        }
+
+        .capture-request-heading,
+        .capture-request-progress-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .capture-request-heading strong {
+            display: block;
+            color: #172554;
+            font-size: 0.78rem;
+        }
+
+        .capture-request-heading span,
+        .capture-request-progress-row {
+            color: #64748b;
+            font-size: 0.62rem;
+        }
+
+        .capture-request-button {
+            flex: 0 0 auto;
+            border: 0;
+            border-radius: 0.65rem;
+            padding: 0.58rem 0.75rem;
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #0ea5e9);
+            font-size: 0.67rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+        }
+
+        .capture-request-button:disabled {
+            cursor: wait;
+            opacity: 0.62;
+            box-shadow: none;
+        }
+
+        .capture-request-progress {
+            height: 0.38rem;
+            margin: 0.72rem 0 0.42rem;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #dbeafe;
+        }
+
+        .capture-request-progress > span {
+            display: block;
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #2563eb, #22c55e);
+            transition: width 350ms ease;
+        }
+
+        .presentation-estimate-card {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #dbe7ff;
+            border-radius: 1rem;
+            padding: 1rem;
+            background:
+                radial-gradient(circle at 100% 0, rgba(37, 99, 235, 0.14), transparent 42%),
+                linear-gradient(145deg, #f8fbff, #ffffff);
+        }
+
+        .presentation-estimate-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: linear-gradient(#2563eb, #38bdf8);
+        }
+
+        .presentation-estimate-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.8rem;
+        }
+
+        .presentation-estimate-heading h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+        }
+
+        .presentation-estimate-heading h3 i { color: #2563eb; }
+        .presentation-estimate-heading p {
+            margin: 0.25rem 0 0;
+            color: #64748b;
+            font-size: 0.7rem;
+        }
+
+        .presentation-estimate-total {
+            flex: 0 0 auto;
+            text-align: right;
+        }
+
+        .presentation-estimate-total strong {
+            display: block;
+            color: #0f172a;
+            font-size: 1.6rem;
+            line-height: 1;
+            letter-spacing: -0.04em;
+        }
+
+        .presentation-estimate-total span {
+            display: block;
+            margin-top: 0.28rem;
+            color: #64748b;
+            font-size: 0.62rem;
+        }
+
+        .presentation-estimate-breakdown {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.55rem;
+            margin-top: 0.9rem;
+        }
+
+        .presentation-estimate-item {
+            min-width: 0;
+            padding: 0.65rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.82);
+        }
+
+        .presentation-estimate-item span,
+        .presentation-estimate-item strong { display: block; }
+        .presentation-estimate-item span {
+            overflow: hidden;
+            color: #64748b;
+            font-size: 0.6rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .presentation-estimate-item strong {
+            margin-top: 0.2rem;
+            color: #1e293b;
+            font-size: 0.76rem;
+        }
+
+        .presentation-estimate-note {
+            margin-top: 0.7rem;
+            color: #64748b;
+            font-size: 0.62rem;
+            line-height: 1.45;
+        }
+
         @keyframes cloudSyncPulse {
             50% {
                 transform: scale(0.72);
@@ -2499,6 +2660,9 @@
             .config-panel { width: 100vw; }
             .settings-nav { grid-template-columns: repeat(7, 88px); justify-content: start; }
             .station-selector-grid, .alert-form-grid, .area-create-grid { grid-template-columns: 1fr; }
+            .presentation-estimate-heading { display: block; }
+            .presentation-estimate-total { margin-top: 0.8rem; text-align: left; }
+            .presentation-estimate-breakdown { grid-template-columns: 1fr; }
         }
 
         /* Acompanhamento do PPR */
@@ -3236,6 +3400,54 @@
                     Sincronizar
                 </button>
             </div>
+            <div class="capture-request-card" id="captureRequestCard">
+                <div class="capture-request-heading">
+                    <div>
+                        <strong><i class="fas fa-camera"></i> Imagens dos dashboards nas TVs</strong>
+                        <span id="captureRequestMessage">Atualize depois de concluir a publicaÃ§Ã£o no Power BI.</span>
+                    </div>
+                    <button id="captureRequestButton" type="button" class="capture-request-button" onclick="requestDashboardCapture()">
+                        <i class="fas fa-rotate"></i> Atualizar agora
+                    </button>
+                </div>
+                <div class="capture-request-progress" aria-hidden="true">
+                    <span id="captureRequestProgress"></span>
+                </div>
+                <div class="capture-request-progress-row">
+                    <span id="captureRequestStatus">Pronto para atualizar</span>
+                    <strong id="captureRequestCount">0/0</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-group presentation-estimate-card" id="presentationEstimateCard" data-settings-section="station">
+            <div class="presentation-estimate-heading">
+                <div>
+                    <h3><i class="fas fa-stopwatch"></i> Tempo estimado da apresentação</h3>
+                    <p id="presentationEstimateContext">Calculando a programação desta TV.</p>
+                </div>
+                <div class="presentation-estimate-total">
+                    <strong id="presentationEstimateTotal">0s</strong>
+                    <span id="presentationEstimateSlides">0 telas em uma volta</span>
+                </div>
+            </div>
+            <div class="presentation-estimate-breakdown">
+                <div class="presentation-estimate-item">
+                    <span>Dashboards</span>
+                    <strong id="presentationEstimateDashboards">0 · 0s</strong>
+                </div>
+                <div class="presentation-estimate-item">
+                    <span>PPR</span>
+                    <strong id="presentationEstimatePpr">0 · 0s</strong>
+                </div>
+                <div class="presentation-estimate-item">
+                    <span>Avisos em tela</span>
+                    <strong id="presentationEstimateAlerts">0 · 0s</strong>
+                </div>
+            </div>
+            <div id="presentationEstimateNote" class="presentation-estimate-note">
+                A estimativa inclui o tempo das telas e das transições.
+            </div>
         </div>
 
         <div class="input-group" data-settings-section="display">
@@ -3910,6 +4122,7 @@
                 }
             }
             slideTimeout = setTimeout(showSlides, currentDisplayTime);
+            updatePresentationEstimate();
             
             showToast('Tempo de exibição atualizado', 'success');
         }
@@ -3919,6 +4132,7 @@
             const effect = document.getElementById('transitionEffect').value;
             currentTransitionEffect = effect;
             localStorage.setItem('transitionEffect', effect);
+            updatePresentationEstimate();
 
             showToast('Efeito de transição atualizado', 'success');
         }
@@ -3938,6 +4152,7 @@
             transitionDuration = Number.isFinite(duration) ? duration : 1400;
             localStorage.setItem('transitionDuration', String(transitionDuration));
             applyTransitionDuration();
+            updatePresentationEstimate();
             showToast('Velocidade da animação atualizada', 'success');
         }
 
@@ -4388,6 +4603,111 @@
             if (pprCount) {
                 const indicators = Array.isArray(pprConfig?.indicators) ? pprConfig.indicators : [];
                 pprCount.textContent = indicators.filter(item => item.enabled).length;
+            }
+            updatePresentationEstimate();
+        }
+
+        function calculatePresentationEstimate(input = {}) {
+            const dashboardCount = Math.max(0, Number(input.dashboardCount) || 0);
+            const dashboardDurationSeconds = Math.max(0, Number(input.dashboardDurationSeconds) || 0);
+            const alertDurations = Array.isArray(input.alertDurations)
+                ? input.alertDurations.map(value => Math.max(0, Number(value) || 0))
+                : [];
+            const pprSlideCount = Math.max(0, Number(input.pprSlideCount) || 0);
+            const pprDurationSeconds = Math.max(0, Number(input.pprDurationSeconds) || 0);
+            const bannerCount = Math.max(0, Number(input.bannerCount) || 0);
+            const slideCount = dashboardCount + alertDurations.length + pprSlideCount;
+            const contentSeconds =
+                dashboardCount * dashboardDurationSeconds +
+                alertDurations.reduce((total, value) => total + value, 0) +
+                pprSlideCount * pprDurationSeconds;
+            const transitionSeconds = slideCount > 1
+                ? slideCount * Math.max(0, Number(input.transitionSeconds) || 0)
+                : 0;
+            return {
+                dashboardCount,
+                dashboardSeconds: dashboardCount * dashboardDurationSeconds,
+                alertCount: alertDurations.length,
+                alertSeconds: alertDurations.reduce((total, value) => total + value, 0),
+                pprSlideCount,
+                pprSeconds: pprSlideCount * pprDurationSeconds,
+                bannerCount,
+                slideCount,
+                transitionSeconds,
+                totalSeconds: contentSeconds + transitionSeconds
+            };
+        }
+
+        function formatPresentationDuration(value) {
+            const total = Math.max(0, Math.round(Number(value) || 0));
+            const hours = Math.floor(total / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const seconds = total % 60;
+            const parts = [];
+            if (hours) parts.push(`${hours}h`);
+            if (minutes) parts.push(`${minutes}min`);
+            if (seconds || parts.length === 0) parts.push(`${seconds}s`);
+            return parts.join(' ');
+        }
+
+        function getPresentationEstimate() {
+            if (!areaSystemReady) return calculatePresentationEstimate();
+            const activeAlerts = getActiveAlerts();
+            const fullscreenAlerts = activeAlerts.filter(alert => alert.displayMode === 'fullscreen');
+            const bannerAlerts = activeAlerts.filter(alert => alert.displayMode === 'banner');
+            const indicators = getActivePprIndicators();
+            let pprSlideCount = 0;
+            if (pprTargetsCurrentStation()) {
+                if (pprConfig.showSummary) pprSlideCount += 1;
+                if (pprConfig.showIndicators && indicators.length) {
+                    pprSlideCount += pprConfig.displayMode === 'general'
+                        ? 1
+                        : indicators.length;
+                }
+                if (pprSlideCount === 0) pprSlideCount = 1;
+            }
+            return calculatePresentationEstimate({
+                dashboardCount: getVisibleDashboards().length,
+                dashboardDurationSeconds: transitionTime / 1000,
+                alertDurations: fullscreenAlerts.map(alert => Number(alert.duration) || 20),
+                pprSlideCount,
+                pprDurationSeconds: Number(pprConfig?.duration) || 30,
+                transitionSeconds: currentTransitionEffect === 'none'
+                    ? 0
+                    : transitionDuration / 1000,
+                bannerCount: bannerAlerts.length
+            });
+        }
+
+        function updatePresentationEstimate() {
+            const totalElement = document.getElementById('presentationEstimateTotal');
+            if (!totalElement || !areaSystemReady) return;
+            const estimate = getPresentationEstimate();
+            const station = getCurrentStation();
+            const context = document.getElementById('presentationEstimateContext');
+            const slides = document.getElementById('presentationEstimateSlides');
+            const dashboards = document.getElementById('presentationEstimateDashboards');
+            const ppr = document.getElementById('presentationEstimatePpr');
+            const alertsElement = document.getElementById('presentationEstimateAlerts');
+            const note = document.getElementById('presentationEstimateNote');
+            totalElement.textContent = formatPresentationDuration(estimate.totalSeconds);
+            if (context) {
+                context.textContent = `${station.name} · ${getAreaLabel(station.areaId)}`;
+            }
+            if (slides) {
+                slides.textContent = `${estimate.slideCount} tela${estimate.slideCount === 1 ? '' : 's'} em uma volta`;
+            }
+            if (dashboards) dashboards.textContent = `${estimate.dashboardCount} · ${formatPresentationDuration(estimate.dashboardSeconds)}`;
+            if (ppr) ppr.textContent = `${estimate.pprSlideCount} · ${formatPresentationDuration(estimate.pprSeconds)}`;
+            if (alertsElement) alertsElement.textContent = `${estimate.alertCount} · ${formatPresentationDuration(estimate.alertSeconds)}`;
+            if (note) {
+                const transitionCopy = estimate.transitionSeconds > 0
+                    ? `${formatPresentationDuration(estimate.transitionSeconds)} de transições incluídos.`
+                    : 'Trocas instantâneas, sem tempo adicional.';
+                const bannerCopy = estimate.bannerCount > 0
+                    ? ` ${estimate.bannerCount} aviso${estimate.bannerCount === 1 ? '' : 's'} em faixa não aumenta${estimate.bannerCount === 1 ? '' : 'm'} a duração.`
+                    : '';
+                note.textContent = `${transitionCopy}${bannerCopy}`;
             }
         }
 
@@ -6742,6 +7062,7 @@
             renderAreaList();
             renderStationList();
             if (pprConfig) renderPprAdmin();
+            updatePresentationEstimate();
         }
 
         function addArea() {
@@ -7172,6 +7493,9 @@
             pprConfig.updatedAt = new Date().toISOString();
             if (action) addPprAudit(action, details);
             localStorage.setItem('dashboardPprV1', JSON.stringify(pprConfig));
+            if (typeof window.scheduleCloudSectionSave === 'function') {
+                window.scheduleCloudSectionSave('ppr', 150);
+            }
             renderPprAdmin();
             updateSettingsNavigationCounts();
             createSlides();
@@ -7989,6 +8313,7 @@
             activeAlertSignature = '';
             createSlides();
             updateEmptyState();
+            updatePresentationEstimate();
         }
 
         function updateEmptyState() {
@@ -8228,6 +8553,150 @@
                 if (detailElement) detailElement.textContent = detail;
             }
 
+            function captureQueueProgress(capture) {
+                const queue = Array.isArray(capture?.queue) ? capture.queue : [];
+                return {
+                    total: queue.length || Number(capture?.total) || 0,
+                    completed: queue.filter(item => item?.status === 'complete').length,
+                    failed: queue.filter(item => item?.status === 'error').length,
+                    active: capture?.status === 'pending' || capture?.status === 'running'
+                };
+            }
+
+            function renderCaptureRequestStatus(capture) {
+                const button = document.getElementById('captureRequestButton');
+                const message = document.getElementById('captureRequestMessage');
+                const status = document.getElementById('captureRequestStatus');
+                const count = document.getElementById('captureRequestCount');
+                const progressBar = document.getElementById('captureRequestProgress');
+                if (!button || !message || !status || !count || !progressBar) return;
+
+                const progress = captureQueueProgress(capture);
+                const finished = progress.completed + progress.failed;
+                const percent = progress.total
+                    ? Math.min(100, Math.round((finished / progress.total) * 100))
+                    : 0;
+                button.disabled = progress.active;
+                count.textContent = `${finished}/${progress.total}`;
+                progressBar.style.width = `${percent}%`;
+
+                if (capture?.status === 'running') {
+                    message.textContent = 'O capturador estÃ¡ preparando as imagens atualizadas.';
+                    status.textContent = `Capturando ${capture.activeDashboardId ? 'o prÃ³ximo painel' : 'painÃ©is'}â€¦`;
+                    return;
+                }
+                if (capture?.status === 'pending') {
+                    message.textContent = 'SolicitaÃ§Ã£o recebida. A captura iniciarÃ¡ em instantes.';
+                    status.textContent = 'Na fila de atualizaÃ§Ã£o';
+                    return;
+                }
+                if (capture?.status === 'partial') {
+                    message.textContent = `${progress.completed} atualizados e ${progress.failed} com falha.`;
+                    status.textContent = 'ConcluÃ­do com pendÃªncias';
+                    return;
+                }
+                if (capture?.status === 'complete' && progress.total) {
+                    message.textContent = 'As TVs jÃ¡ podem carregar as novas imagens.';
+                    status.textContent = 'AtualizaÃ§Ã£o concluÃ­da';
+                    return;
+                }
+                message.textContent = 'Atualize depois de concluir a publicaÃ§Ã£o no Power BI.';
+                status.textContent = 'Pronto para atualizar';
+            }
+
+            window.requestDashboardCapture = async function() {
+                const button = document.getElementById('captureRequestButton');
+                if (button) button.disabled = true;
+                try {
+                    if (!cloudReady) await bootstrapCloudSync();
+                    if (cloudDirtySections.size > 0) await saveCloudState();
+
+                    for (let attempt = 0; attempt < 4; attempt += 1) {
+                        const row = await readCloudRow();
+                        if (!row) throw new Error('A configuraÃ§Ã£o central nÃ£o foi encontrada.');
+                        const currentCapture = row.payload?.capture || {};
+                        if (captureQueueProgress(currentCapture).active) {
+                            renderCaptureRequestStatus(currentCapture);
+                            showToast('JÃ¡ existe uma atualizaÃ§Ã£o em andamento.', 'error');
+                            return;
+                        }
+
+                        const dashboards = (Array.isArray(row.payload?.urls) ? row.payload.urls : [])
+                            .filter(item => item?.id != null)
+                            .filter(item => /powerbi\.com/i.test(String(
+                                item.combined || item.public || item.url || ''
+                            )));
+                        if (!dashboards.length) {
+                            throw new Error('Nenhum dashboard do Power BI estÃ¡ configurado.');
+                        }
+
+                        const requestedAt = new Date().toISOString();
+                        const requestId = globalThis.crypto?.randomUUID
+                            ? globalThis.crypto.randomUUID()
+                            : `capture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                        const capture = {
+                            ...currentCapture,
+                            requestId,
+                            requestedAt,
+                            requestedBy: 'Central Web',
+                            status: 'pending',
+                            queue: dashboards.map((item, index) => ({
+                                id: String(item.id),
+                                name: String(item.name || `Dashboard ${index + 1}`),
+                                status: 'pending',
+                                attempts: 0,
+                                startedAt: null,
+                                completedAt: null,
+                                error: null
+                            })),
+                            total: dashboards.length,
+                            completed: 0,
+                            failed: 0,
+                            activeDashboardId: null,
+                            leaseUntil: null,
+                            completedAt: null
+                        };
+                        const payload = { ...(row.payload || {}), capture };
+                        const nextRevision = Number(row.revision || 0) + 1;
+                        const response = await fetch(
+                            `${CLOUD_STATE_ENDPOINT}?id=eq.${encodeURIComponent(CLOUD_ROW_ID)}&revision=eq.${row.revision}`,
+                            {
+                                method: 'PATCH',
+                                headers: cloudHeaders({ Prefer: 'return=representation' }),
+                                body: JSON.stringify({
+                                    payload,
+                                    revision: nextRevision,
+                                    updated_at: requestedAt
+                                })
+                            }
+                        );
+                        if (!response.ok) {
+                            const error = await response.json().catch(() => ({}));
+                            throw new Error(error.message || `Falha ao solicitar (${response.status}).`);
+                        }
+                        const rows = await response.json();
+                        const saved = Array.isArray(rows) ? rows[0] : null;
+                        if (!saved) continue;
+
+                        cloudRevision = Number(saved.revision) || nextRevision;
+                        cloudPayloadSignature = payloadSignature(saved.payload || payload);
+                        applyCloudPayload(saved.payload || payload);
+                        showToast(`${dashboards.length} dashboard(s) enviado(s) para atualizaÃ§Ã£o.`);
+                        setTimeout(pollCloudState, 1200);
+                        return;
+                    }
+                    throw new Error('A Central foi alterada ao mesmo tempo. Tente novamente.');
+                } catch (error) {
+                    console.error('Erro ao solicitar capturas:', error);
+                    showToast(error instanceof Error ? error.message : String(error), 'error');
+                } finally {
+                    const latest = document.getElementById('captureRequestButton');
+                    if (latest && !captureQueueProgress(
+                        (await readCloudRow().catch(() => null))?.payload?.capture
+                    ).active) latest.disabled = false;
+                }
+            };
+
             function applyCloudPayload(payload) {
                 const state = payload && typeof payload === 'object' ? payload : {};
                 const settings = state.settings || {};
@@ -8306,6 +8775,7 @@
                     }
                     applyTransitionDuration();
                     refreshAreaExperience();
+                    renderCaptureRequestStatus(state.capture);
                 } finally {
                     cloudApplyingState = false;
                 }
@@ -8566,6 +9036,15 @@
                     return;
                 }
                 await saveCloudState({ force: true });
+            };
+
+            window.scheduleCloudSectionSave = function(section, delay = 250) {
+                if (section) cloudDirtySections.add(String(section));
+                if (!cloudReady) {
+                    cloudPendingBeforeReady = true;
+                    return;
+                }
+                scheduleCloudSave(Math.max(0, Number(delay) || 0));
             };
 
             window.addEventListener('online', () => {
