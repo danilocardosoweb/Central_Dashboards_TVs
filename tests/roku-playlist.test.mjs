@@ -62,3 +62,12 @@ test('sincronizacao preserva o slide atual quando outro item foi atualizado', ()
   assert.match(scene, /if currentSlideSignature = previousSlideSignature/);
   assert.match(scene, /updateSlideStatus\(\)\s+return/);
 });
+
+test('abertura sempre libera a camada de video antes do carrossel', () => {
+  assert.match(xml, /id="introFallbackTimer"/);
+  assert.match(xml, /id="introVideo"[\s\S]*?loop="false"/);
+  assert.match(scene, /state = "finished" or state = "error" or state = "stopped"/);
+  assert.match(scene, /m\.introVideo\.visible = false/);
+  assert.match(scene, /m\.introVideo\.content = invalid/);
+  assert.match(scene, /if key = "OK" or key = "back"[\s\S]*?finishIntroVideo\(\)/);
+});
