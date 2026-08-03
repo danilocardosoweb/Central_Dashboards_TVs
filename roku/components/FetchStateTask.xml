@@ -2,7 +2,6 @@
 <component name="FetchStateTask" extends="Task">
     <interface>
         <field id="endpoint" type="string" />
-        <field id="apiKey" type="string" />
         <field id="result" type="assocarray" />
         <field id="error" type="string" />
     </interface>

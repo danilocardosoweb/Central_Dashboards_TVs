@@ -4,7 +4,7 @@ import chromiumBinary from '@sparticuz/chromium';
 import { createClient } from '@supabase/supabase-js';
 
 import {
-  readCentralRow,
+  readCentralState,
   readConfiguration,
   runCaptureCycle
 } from '../renderer/capture.mjs';
@@ -13,6 +13,7 @@ import {
   claimNextCapture,
   completeCapture
 } from '../renderer/capture-queue.mjs';
+import { updateResilientState } from '../renderer/state-store.mjs';
 
 export function isAuthorized(authorizationHeader, expectedSecret) {
   if (!expectedSecret || typeof authorizationHeader !== 'string') return false;
@@ -54,7 +55,7 @@ async function captureHealth() {
   const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
-  const row = await readCentralRow(supabase, config.rowId);
+  const row = await readCentralState(supabase, config);
   const dashboards = Array.isArray(row.payload?.urls) ? row.payload.urls : [];
   const captureDates = dashboards
     .map(item => Date.parse(String(item?.rokuCapturedAt || '')))
@@ -63,7 +64,8 @@ async function captureHealth() {
     ? row.payload.ppr.indicators
     : [];
   return {
-    databaseReachable: true,
+    stateReachable: true,
+    stateBackend: 'storage',
     revision: Number(row.revision) || 0,
     stateUpdatedAt: row.updated_at || null,
     dashboards: dashboards.length,
@@ -79,30 +81,25 @@ async function captureHealth() {
   };
 }
 
-async function updateCentralPayload(supabase, rowId, buildPayload, maxAttempts = 5) {
+async function updateCentralPayload(supabase, config, buildPayload, maxAttempts = 5) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const row = await readCentralRow(supabase, rowId);
+    const row = await readCentralState(supabase, config);
     const nextPayload = buildPayload(row.payload, row);
     if (!nextPayload) return { row, updated: false };
-    const nextRevision = Number(row.revision || 0) + 1;
-    const updatedAt = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('tv_app_state')
-      .update({ payload: nextPayload, revision: nextRevision, updated_at: updatedAt })
-      .eq('id', rowId)
-      .eq('revision', row.revision)
-      .select('id,payload,revision,updated_at');
-    if (error) throw new Error(`Falha ao atualizar a fila: ${error.message}`);
-    if (Array.isArray(data) && data.length === 1) {
-      return { row: data[0], updated: true };
-    }
+    const saved = await updateResilientState(
+      supabase,
+      config,
+      () => nextPayload,
+      { expectedRevision: row.revision }
+    );
+    if (saved.updated) return saved;
   }
   throw new Error('A fila mudou durante a atualizaÃ§Ã£o. Tente novamente.');
 }
 
-async function claimQueuedDashboard(supabase, rowId) {
+async function claimQueuedDashboard(supabase, config) {
   let decision = null;
-  const saved = await updateCentralPayload(supabase, rowId, payload => {
+  const saved = await updateCentralPayload(supabase, config, payload => {
     decision = claimNextCapture(payload);
     if (decision.reason === 'idle' || decision.reason === 'busy') return null;
     return decision.payload;
@@ -110,8 +107,8 @@ async function claimQueuedDashboard(supabase, rowId) {
   return { ...decision, row: saved.row };
 }
 
-async function finishQueuedDashboard(supabase, rowId, dashboardId, result) {
-  const saved = await updateCentralPayload(supabase, rowId, payload =>
+async function finishQueuedDashboard(supabase, config, dashboardId, result) {
+  const saved = await updateCentralPayload(supabase, config, payload =>
     completeCapture(payload, dashboardId, result)
   );
   return captureProgress(saved.row.payload?.capture);
@@ -122,7 +119,7 @@ export default async function handler(request, response) {
     const payload = {
       ok: true,
       service: 'central-dashboards-capture',
-      version: 'flow-v4',
+      version: 'flow-v5-storage',
       rendererConfigured: Boolean(process.env.SUPABASE_RENDERER_KEY),
       authorizationConfigured: Boolean(process.env.CAPTURE_API_SECRET)
     };
@@ -131,7 +128,8 @@ export default async function handler(request, response) {
         payload.state = await captureHealth();
       } catch (error) {
         payload.state = {
-          databaseReachable: false,
+          stateReachable: false,
+          stateBackend: 'storage',
           error: error instanceof Error ? error.message : String(error)
         };
       }
@@ -166,7 +164,7 @@ export default async function handler(request, response) {
     let queuedDashboardId = '';
 
     if (!explicitDashboardIds.length) {
-      const claim = await claimQueuedDashboard(supabase, baseConfig.rowId);
+      const claim = await claimQueuedDashboard(supabase, baseConfig);
       if (!claim.claimed) {
         return json(response, 200, {
           ok: true,
@@ -216,7 +214,7 @@ export default async function handler(request, response) {
       summary = await runCaptureCycle(config);
     } catch (error) {
       if (queuedDashboardId) {
-        await finishQueuedDashboard(supabase, baseConfig.rowId, queuedDashboardId, {
+        await finishQueuedDashboard(supabase, baseConfig, queuedDashboardId, {
           ok: false,
           error: error instanceof Error ? error.message : String(error)
         }).catch(queueError => console.error('[captura-cloud] Falha ao concluir fila:', queueError));
@@ -230,7 +228,7 @@ export default async function handler(request, response) {
     const captureRequest = queuedDashboardId
       ? await finishQueuedDashboard(
           supabase,
-          baseConfig.rowId,
+          baseConfig,
           queuedDashboardId,
           result
         )

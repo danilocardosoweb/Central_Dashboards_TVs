@@ -10,6 +10,17 @@ const xml = fs.readFileSync(
   new URL('../roku/components/MainScene.xml', import.meta.url),
   'utf8'
 );
+const fetchTask = fs.readFileSync(
+  new URL('../roku/components/FetchStateTask.brs', import.meta.url),
+  'utf8'
+);
+
+test('Roku consulta a API de estado sem chave embutida', () => {
+  assert.match(scene, /central-dashboards-t-vs\.vercel\.app\/api\/state/);
+  assert.doesNotMatch(scene, /supabase\.co\/rest\/v1\/tv_app_state/);
+  assert.doesNotMatch(scene, /sb_publishable_/);
+  assert.match(fetchTask, /GetResponseCode\(\)/);
+});
 
 test('playlist adiciona todos os dashboards compatíveis com a área', () => {
   assert.match(scene, /for each dashboard in urls/);

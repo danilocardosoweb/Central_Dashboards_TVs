@@ -179,24 +179,24 @@ Power BI -> Chromium na Vercel -> Supabase Storage -> aplicativo Roku
 
 Configuração:
 
-1. Execute [`supabase/roku_snapshots.sql`](supabase/roku_snapshots.sql) e,
-   depois, [`supabase/roku_snapshots_secure.sql`](supabase/roku_snapshots_secure.sql).
+1. Execute [`supabase/roku_snapshots.sql`](supabase/roku_snapshots.sql),
+   [`supabase/roku_snapshots_secure.sql`](supabase/roku_snapshots_secure.sql) e
+   [`supabase/central_state_storage.sql`](supabase/central_state_storage.sql).
 2. Na Vercel, adicione as variáveis descritas em
    [`.env.vercel.example`](.env.vercel.example). A chave
    `SUPABASE_RENDERER_KEY` deve ser uma chave secreta do Supabase e nunca uma
    chave pública.
-3. Faça o deploy de produção e confirme que `/api/capture` existe.
-4. Edite e execute [`supabase/cloud_capture_cron.sql`](supabase/cloud_capture_cron.sql).
-   O script cria um gatilho assíncrono que inicia a fila imediatamente e um
-   trabalhador de segurança a cada cinco minutos. Sem fila pendente, esse
-   trabalhador apenas consulta o estado e não abre o Chromium.
-5. Use [`supabase/cloud_capture_diagnostics.sql`](supabase/cloud_capture_diagnostics.sql)
-   para conferir as execuções do Cron, respostas HTTP e idade das imagens.
+3. Faça o deploy de produção e confirme que `/api/state` e `/api/capture`
+   existem.
+4. Abra a Central, sincronize a configuração e confirme que o arquivo
+   `central-state/state/central.json` foi criado.
+5. Mantenha o antigo job do Cron desativado. O botão **Atualizar agora**
+   processa a fila diretamente e reduz o consumo do banco.
 
 Cada chamada captura somente um dashboard. Ao terminar, o próprio estado
 central aciona o item seguinte. Uma concessão temporária impede execuções
-simultâneas; se uma chamada for interrompida, o trabalhador de segurança
-retoma a fila depois que a concessão expirar.
+simultâneas. Se uma chamada for interrompida, abrir a Central novamente retoma
+a fila automaticamente.
 
 O endpoint aceita somente `POST` autenticado por
 `Authorization: Bearer CAPTURE_API_SECRET`. A chave secreta do Supabase fica
@@ -231,6 +231,33 @@ npm.cmd run capture:watch
 
 Consulte [`renderer/README.md`](renderer/README.md) para intervalos, recorte,
 diagnóstico e endurecimento de segurança para produção.
+
+## Estado resiliente e captura local
+
+A configuração central usa `central-state/state/central.json` como fonte
+principal. A Central Web, a API de captura e o Roku leem o mesmo arquivo. Isso
+mantém a programação disponível quando o Postgres ou a Data API estiverem
+sobrecarregados, desde que o Supabase Storage esteja operacional.
+
+O endpoint `/api/state` acessa o Storage no servidor. A chave secreta permanece
+na Vercel e não faz parte do navegador nem do ZIP do Roku. A tabela antiga pode
+ser mantida somente como espelho opcional com
+`SUPABASE_MIRROR_DATABASE=true`.
+
+O Cron antigo não é necessário para **Atualizar agora**. A Central processa a
+fila sob demanda, um dashboard por chamada. Deixe o job
+`central-dashboards-cloud-capture` desativado para evitar consumo desnecessário.
+
+Para gerar as imagens pelo PC e enviá-las diretamente ao Storage:
+
+1. execute `npm.cmd install` e `npm.cmd run capture:install-browser` uma vez;
+2. abra `Capturar_e_Enviar_para_TV.cmd`;
+3. preencha `SUPABASE_RENDERER_KEY` no `.env` criado na primeira abertura;
+4. abra o atalho novamente e acompanhe o Chromium.
+
+Não existe quantidade fixa: novos dashboards entram na próxima captura. As
+cópias locais ficam em `renderer/output` e os links publicados são gravados no
+mesmo estado consumido pelo Roku.
 
 ## Segurança
 
