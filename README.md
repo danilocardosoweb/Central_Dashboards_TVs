@@ -157,7 +157,7 @@ npm.cmd run roku:package
 O pacote será criado em `dist/Central_Dashboards_TVs_Roku.zip`. As instruções
 de instalação por modo desenvolvedor estão em [`roku/README.md`](roku/README.md).
 
-## Capturas automáticas para o Roku
+## Capturas manuais para o Roku
 
 O serviço em [`renderer`](renderer) abre os dashboards públicos do Power BI
 em um Chromium automatizado, gera imagens 1920×1080 e atualiza o
@@ -190,13 +190,14 @@ Configuração:
    existem.
 4. Abra a Central, sincronize a configuração e confirme que o arquivo
    `central-state/state/central.json` foi criado.
-5. Mantenha o antigo job do Cron desativado. O botão **Atualizar agora**
-   processa a fila diretamente e reduz o consumo do banco.
+5. Execute [`supabase/manual_capture_only.sql`](supabase/manual_capture_only.sql)
+   uma vez. Ele remove o Cron e o gatilho antigos. Depois disso, somente o botão
+   **Atualizar agora** inicia ou retoma a captura.
 
-Cada chamada captura somente um dashboard. Ao terminar, o próprio estado
-central aciona o item seguinte. Uma concessão temporária impede execuções
-simultâneas. Se uma chamada for interrompida, abrir a Central novamente retoma
-a fila automaticamente.
+Cada chamada captura somente um dashboard e o navegador avança a fila enquanto
+a Central permanece aberta. Uma concessão temporária impede execuções
+simultâneas. Se uma chamada for interrompida, clique novamente em
+**Atualizar agora** para retomar a fila.
 
 O endpoint aceita somente `POST` autenticado por
 `Authorization: Bearer CAPTURE_API_SECRET`. A chave secreta do Supabase fica
@@ -245,8 +246,9 @@ ser mantida somente como espelho opcional com
 `SUPABASE_MIRROR_DATABASE=true`.
 
 O Cron antigo não é necessário para **Atualizar agora**. A Central processa a
-fila sob demanda, um dashboard por chamada. Deixe o job
-`central-dashboards-cloud-capture` desativado para evitar consumo desnecessário.
+fila sob demanda, um dashboard por chamada. O script
+[`supabase/manual_capture_only.sql`](supabase/manual_capture_only.sql) remove o
+job e o gatilho antigos para evitar capturas automáticas e consumo desnecessário.
 
 Para gerar as imagens pelo PC e enviá-las diretamente ao Storage:
 
