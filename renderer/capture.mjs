@@ -44,8 +44,27 @@ export function readConfiguration(env = process.env, argv = process.argv.slice(2
     localOnly,
     watch,
     debug: env.CAPTURE_DEBUG === 'true',
-    onlyDashboardIds: parseIdFilter(env.CAPTURE_ONLY_IDS)
+    onlyDashboardIds: parseIdFilter(env.CAPTURE_ONLY_IDS),
+    maxDashboardsPerCycle: positiveInteger(env.CAPTURE_MAX_DASHBOARDS, 0)
   };
+}
+
+export function selectDashboardsForCapture(dashboards, config) {
+  const source = Array.isArray(dashboards) ? dashboards : [];
+  const requested = config.onlyDashboardIds?.size
+    ? source.filter((item) => config.onlyDashboardIds.has(String(item.id)))
+    : [...source].sort((left, right) =>
+        dashboardCaptureTimestamp(left) - dashboardCaptureTimestamp(right)
+      );
+  const limit = Number(config.maxDashboardsPerCycle) || 0;
+  return limit > 0 ? requested.slice(0, limit) : requested;
+}
+
+function dashboardCaptureTimestamp(dashboard) {
+  const attempts = [dashboard?.rokuCapturedAt, dashboard?.rokuCaptureAttemptedAt]
+    .map((value) => Date.parse(String(value || '')))
+    .filter(Number.isFinite);
+  return attempts.length ? Math.max(...attempts) : 0;
 }
 
 export function normalizeDashboardUrl(dashboard) {
@@ -97,6 +116,7 @@ export function mergeCaptureResults(payload, captureResults) {
           ...dashboard,
           rokuImageUrl: result.publicUrl,
           rokuCapturedAt: result.capturedAt,
+          rokuCaptureAttemptedAt: result.capturedAt,
           rokuCaptureStatus: 'ok',
           rokuCaptureError: null
         };
@@ -378,11 +398,7 @@ export async function runCaptureCycle(config) {
   const allDashboards = Array.isArray(centralRow.payload?.urls)
     ? centralRow.payload.urls
     : [];
-  const dashboards = config.onlyDashboardIds.size
-    ? allDashboards.filter((item) =>
-        config.onlyDashboardIds.has(String(item.id))
-      )
-    : allDashboards;
+  const dashboards = selectDashboardsForCapture(allDashboards, config);
 
   if (!dashboards.length) {
     console.log('[captura] Nenhum dashboard disponível.');
@@ -437,20 +453,22 @@ export async function runCaptureCycle(config) {
         );
       }
       results.push(result);
+
+      if (!config.localOnly) {
+        const { image, ...serializable } = result;
+        const saved = await persistCaptureResults(supabase, config, [serializable]);
+        console.log(
+          `[captura] Resultado persistido na revisão ${saved.revision}: ` +
+            `${dashboard.name || dashboard.id}.`
+        );
+      }
     }
   } finally {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
 
-  if (!config.localOnly) {
-    const storageResults = results.map((result) => {
-      const { image, ...serializable } = result;
-      return serializable;
-    });
-    const saved = await persistCaptureResults(supabase, config, storageResults);
-    console.log(`[captura] Estado central atualizado para revisão ${saved.revision}.`);
-  } else {
+  if (config.localOnly) {
     console.log(`[captura] Modo local: imagens não foram enviadas ao Supabase.`);
   }
 

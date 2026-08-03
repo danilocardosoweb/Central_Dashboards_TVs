@@ -9,6 +9,9 @@
     "capture:once": "node renderer/capture.mjs",
     "capture:watch": "node renderer/capture.mjs --watch",
     "capture:test": "node --test renderer/capture.test.mjs api/capture.test.mjs",
+    "ppr:test": "node --test tests/ppr.test.mjs",
+    "alerts:test": "node --test tests/alerts-image.test.mjs",
+    "roku:test": "node --test tests/roku-playlist.test.mjs",
     "capture:install-browser": "playwright install chromium",
     "roku:check": "bsc --project roku/bsconfig.json",
     "roku:package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-roku.ps1"

@@ -1354,6 +1354,8 @@
             white-space: nowrap;
             padding: 0.65rem 0.8rem;
         }
+        .alert-new-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.55rem; }
+        .alert-new-actions .btn { width: auto; }
 
         .alert-list {
             display: grid;
@@ -1599,6 +1601,11 @@
             object-fit: cover;
             z-index: 1;
         }
+
+        .alert-image-only { position: relative; width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; background: #000; }
+        .alert-image-only img { width: 100%; height: 100%; display: block; }
+        .alert-image-only-placeholder { color: #cbd5e1; font-size: clamp(1rem, 2.2vw, 2rem); font-weight: 700; }
+        .alert-image-options { margin-top: 0.7rem; padding: 0.8rem; border: 1px solid #bfdbfe; border-radius: 0.75rem; background: #eff6ff; }
 
         .alert-preview-screen .alert-visual-content {
             padding: 1rem 1rem 1rem 1.4rem;
@@ -2357,6 +2364,556 @@
                 opacity: 0.65;
             }
         }
+
+        /* Navegacao orientada a tarefas no painel de administracao */
+        .config-panel {
+            width: min(680px, 100vw);
+            padding: 0;
+            background: #f8fafc;
+            box-shadow: -18px 0 55px rgba(15, 23, 42, 0.18);
+        }
+
+        .config-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: rgba(15, 23, 42, 0.3);
+            backdrop-filter: blur(2px);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 180ms ease, visibility 180ms ease;
+        }
+
+        .config-backdrop.visible { opacity: 1; visibility: visible; }
+
+        .settings-panel-top {
+            position: sticky;
+            top: 0;
+            z-index: 12;
+            background: rgba(255, 255, 255, 0.97);
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .config-panel .panel-header {
+            min-height: 82px;
+            margin: 0;
+            padding: 1rem 1.35rem 0.8rem;
+            border: 0;
+            gap: 0.8rem;
+        }
+
+        .panel-title-block { flex: 1; min-width: 0; }
+        .panel-title-block h2 { font-size: 1.18rem; letter-spacing: -0.025em; }
+        .panel-title-block p { margin-top: 0.2rem; color: #64748b; font-size: 0.72rem; }
+
+        .panel-close-button {
+            width: 2.55rem;
+            height: 2.55rem;
+            flex: 0 0 auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.8rem;
+            color: #475569;
+            background: #fff;
+            cursor: pointer;
+            transition: 160ms ease;
+        }
+
+        .panel-close-button:hover { color: #0f172a; border-color: #cbd5e1; background: #f1f5f9; }
+
+        .settings-nav {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(84px, 1fr));
+            gap: 0.35rem;
+            padding: 0 1.1rem 0.8rem;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .settings-nav::-webkit-scrollbar { display: none; }
+
+        .settings-nav-button {
+            position: relative;
+            min-width: 84px;
+            min-height: 58px;
+            padding: 0.55rem 0.35rem;
+            border: 1px solid transparent;
+            border-radius: 0.75rem;
+            color: #64748b;
+            background: transparent;
+            cursor: pointer;
+            font-size: 0.62rem;
+            font-weight: 700;
+            line-height: 1.15;
+            transition: 160ms ease;
+        }
+
+        .settings-nav-button i { display: block; margin-bottom: 0.35rem; font-size: 1rem; }
+        .settings-nav-button:hover { color: #1d4ed8; background: #eff6ff; }
+        .settings-nav-button.active {
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+            background: #eff6ff;
+            box-shadow: inset 0 -2px 0 #3b82f6;
+        }
+
+        .settings-nav-count {
+            position: absolute;
+            top: 0.35rem;
+            right: 0.45rem;
+            min-width: 1.1rem;
+            height: 1.1rem;
+            padding: 0 0.25rem;
+            border-radius: 999px;
+            color: #1d4ed8;
+            background: #dbeafe;
+            font-size: 0.55rem;
+            line-height: 1.1rem;
+        }
+
+        .settings-section-intro {
+            margin: 1.25rem 1.35rem 0.25rem;
+            padding: 1rem 1.05rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.9rem;
+            background: #fff;
+        }
+
+        .settings-section-intro h3 { color: #0f172a; font-size: 0.92rem; }
+        .settings-section-intro p { margin-top: 0.2rem; color: #64748b; font-size: 0.7rem; }
+
+        .config-panel > [data-settings-section] {
+            display: none;
+            margin: 1rem 1.35rem;
+            animation: settingsSectionIn 180ms ease both;
+        }
+
+        .config-panel > [data-settings-section].settings-section-visible { display: block; }
+
+        @keyframes settingsSectionIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 720px) {
+            .config-panel { width: 100vw; }
+            .settings-nav { grid-template-columns: repeat(7, 88px); justify-content: start; }
+            .station-selector-grid, .alert-form-grid, .area-create-grid { grid-template-columns: 1fr; }
+        }
+
+        /* Acompanhamento do PPR */
+        .settings-nav {
+            grid-template-columns: repeat(7, minmax(82px, 1fr));
+        }
+
+        .ppr-admin-card {
+            padding: 0;
+            overflow: hidden;
+            border: 1px solid #dbe4f0;
+            border-radius: 1rem;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .ppr-admin-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1.1rem;
+            color: #f8fafc;
+            background: linear-gradient(135deg, #172554, #1e3a8a 58%, #0369a1);
+        }
+
+        .ppr-admin-header h3 { color: #fff; font-size: 1rem; }
+        .ppr-admin-header p { margin-top: 0.2rem; color: #bfdbfe; font-size: 0.68rem; }
+
+        .ppr-master-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 0 0 auto;
+            padding: 0.45rem 0.7rem;
+            border: 1px solid rgba(255,255,255,0.25);
+            border-radius: 999px;
+            color: #dbeafe;
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+
+        .ppr-master-toggle input { accent-color: #22c55e; }
+
+        .ppr-admin-body { padding: 1.05rem; }
+
+        .ppr-settings-grid,
+        .ppr-editor-grid,
+        .ppr-target-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.85rem;
+        }
+
+        .ppr-admin-card label,
+        .ppr-rule-editor label {
+            display: block;
+            margin-bottom: 0.32rem;
+            color: #475569;
+            font-size: 0.66rem;
+            font-weight: 700;
+        }
+
+        .ppr-target-select { min-height: 6.5rem; }
+        .ppr-help { margin: -0.15rem 0 0.85rem; color: #64748b; font-size: 0.64rem; }
+
+        .ppr-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            margin: 1rem 0;
+        }
+
+        .ppr-toolbar .btn { width: auto; }
+
+        .ppr-section-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin: 1rem 0 0.65rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .ppr-section-heading h4 { color: #0f172a; font-size: 0.82rem; }
+        .ppr-section-heading span { color: #64748b; font-size: 0.62rem; }
+
+        .ppr-indicator-list { display: grid; gap: 0.65rem; }
+
+        .ppr-indicator-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.7rem;
+            align-items: center;
+            padding: 0.8rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.8rem;
+            background: #f8fafc;
+        }
+
+        .ppr-indicator-item.is-inactive { opacity: 0.58; }
+        .ppr-indicator-item.needs-update { border-color: #fbbf24; background: #fffbeb; }
+        .ppr-indicator-name { color: #0f172a; font-size: 0.74rem; font-weight: 750; }
+        .ppr-indicator-meta { margin-top: 0.18rem; color: #64748b; font-size: 0.62rem; }
+        .ppr-indicator-value { color: #1d4ed8; font-size: 0.95rem; font-weight: 800; }
+        .ppr-indicator-actions { display: flex; gap: 0.3rem; }
+
+        .ppr-mini-button {
+            width: 2rem;
+            height: 2rem;
+            border: 1px solid #dbe4f0;
+            border-radius: 0.58rem;
+            color: #475569;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .ppr-mini-button:hover { color: #1d4ed8; border-color: #93c5fd; }
+        .ppr-mini-button.danger:hover { color: #dc2626; border-color: #fca5a5; }
+
+        .ppr-editor,
+        .ppr-rule-editor {
+            margin-top: 0.9rem;
+            padding: 0.95rem;
+            border: 1px solid #bfdbfe;
+            border-radius: 0.85rem;
+            background: #eff6ff;
+        }
+
+        .ppr-editor-actions { display: flex; justify-content: flex-end; gap: 0.55rem; margin-top: 0.75rem; }
+        .ppr-editor-actions .btn { width: auto; }
+
+        .ppr-rules { display: grid; gap: 0.45rem; }
+        .ppr-rule-row {
+            display: grid;
+            grid-template-columns: 72px 72px 1fr 42px;
+            gap: 0.45rem;
+            align-items: center;
+        }
+        .ppr-rule-row .input-field { margin: 0; padding: 0.55rem; }
+        .ppr-rule-row input[type="color"] { width: 42px; height: 38px; border: 0; background: transparent; }
+
+        .ppr-preview-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 2100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: rgba(2, 6, 23, 0.88);
+        }
+        .ppr-preview-modal.open { display: flex; }
+        .ppr-preview-shell { width: min(1180px, 96vw); }
+        .ppr-preview-actions { display: flex; justify-content: flex-end; margin-bottom: 0.6rem; }
+        .ppr-preview-actions button { width: auto; }
+
+        .ppr-slide {
+            color: #e2e8f0;
+            background:
+                radial-gradient(circle at 82% 14%, rgba(37,99,235,0.24), transparent 30%),
+                linear-gradient(135deg, #020617, #0f172a 48%, #172554);
+            overflow: hidden;
+        }
+
+        .ppr-screen {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            padding: clamp(1.2rem, 3vw, 3.25rem);
+            color: #e2e8f0;
+            background:
+                radial-gradient(circle at 82% 14%, rgba(37,99,235,0.24), transparent 30%),
+                linear-gradient(135deg, #020617, #0f172a 48%, #172554);
+        }
+
+        .ppr-preview-shell .ppr-screen { aspect-ratio: 16 / 9; height: auto; }
+
+        .ppr-screen-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 2rem;
+            margin-bottom: clamp(1rem, 2.5vw, 2.2rem);
+        }
+        .ppr-screen-kicker { color: #60a5fa; font-size: clamp(0.7rem, 1.2vw, 1.15rem); font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; }
+        .ppr-screen-title { margin-top: 0.25rem; color: #f8fafc; font-size: clamp(1.8rem, 4vw, 4.3rem); font-weight: 800; letter-spacing: -0.04em; }
+        .ppr-period-badge { padding: 0.65rem 1rem; border: 1px solid rgba(147,197,253,0.35); border-radius: 999px; color: #dbeafe; background: rgba(30,64,175,0.24); font-size: clamp(0.7rem, 1.15vw, 1.05rem); font-weight: 700; white-space: nowrap; }
+
+        .ppr-individual-layout { display: grid; grid-template-columns: minmax(260px, 34%) 1fr; gap: clamp(2rem, 5vw, 6rem); align-items: center; height: calc(100% - 7rem); }
+        .ppr-thermometer-wrap { display: flex; justify-content: center; align-items: center; gap: 1.5rem; height: 100%; }
+        .ppr-thermometer {
+            position: relative;
+            width: clamp(64px, 7vw, 110px);
+            height: min(56vh, 570px);
+            border: 5px solid #cbd5e1;
+            border-radius: 999px;
+            background: rgba(15,23,42,0.82);
+            box-shadow: inset 0 0 26px rgba(0,0,0,0.5), 0 20px 55px rgba(0,0,0,0.3);
+            overflow: visible;
+        }
+        .ppr-thermometer::after { content: ''; position: absolute; left: 50%; bottom: -0.45em; width: 1.5em; height: 1.5em; transform: translateX(-50%); border: 5px solid #cbd5e1; border-radius: 50%; background: var(--ppr-color, #3b82f6); }
+        .ppr-fill { position: absolute; left: 8px; right: 8px; bottom: 8px; height: var(--ppr-fill, 0%); max-height: calc(100% - 16px); border-radius: 999px; background: linear-gradient(to top, color-mix(in srgb, var(--ppr-color) 72%, #0f172a), var(--ppr-color)); transform-origin: bottom; animation: pprFillRise 1.4s cubic-bezier(.2,.75,.25,1) both; }
+        @keyframes pprFillRise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+        .ppr-scale { position: absolute; inset: 8px -280px 8px 100%; width: 270px; }
+        .ppr-tick { position: absolute; left: 0; width: 100%; transform: translateY(50%); color: #cbd5e1; font-size: clamp(0.65rem, 1vw, 1rem); font-weight: 700; white-space: nowrap; }
+        .ppr-tick::before { content: ''; display: inline-block; width: 28px; margin-right: 8px; border-top: 2px solid #64748b; vertical-align: middle; }
+        .ppr-tick-expected { margin-left: 0.35rem; color: #94a3b8; font-size: 0.8em; font-weight: 650; }
+        .ppr-tick.meta { color: #f8fafc; font-weight: 900; }
+        .ppr-tick.meta::before { width: 42px; border-top: 5px solid #f8fafc; }
+
+        .ppr-result-copy { min-width: 0; }
+        .ppr-result-value { color: #f8fafc; font-size: clamp(3.5rem, 8vw, 8rem); font-weight: 900; line-height: 0.88; letter-spacing: -0.07em; }
+        .ppr-result-value span { color: #93c5fd; font-size: 0.43em; }
+        .ppr-result-name { margin-top: 0.85rem; color: #f8fafc; font-size: clamp(1.25rem, 2.5vw, 2.65rem); font-weight: 750; }
+        .ppr-result-description { margin-top: 0.55rem; max-width: 850px; color: #94a3b8; font-size: clamp(0.8rem, 1.4vw, 1.35rem); }
+        .ppr-status-message { display: inline-flex; margin-top: 0.8rem; padding: 0.55rem 0.9rem; border-left: 5px solid var(--ppr-color); color: #f8fafc; background: rgba(255,255,255,0.07); font-size: clamp(0.9rem, 1.5vw, 1.35rem); font-weight: 750; }
+        .ppr-result-footer { margin-top: 0.75rem; color: #94a3b8; font-size: clamp(0.68rem, 1.05vw, 1rem); }
+
+        .ppr-summary-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; }
+        .ppr-stat-card { padding: 1.15rem; border: 1px solid rgba(148,163,184,0.2); border-radius: 1rem; background: rgba(15,23,42,0.62); }
+        .ppr-stat-label { color: #94a3b8; font-size: clamp(0.65rem, 1vw, 0.95rem); }
+        .ppr-stat-value { margin-top: 0.2rem; color: #f8fafc; font-size: clamp(1.7rem, 3.5vw, 3.4rem); font-weight: 850; }
+        .ppr-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 0.8rem; margin-top: 1rem; }
+        .ppr-summary-indicator { position: relative; overflow: hidden; padding: 0.95rem 1rem; border: 1px solid rgba(148,163,184,0.2); border-radius: 0.9rem; background: rgba(15,23,42,0.56); }
+        .ppr-summary-indicator::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--ppr-color); }
+        .ppr-summary-indicator strong { display: block; color: #f8fafc; font-size: clamp(0.75rem, 1.15vw, 1.05rem); }
+        .ppr-summary-indicator span { display: block; margin-top: 0.25rem; color: var(--ppr-color); font-size: clamp(1.3rem, 2.4vw, 2.4rem); font-weight: 850; }
+
+        .ppr-general-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: clamp(0.7rem, 1.5vw, 1.4rem); }
+        .ppr-general-card { display: grid; grid-template-columns: 56px 1fr; gap: 1rem; align-items: end; min-height: 220px; padding: 1rem; border: 1px solid rgba(148,163,184,0.2); border-radius: 1rem; background: rgba(15,23,42,0.62); }
+        .ppr-mini-thermometer { position: relative; width: 34px; height: 160px; margin: auto; border: 3px solid #94a3b8; border-radius: 999px; background: #0f172a; overflow: hidden; }
+        .ppr-mini-thermometer .ppr-fill { left: 4px; right: 4px; bottom: 4px; max-height: calc(100% - 8px); }
+        .ppr-general-value { color: #f8fafc; font-size: clamp(1.7rem, 3vw, 3.2rem); font-weight: 850; }
+        .ppr-general-name { margin-top: 0.25rem; color: #cbd5e1; font-size: clamp(0.68rem, 1.05vw, 1rem); font-weight: 700; }
+        .ppr-general-status { margin-top: 0.4rem; color: var(--ppr-color); font-size: clamp(0.6rem, 0.95vw, 0.9rem); font-weight: 750; }
+
+        .ppr-operational-values { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 0.7rem; }
+        .ppr-operational-value { min-width: 180px; padding: 0.7rem 0.9rem; border: 1px solid rgba(148,163,184,0.28); border-radius: 0.8rem; background: rgba(255,255,255,0.07); }
+        .ppr-operational-value small { display: block; color: #94a3b8; font-size: clamp(0.62rem, 0.9vw, 0.82rem); }
+        .ppr-operational-value strong { display: block; margin-top: 0.16rem; color: #f8fafc; font-size: clamp(1rem, 1.7vw, 1.55rem); }
+        .ppr-summary-indicator small,
+        .ppr-general-operational { display: block; margin-top: 0.22rem; color: #94a3b8; font-size: clamp(0.58rem, 0.82vw, 0.78rem); }
+
+        .ppr-screen.ppr-theme-light {
+            color: #0f172a;
+            background: radial-gradient(circle at 84% 10%, rgba(59,130,246,0.12), transparent 32%), linear-gradient(135deg, #f8fafc, #ffffff 48%, #eff6ff);
+        }
+        .ppr-theme-light .ppr-screen-kicker { color: #2563eb; }
+        .ppr-theme-light .ppr-screen-title,
+        .ppr-theme-light .ppr-result-value,
+        .ppr-theme-light .ppr-result-name,
+        .ppr-theme-light .ppr-stat-value,
+        .ppr-theme-light .ppr-summary-indicator strong,
+        .ppr-theme-light .ppr-general-value,
+        .ppr-theme-light .ppr-operational-value strong { color: #0f172a; }
+        .ppr-theme-light .ppr-period-badge { color: #1e40af; border-color: #bfdbfe; background: #dbeafe; }
+        .ppr-theme-light .ppr-result-description,
+        .ppr-theme-light .ppr-result-footer,
+        .ppr-theme-light .ppr-stat-label,
+        .ppr-theme-light .ppr-general-name,
+        .ppr-theme-light .ppr-operational-value small,
+        .ppr-theme-light .ppr-summary-indicator small,
+        .ppr-theme-light .ppr-general-operational { color: #64748b; }
+        .ppr-theme-light .ppr-thermometer { border-color: #94a3b8; background: #fff; box-shadow: inset 0 0 18px rgba(15,23,42,0.08), 0 18px 42px rgba(15,23,42,0.12); }
+        .ppr-theme-light .ppr-thermometer::after { border-color: #94a3b8; }
+        .ppr-theme-light .ppr-tick { color: #475569; }
+        .ppr-theme-light .ppr-tick-expected { color: #64748b; }
+        .ppr-theme-light .ppr-tick.meta { color: #0f172a; }
+        .ppr-theme-light .ppr-tick.meta::before { border-color: #0f172a; }
+        .ppr-theme-light .ppr-status-message { color: #0f172a; background: color-mix(in srgb, var(--ppr-color) 10%, #fff); }
+        .ppr-theme-light .ppr-stat-card,
+        .ppr-theme-light .ppr-summary-indicator,
+        .ppr-theme-light .ppr-general-card,
+        .ppr-theme-light .ppr-operational-value { border-color: #dbe4f0; background: rgba(255,255,255,0.88); box-shadow: 0 10px 28px rgba(15,23,42,0.06); }
+        .ppr-theme-light .ppr-mini-thermometer { border-color: #94a3b8; background: #fff; }
+
+        /* PPR Executive Experience */
+        body.ppr-presenting .station-status-chip,
+        body.ppr-presenting .control-buttons {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-12px);
+        }
+        .station-status-chip, .control-buttons { transition: opacity 260ms ease, transform 260ms ease; }
+        .ppr-screen {
+            --ppr-surface: rgba(15,23,42,0.72);
+            --ppr-border: rgba(148,163,184,0.2);
+            position: relative;
+            padding: clamp(1.45rem, 2.4vw, 2.7rem) clamp(1.8rem, 3.2vw, 3.8rem);
+            isolation: isolate;
+        }
+        .ppr-screen::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background:
+                linear-gradient(90deg, rgba(37,99,235,0.1) 1px, transparent 1px),
+                linear-gradient(rgba(37,99,235,0.08) 1px, transparent 1px);
+            background-size: 64px 64px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,.18), transparent 52%);
+        }
+        .ppr-screen::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 8px;
+            background: linear-gradient(90deg, #2563eb, #38bdf8 48%, #22c55e);
+        }
+        .ppr-screen-header { align-items: center; margin-bottom: clamp(1rem, 1.7vw, 1.65rem); }
+        .ppr-header-copy { min-width: 0; }
+        .ppr-screen-kicker { font-size: clamp(.66rem, .95vw, .95rem); letter-spacing: .24em; }
+        .ppr-screen-title { margin-top: .35rem; font-size: clamp(2rem, 3.55vw, 4rem); line-height: .98; }
+        .ppr-period-badge { display: inline-flex; align-items: center; gap: .55rem; box-shadow: 0 14px 35px rgba(37,99,235,.13); }
+        .ppr-period-badge::before { content: ''; width: .55rem; height: .55rem; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 5px rgba(34,197,94,.14); }
+
+        .ppr-summary-hero { display: grid; grid-template-columns: minmax(230px, 28%) 1fr; gap: clamp(1rem, 2vw, 1.8rem); align-items: stretch; }
+        .ppr-score-card {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: clamp(.9rem, 1.5vw, 1.4rem);
+            align-items: center;
+            padding: clamp(1rem, 1.65vw, 1.65rem);
+            border: 1px solid var(--ppr-border);
+            border-radius: 1.35rem;
+            background: var(--ppr-surface);
+            box-shadow: 0 22px 60px rgba(2,6,23,.18);
+        }
+        .ppr-score-ring {
+            --ppr-score-angle: 0deg;
+            width: clamp(94px, 8.8vw, 145px);
+            aspect-ratio: 1;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: conic-gradient(#2563eb var(--ppr-score-angle), rgba(148,163,184,.18) 0);
+            position: relative;
+        }
+        .ppr-score-ring::before { content: ''; position: absolute; inset: 11px; border-radius: 50%; background: #0f172a; }
+        .ppr-score-ring-value { position: relative; color: #f8fafc; font-size: clamp(1.35rem, 2.5vw, 2.55rem); font-weight: 900; letter-spacing: -.06em; }
+        .ppr-score-copy small { color: #94a3b8; font-weight: 750; text-transform: uppercase; letter-spacing: .12em; }
+        .ppr-score-copy strong { display: block; margin-top: .35rem; color: #f8fafc; font-size: clamp(1rem, 1.45vw, 1.45rem); }
+        .ppr-score-copy span { display: block; margin-top: .35rem; color: #94a3b8; font-size: clamp(.68rem, .9vw, .9rem); line-height: 1.35; }
+        .ppr-summary-stats { grid-template-columns: repeat(3, minmax(0,1fr)); gap: clamp(.7rem, 1.2vw, 1rem); }
+        .ppr-stat-card { position: relative; min-height: 100%; padding: clamp(1rem, 1.45vw, 1.45rem); border-radius: 1.25rem; overflow: hidden; }
+        .ppr-stat-card::after { content: ''; position: absolute; right: -22px; top: -28px; width: 92px; height: 92px; border-radius: 50%; background: var(--stat-color, #3b82f6); opacity: .1; }
+        .ppr-stat-icon { width: 2.35rem; height: 2.35rem; display: grid; place-items: center; margin-bottom: .7rem; border-radius: .75rem; color: var(--stat-color, #3b82f6); background: color-mix(in srgb, var(--stat-color, #3b82f6) 13%, transparent); }
+        .ppr-stat-label { font-weight: 720; }
+        .ppr-stat-value { line-height: 1; }
+
+        .ppr-summary-grid { gap: clamp(.65rem, 1vw, .9rem); margin-top: clamp(.8rem, 1.2vw, 1.1rem); }
+        .ppr-summary-indicator { min-height: 128px; padding: 1rem 1.1rem 1rem 1.25rem; border-radius: 1.1rem; box-shadow: 0 16px 38px rgba(2,6,23,.09); }
+        .ppr-indicator-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .65rem; }
+        .ppr-indicator-head strong { line-height: 1.25; }
+        .ppr-indicator-status { flex: 0 0 auto; padding: .28rem .5rem; border-radius: 999px; color: var(--ppr-color); background: color-mix(in srgb, var(--ppr-color) 12%, transparent); font-size: clamp(.52rem,.7vw,.7rem); font-weight: 850; }
+        .ppr-indicator-result { display: flex; align-items: flex-end; justify-content: space-between; gap: .5rem; }
+        .ppr-indicator-result span { line-height: 1; }
+        .ppr-indicator-result small { margin: 0 0 .2rem; text-align: right; }
+        .ppr-progress { height: 7px; margin-top: .72rem; overflow: hidden; border-radius: 999px; background: rgba(148,163,184,.2); }
+        .ppr-progress-fill { display: block; width: var(--ppr-progress, 0%); height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--ppr-color) 72%, #2563eb), var(--ppr-color)); box-shadow: 0 0 18px color-mix(in srgb, var(--ppr-color) 35%, transparent); }
+        .ppr-indicator-meta { display: flex; justify-content: space-between; gap: .6rem; margin-top: .55rem; color: #94a3b8; font-size: clamp(.52rem,.72vw,.72rem); }
+
+        .ppr-individual-layout { grid-template-columns: minmax(300px, 31%) 1fr; gap: clamp(2.2rem, 4vw, 5rem); height: calc(100% - 6.2rem); }
+        .ppr-thermometer-wrap { padding: 1.4rem 1rem; border: 1px solid var(--ppr-border); border-radius: 1.6rem; background: var(--ppr-surface); box-shadow: 0 25px 70px rgba(2,6,23,.18); }
+        .ppr-result-copy { padding: clamp(1.2rem, 2vw, 2rem); border: 1px solid var(--ppr-border); border-radius: 1.6rem; background: var(--ppr-surface); box-shadow: 0 25px 70px rgba(2,6,23,.14); }
+        .ppr-performance-label { display: inline-flex; align-items: center; gap: .5rem; color: var(--ppr-color); font-size: clamp(.62rem,.9vw,.88rem); font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
+        .ppr-performance-label::before { content: ''; width: .55rem; height: .55rem; border-radius: 50%; background: var(--ppr-color); box-shadow: 0 0 0 6px color-mix(in srgb, var(--ppr-color) 13%, transparent); }
+        .ppr-result-value { margin-top: .55rem; }
+        .ppr-goal-context { margin-top: .65rem; color: var(--ppr-color); font-size: clamp(.72rem, 1vw, 1rem); font-weight: 800; }
+        .ppr-status-message { border: 0; border-radius: .75rem; color: var(--ppr-color); background: color-mix(in srgb, var(--ppr-color) 12%, transparent); }
+        .ppr-result-footer { padding-top: .7rem; border-top: 1px solid var(--ppr-border); }
+        .ppr-operational-value { min-width: 205px; }
+
+        .ppr-general-card { position: relative; overflow: hidden; border-radius: 1.3rem; box-shadow: 0 18px 45px rgba(2,6,23,.1); }
+        .ppr-general-card::after { content: ''; position: absolute; inset: auto 0 0; height: 6px; background: var(--ppr-color); }
+        .ppr-general-card .ppr-progress { grid-column: 1 / -1; }
+
+        .ppr-theme-light { --ppr-surface: rgba(255,255,255,.9); --ppr-border: #dbe5f2; }
+        .ppr-theme-light .ppr-score-ring::before { background: #fff; }
+        .ppr-theme-light .ppr-score-ring-value,
+        .ppr-theme-light .ppr-score-copy strong { color: #0f172a; }
+        .ppr-theme-light .ppr-score-card,
+        .ppr-theme-light .ppr-result-copy,
+        .ppr-theme-light .ppr-thermometer-wrap { box-shadow: 0 24px 65px rgba(15,23,42,.09); }
+
+        @media (max-width: 980px) {
+            .ppr-summary-hero { grid-template-columns: 1fr; }
+            .ppr-score-card { grid-template-columns: auto 1fr; }
+            .ppr-summary-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+        }
+
+        .ppr-auto-calculate { margin: 0.75rem 0; padding: 0.75rem; border: 1px solid #bfdbfe; border-radius: 0.75rem; background: #eff6ff; }
+        .ppr-band-editor { margin: 0.7rem 0; padding: 0.8rem; border: 1px solid #dbe4f0; border-radius: 0.75rem; background: #fff; }
+        .ppr-band-list { display: grid; gap: 0.4rem; margin-top: 0.6rem; }
+        .ppr-band-row { display: grid; grid-template-columns: 72px 1fr; gap: 0.55rem; align-items: center; }
+        .ppr-band-percent { color: #1d4ed8; font-size: 0.72rem; font-weight: 850; }
+        .ppr-band-row .input-field { margin: 0; }
+        .ppr-band-row.invalid .input-field { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12); }
+
+        @media (max-width: 720px) {
+            .ppr-settings-grid, .ppr-editor-grid, .ppr-target-grid { grid-template-columns: 1fr; }
+            .ppr-rule-row { grid-template-columns: 58px 58px 1fr 38px; }
+            .ppr-individual-layout { grid-template-columns: 1fr; height: auto; }
+            .ppr-thermometer { height: 46vh; }
+            .ppr-summary-stats { grid-template-columns: repeat(2, 1fr); }
+            .ppr-summary-grid, .ppr-general-grid { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
 </head>
 <body>
@@ -2376,12 +2933,54 @@
         </button>
     </div>
 
-    <div class="config-panel">
-        <div class="panel-header">
-            <h2>Configurações do Dashboard</h2>
+    <div id="configPanelBackdrop" class="config-backdrop" onclick="togglePanel()"></div>
+
+    <div class="config-panel" aria-hidden="true">
+        <div class="settings-panel-top">
+            <div class="panel-header">
+                <div class="panel-title-block">
+                    <h2>Central de configurações</h2>
+                    <p>Gerencie o que cada TV exibe e mantenha tudo sincronizado.</p>
+                </div>
+                <button type="button" class="panel-close-button" onclick="togglePanel()" aria-label="Fechar configurações" title="Fechar">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <nav class="settings-nav" role="tablist" aria-label="Seções das configurações">
+                <button type="button" class="settings-nav-button active" data-settings-target="station" role="tab" aria-selected="true" onclick="showSettingsSection('station', this)">
+                    <i class="fas fa-tv"></i>Visão geral
+                </button>
+                <button type="button" class="settings-nav-button" data-settings-target="dashboards" role="tab" aria-selected="false" onclick="showSettingsSection('dashboards', this)">
+                    <span id="dashboardNavCount" class="settings-nav-count">0</span>
+                    <i class="fas fa-chart-line"></i>Dashboards
+                </button>
+                <button type="button" class="settings-nav-button" data-settings-target="ppr" role="tab" aria-selected="false" onclick="showSettingsSection('ppr', this)">
+                    <span id="pprNavCount" class="settings-nav-count">0</span>
+                    <i class="fas fa-temperature-three-quarters"></i>PPR
+                </button>
+                <button type="button" class="settings-nav-button" data-settings-target="alerts" role="tab" aria-selected="false" onclick="showSettingsSection('alerts', this)">
+                    <span id="alertNavCount" class="settings-nav-count">0</span>
+                    <i class="fas fa-bullhorn"></i>Avisos
+                </button>
+                <button type="button" class="settings-nav-button" data-settings-target="organization" role="tab" aria-selected="false" onclick="showSettingsSection('organization', this)">
+                    <i class="fas fa-sitemap"></i>TVs e setores
+                </button>
+                <button type="button" class="settings-nav-button" data-settings-target="display" role="tab" aria-selected="false" onclick="showSettingsSection('display', this)">
+                    <i class="fas fa-wand-magic-sparkles"></i>Exibição
+                </button>
+                <button type="button" class="settings-nav-button" data-settings-target="tools" role="tab" aria-selected="false" onclick="showSettingsSection('tools', this)">
+                    <i class="fas fa-file-arrow-down"></i>Arquivos
+                </button>
+            </nav>
         </div>
 
-        <div class="input-group area-control-card" id="stationControlCard">
+        <div class="settings-section-intro">
+            <h3 id="settingsSectionTitle">Visão geral desta TV</h3>
+            <p id="settingsSectionDescription">Escolha a estação, confira o setor ativo e acompanhe a sincronização.</p>
+        </div>
+
+        <div class="input-group area-control-card settings-section-visible" id="stationControlCard" data-settings-section="station">
             <div class="area-control-heading">
                 <div>
                     <h3>Estação em exibição</h3>
@@ -2416,7 +3015,7 @@
             </div>
         </div>
 
-        <div class="input-group">
+        <div class="input-group" data-settings-section="display">
             <h3>Configurações de Transição</h3>
             <label class="transition-setting-label" for="transitionTime">
                 Tempo de exibição de cada dashboard
@@ -2475,7 +3074,7 @@
             <div class="refresh-info">Última atualização: <span id="lastRefresh">Agora</span></div>
         </div>
 
-        <div class="input-group">
+        <div class="input-group" data-settings-section="dashboards">
             <h3>Nome do Dashboard</h3>
             <input type="text" 
                    id="dashboardName" 
@@ -2487,7 +3086,7 @@
             <select id="dashboardAreaId" class="select-field"></select>
         </div>
 
-        <div class="input-group">
+        <div class="input-group" data-settings-section="dashboards">
             <h3>Link Público do Power BI</h3>
             <input type="text" 
                    id="publicUrl" 
@@ -2496,7 +3095,7 @@
                    onkeypress="if(event.key === 'Enter') processLinks()">
         </div>
 
-        <div class="input-group">
+        <div class="input-group" data-settings-section="dashboards">
             <h3>Link de Serviço do Power BI</h3>
             <input type="text" 
                    id="serviceUrl" 
@@ -2520,7 +3119,7 @@
             </button>
         </div>
 
-        <div class="import-section">
+        <div class="import-section" data-settings-section="tools">
             <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" onchange="handleExcelImport(event)" />
             <button class="import-button" onclick="document.getElementById('excelFileInput').click()">
                 <i class="fas fa-file-import"></i>
@@ -2531,7 +3130,7 @@
             </div>
         </div>
 
-        <div class="import-section">
+        <div class="import-section" data-settings-section="tools">
             <button class="import-button" onclick="exportDashboard()">
                 <i class="fas fa-file-export"></i>
                 Exportar Dashboard
@@ -2541,11 +3140,177 @@
             </div>
         </div>
 
-        <div class="url-list" id="urlList">
+        <div class="url-list" id="urlList" data-settings-section="dashboards">
             <h3>Dashboards Configurados</h3>
         </div>
 
-        <div class="input-group">
+        <div class="ppr-admin-card" data-settings-section="ppr">
+            <div class="ppr-admin-header">
+                <div>
+                    <h3>Acompanhamento do PPR</h3>
+                    <p>Resultados manuais, escala oficial de 0% a 150% e exibição nas TVs.</p>
+                </div>
+                <label class="ppr-master-toggle">
+                    <input type="checkbox" id="pprEnabled" onchange="savePprSettingsFromForm()">
+                    <span id="pprEnabledLabel">Desativado</span>
+                </label>
+            </div>
+
+            <div class="ppr-admin-body">
+                <div class="ppr-settings-grid">
+                    <div>
+                        <label for="pprReferencePeriod">Período de referência</label>
+                        <input id="pprReferencePeriod" class="input-field" maxlength="40" placeholder="Ex.: 2026/2027" onchange="savePprSettingsFromForm()">
+                    </div>
+                    <div>
+                        <label for="pprDuration">Tempo de permanência</label>
+                        <select id="pprDuration" class="select-field" onchange="savePprSettingsFromForm()">
+                            <option value="15">15 segundos</option>
+                            <option value="20">20 segundos</option>
+                            <option value="30">30 segundos</option>
+                            <option value="45">45 segundos</option>
+                            <option value="60">1 minuto</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="pprStaleDays">Sinalizar dado desatualizado após</label>
+                        <input id="pprStaleDays" class="input-field" type="number" min="1" max="365" step="1" onchange="savePprSettingsFromForm()">
+                    </div>
+                    <div>
+                        <label for="pprDisplayMode">Modo dos indicadores</label>
+                        <select id="pprDisplayMode" class="select-field" onchange="savePprSettingsFromForm()">
+                            <option value="individual">Individual: um por vez</option>
+                            <option value="general">Geral: cartões lado a lado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="pprTheme">Tema das telas do PPR</label>
+                        <select id="pprTheme" class="select-field" onchange="savePprSettingsFromForm()">
+                            <option value="light">Claro</option>
+                            <option value="dark">Escuro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="pprSequencePosition">Posição na rotação</label>
+                        <select id="pprSequencePosition" class="select-field" onchange="savePprSettingsFromForm()">
+                            <option value="start">Antes dos dashboards</option>
+                            <option value="after-dashboards">Depois dos dashboards</option>
+                            <option value="end">Ao final da programação</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="ppr-settings-grid">
+                    <label class="checkbox-field">
+                        <input type="checkbox" id="pprShowSummary" onchange="savePprSettingsFromForm()">
+                        Exibir resumo geral
+                    </label>
+                    <label class="checkbox-field">
+                        <input type="checkbox" id="pprShowIndicators" onchange="savePprSettingsFromForm()">
+                        Exibir indicadores
+                    </label>
+                </div>
+
+                <div class="ppr-target-grid">
+                    <div>
+                        <label for="pprAreaTargets">Setores que receberão o PPR</label>
+                        <select id="pprAreaTargets" class="select-field ppr-target-select" multiple onchange="savePprSettingsFromForm()"></select>
+                    </div>
+                    <div>
+                        <label for="pprStationTargets">TVs que receberão o PPR</label>
+                        <select id="pprStationTargets" class="select-field ppr-target-select" multiple onchange="savePprSettingsFromForm()"></select>
+                    </div>
+                </div>
+                <div class="ppr-help">Use Ctrl para escolher vários itens. “Todas” mantém o conteúdo disponível para toda a empresa.</div>
+
+                <div>
+                    <label for="pprUpdatedBy">Responsável pela alteração</label>
+                    <input id="pprUpdatedBy" class="input-field" maxlength="60" placeholder="Nome do administrador" onchange="savePprSettingsFromForm()">
+                </div>
+
+                <div class="ppr-toolbar">
+                    <button type="button" class="btn btn-primary" onclick="newPprIndicator()">
+                        <i class="fas fa-plus"></i> Novo indicador
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="openPprPreview()">
+                        <i class="fas fa-eye"></i> Visualizar prévia
+                    </button>
+                </div>
+
+                <div class="ppr-section-heading">
+                    <div>
+                        <h4>Indicadores cadastrados</h4>
+                        <span id="pprIndicatorSummary">0 indicadores</span>
+                    </div>
+                </div>
+                <div id="pprIndicatorList" class="ppr-indicator-list"></div>
+
+                <div id="pprIndicatorEditor" class="ppr-editor" style="display:none;">
+                    <input type="hidden" id="pprIndicatorId">
+                    <div class="ppr-editor-grid">
+                        <div>
+                            <label for="pprIndicatorName">Nome do indicador *</label>
+                            <input id="pprIndicatorName" class="input-field" maxlength="80" placeholder="Ex.: Eficiência Líquida">
+                        </div>
+                        <div>
+                            <label for="pprIndicatorResult">Resultado atual (%) *</label>
+                            <input type="number" id="pprIndicatorResult" class="input-field" min="0" max="150" step="0.01" placeholder="0 a 150">
+                        </div>
+                        <div>
+                            <label for="pprIndicatorReferenceDate">Data de referência *</label>
+                            <input type="date" id="pprIndicatorReferenceDate" class="input-field">
+                        </div>
+                        <div>
+                            <label for="pprIndicatorOrder">Ordem de exibição</label>
+                            <input type="number" id="pprIndicatorOrder" class="input-field" min="1" max="999" step="1" value="1">
+                        </div>
+                        <div>
+                            <label for="pprIndicatorOperationalValue">Valor realizado</label>
+                            <input id="pprIndicatorOperationalValue" class="input-field" maxlength="40" placeholder="Ex.: 1.135">
+                        </div>
+                        <div>
+                            <label for="pprIndicatorUnit">Unidade</label>
+                            <input id="pprIndicatorUnit" class="input-field" maxlength="24" placeholder="Ex.: kg/h">
+                        </div>
+                    </div>
+                    <label class="checkbox-field ppr-auto-calculate">
+                        <input type="checkbox" id="pprIndicatorAutoCalculate" onchange="togglePprAutomaticCalculation()">
+                        Calcular o percentual automaticamente pelo valor realizado
+                    </label>
+                    <details id="pprBandEditor" class="ppr-band-editor">
+                        <summary><strong>Valores esperados da escala</strong></summary>
+                        <p class="ppr-help">Configure uma vez. Exemplos: “Abaixo de 1.250”, “1.310 a 1.339” ou “1.360 ou mais”.</p>
+                        <div id="pprIndicatorBandList" class="ppr-band-list"></div>
+                    </details>
+                    <label for="pprIndicatorDescription">Descrição resumida *</label>
+                    <input id="pprIndicatorDescription" class="input-field" maxlength="160" placeholder="Explique o indicador de forma objetiva">
+                    <label for="pprIndicatorNote">Observação opcional</label>
+                    <textarea id="pprIndicatorNote" class="textarea-field" maxlength="260" placeholder="Informação complementar para as TVs"></textarea>
+                    <label class="checkbox-field">
+                        <input type="checkbox" id="pprIndicatorEnabled" checked>
+                        Indicador ativo na programação
+                    </label>
+                    <div class="ppr-editor-actions">
+                        <button type="button" class="btn btn-outline" onclick="cancelPprIndicatorEdit()">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="savePprIndicator()">
+                            <i class="fas fa-check"></i> Salvar indicador
+                        </button>
+                    </div>
+                </div>
+
+                <details class="ppr-rule-editor">
+                    <summary><strong>Mensagens e faixas de desempenho</strong></summary>
+                    <p class="ppr-help">Personalize os textos e as cores. As faixas devem cobrir a escala de 0% a 150%.</p>
+                    <div id="pprRuleList" class="ppr-rules"></div>
+                    <div class="ppr-editor-actions">
+                        <button type="button" class="btn btn-outline" onclick="resetPprRules()">Restaurar padrão</button>
+                        <button type="button" class="btn btn-primary" onclick="savePprRulesFromForm()">Salvar faixas</button>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <div class="input-group" data-settings-section="organization">
             <div class="area-manager-header">
                 <h3>Áreas e programações</h3>
                 <p>Organize os conteúdos por Comercial, PCP, Produção ou qualquer outro setor.</p>
@@ -2580,15 +3345,20 @@
             <div id="stationList" class="station-list"></div>
         </div>
 
-        <div class="input-group alert-center">
+        <div class="input-group alert-center" data-settings-section="alerts">
             <div class="alert-center-header">
                 <div>
                     <h3>Central de Avisos</h3>
                     <p>Alertas de qualidade e mensagens para os colaboradores.</p>
                 </div>
-                <button type="button" class="btn btn-primary alert-new-button" onclick="newAlert()">
-                    <i class="fas fa-plus"></i> Novo aviso
-                </button>
+                <div class="alert-new-actions">
+                    <button type="button" class="btn btn-primary alert-new-button" onclick="newAlert()">
+                        <i class="fas fa-plus"></i> Novo aviso
+                    </button>
+                    <button type="button" class="btn btn-outline alert-new-button" onclick="newImageAlert()">
+                        <i class="fas fa-image"></i> Postar imagem
+                    </button>
+                </div>
             </div>
 
             <div id="alertList" class="alert-list"></div>
@@ -2596,7 +3366,13 @@
             <div id="alertEditor" class="alert-editor" style="display: none;">
                 <input type="hidden" id="alertId">
 
-                <div class="alert-form-grid">
+                <label for="alertContentType">Tipo de aviso</label>
+                <select id="alertContentType" class="select-field" onchange="handleAlertContentTypeChange()">
+                    <option value="message">Comunicado com texto</option>
+                    <option value="image">Somente imagem</option>
+                </select>
+
+                <div class="alert-form-grid alert-message-only">
                     <div>
                         <label for="alertCategory">Categoria</label>
                         <select id="alertCategory" class="select-field" onchange="updateAlertPreview()">
@@ -2622,22 +3398,22 @@
                 <label for="alertAreaTarget">Destino do aviso</label>
                 <select id="alertAreaTarget" class="select-field" onchange="updateAlertPreview()"></select>
 
-                <label for="alertTitle">Título</label>
+                <label class="alert-message-only" for="alertTitle">Título</label>
                 <input id="alertTitle" class="input-field" maxlength="80"
-                       placeholder="Ex.: Alerta de qualidade" oninput="updateAlertPreview()">
+                       placeholder="Ex.: Alerta de qualidade" oninput="updateAlertPreview()" data-alert-message-only>
 
-                <label for="alertBody">Mensagem</label>
+                <label class="alert-message-only" for="alertBody">Mensagem</label>
                 <textarea id="alertBody" class="message-textarea" maxlength="500"
                           placeholder="Descreva o aviso de forma objetiva"
-                          oninput="updateAlertPreview()"></textarea>
-                <div class="alert-counter"><span id="alertBodyCount">0</span>/500</div>
+                          oninput="updateAlertPreview()" data-alert-message-only></textarea>
+                <div class="alert-counter alert-message-only"><span id="alertBodyCount">0</span>/500</div>
 
-                <label for="alertAction">Ação esperada</label>
+                <label class="alert-message-only" for="alertAction">Ação esperada</label>
                 <input id="alertAction" class="input-field" maxlength="160"
                        placeholder="Ex.: Segregar as peças produzidas após as 14h"
-                       oninput="updateAlertPreview()">
+                       oninput="updateAlertPreview()" data-alert-message-only>
 
-                <div class="alert-form-grid">
+                <div class="alert-form-grid alert-message-only">
                     <div>
                         <label for="alertAudience">Setor ou público</label>
                         <input id="alertAudience" class="input-field" maxlength="60"
@@ -2689,6 +3465,23 @@
                         style="display: none;" onclick="removeAlertImage()">
                     <i class="fas fa-trash"></i> Remover imagem
                 </button>
+
+                <div id="alertImageOnlyOptions" class="alert-image-options" style="display:none;">
+                    <div class="alert-form-grid">
+                        <div>
+                            <label for="alertImageFit">Ajuste na tela</label>
+                            <select id="alertImageFit" class="select-field" onchange="updateAlertPreview()">
+                                <option value="contain">Mostrar imagem inteira</option>
+                                <option value="cover">Preencher a tela, permitindo corte</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="alertImageBackground">Cor de fundo</label>
+                            <input type="color" id="alertImageBackground" class="input-field" value="#000000" onchange="updateAlertPreview()">
+                        </div>
+                    </div>
+                    <p class="alert-layout-help">A imagem é otimizada para Full HD e enviada ao Supabase para funcionar também no Roku.</p>
+                </div>
 
                 <div id="alertLayoutModeContainer">
                     <label for="alertLayoutMode">Organização da página</label>
@@ -2785,6 +3578,17 @@
         </div>
     </div>
 
+    <div id="pprPreviewModal" class="ppr-preview-modal" role="dialog" aria-modal="true" aria-label="Prévia do acompanhamento do PPR">
+        <div class="ppr-preview-shell">
+            <div class="ppr-preview-actions">
+                <button type="button" class="btn btn-outline" onclick="closePprPreview()">
+                    <i class="fas fa-xmark"></i> Fechar prévia
+                </button>
+            </div>
+            <div id="pprPreviewContent"></div>
+        </div>
+    </div>
+
     <div class="slideshow-container" id="slideshowContainer">
         <div class="empty-state" id="emptyState">
             <i class="fas fa-chart-line"></i>
@@ -2808,7 +3612,14 @@
         let refreshInterval = 5 * 60 * 1000; // 5 minutos em milissegundos
         let lastRefreshTime = new Date();
         let alerts = [];
+        let pprConfig = null;
         let alertEditorImageData = null;
+        let alertEditorImageUrl = '';
+        let alertEditorImageName = '';
+        const ALERT_STORAGE_PROJECT_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
+        const ALERT_STORAGE_PUBLISHABLE_KEY =
+            'sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv';
+        const ALERT_STORAGE_BUCKET = 'alert-assets';
         let alertEditorLayout = null;
         let selectedAlertElementKey = null;
         let alertDragState = null;
@@ -2869,10 +3680,10 @@
             // já está visível permanece no lugar e inicia um novo ciclo.
             const activeSlide = document.querySelector('.mySlides.active');
             let currentDisplayTime = transitionTime;
-            if (activeSlide && activeSlide.dataset.slideType === 'alert') {
-                const alertDuration = parseInt(activeSlide.dataset.duration, 10);
-                if (Number.isFinite(alertDuration) && alertDuration > 0) {
-                    currentDisplayTime = alertDuration * 1000;
+            if (activeSlide?.dataset.duration) {
+                const configuredDuration = parseInt(activeSlide.dataset.duration, 10);
+                if (Number.isFinite(configuredDuration) && configuredDuration > 0) {
+                    currentDisplayTime = configuredDuration * 1000;
                 }
             }
             slideTimeout = setTimeout(showSlides, currentDisplayTime);
@@ -3171,6 +3982,13 @@
             updateEmptyState();
         }
 
+        function updatePresentationChrome(slide) {
+            document.body.classList.toggle(
+                'ppr-presenting',
+                slide?.dataset?.slideType === 'ppr'
+            );
+        }
+
         // Controle do slideshow
         function showSlides() {
             const slides = document.getElementsByClassName("mySlides");
@@ -3213,9 +4031,10 @@
                 slideIndex = 0;
                 clearTransitionState(onlySlide, true);
                 onlySlide.classList.add('active');
+                updatePresentationChrome(onlySlide);
 
                 let onlySlideDuration = transitionTime;
-                if (onlySlide.dataset.slideType === 'alert') {
+                if (onlySlide.dataset.duration) {
                     const configuredDuration = parseInt(onlySlide.dataset.duration, 10);
                     if (Number.isFinite(configuredDuration) && configuredDuration > 0) {
                         onlySlideDuration = configuredDuration * 1000;
@@ -3230,6 +4049,7 @@
             const currentSlide = slideIndex >= 0 ? slides[slideIndex] : null;
             slideIndex = (slideIndex + 1) % slides.length;
             const nextSlide = slides[slideIndex];
+            updatePresentationChrome(nextSlide);
 
             // Normalizar qualquer transição anterior antes de iniciar a próxima.
             for (let i = 0; i < slides.length; i++) {
@@ -3238,7 +4058,7 @@
 
             // Calcular quanto tempo o próximo conteúdo ficará totalmente visível.
             let timeToNext = transitionTime;
-            if (nextSlide.dataset.slideType === 'alert') {
+            if (nextSlide.dataset.duration) {
                 const alertDuration = parseInt(nextSlide.dataset.duration, 10);
                 if (Number.isFinite(alertDuration) && alertDuration > 0) {
                     timeToNext = alertDuration * 1000;
@@ -3305,10 +4125,111 @@
             updateLastRefreshText();
         }
 
-        // Toggle painel de configuração
-        function togglePanel() {
-            document.querySelector('.config-panel').classList.toggle('open');
+        const settingsSectionCopy = {
+            station: {
+                title: 'Visão geral desta TV',
+                description: 'Escolha a estação, confira o setor ativo e acompanhe a sincronização.'
+            },
+            dashboards: {
+                title: 'Dashboards',
+                description: 'Adicione os links do Power BI e organize o conteúdo exibido nas telas.'
+            },
+            ppr: {
+                title: 'Acompanhamento do PPR',
+                description: 'Cadastre resultados manuais e escolha em quais TVs o acompanhamento será exibido.'
+            },
+            alerts: {
+                title: 'Central de avisos',
+                description: 'Crie comunicados, alertas de qualidade e mensagens para os colaboradores.'
+            },
+            organization: {
+                title: 'TVs e setores',
+                description: 'Organize áreas da empresa e defina a programação de cada estação.'
+            },
+            display: {
+                title: 'Experiência de exibição',
+                description: 'Ajuste duração, transições e frequência de atualização dos dashboards.'
+            },
+            tools: {
+                title: 'Importar e exportar',
+                description: 'Cadastre vários links por planilha ou gere uma cópia portátil da configuração.'
+            }
+        };
+
+        function updateSettingsNavigationCounts() {
+            const dashboardCount = document.getElementById('dashboardNavCount');
+            const alertCount = document.getElementById('alertNavCount');
+            const pprCount = document.getElementById('pprNavCount');
+            if (dashboardCount) dashboardCount.textContent = Array.isArray(urls) ? urls.length : 0;
+            if (alertCount) alertCount.textContent = Array.isArray(alerts) ? alerts.length : 0;
+            if (pprCount) {
+                const indicators = Array.isArray(pprConfig?.indicators) ? pprConfig.indicators : [];
+                pprCount.textContent = indicators.filter(item => item.enabled).length;
+            }
         }
+
+        function showSettingsSection(sectionName, sourceButton = null) {
+            const selectedSection = settingsSectionCopy[sectionName] ? sectionName : 'station';
+            document.querySelectorAll('[data-settings-section]').forEach(section => {
+                section.classList.toggle(
+                    'settings-section-visible',
+                    section.dataset.settingsSection === selectedSection
+                );
+            });
+
+            document.querySelectorAll('.settings-nav-button').forEach(button => {
+                const active = button.dataset.settingsTarget === selectedSection;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+
+            const copy = settingsSectionCopy[selectedSection];
+            const title = document.getElementById('settingsSectionTitle');
+            const description = document.getElementById('settingsSectionDescription');
+            if (title) title.textContent = copy.title;
+            if (description) description.textContent = copy.description;
+
+            localStorage.setItem('dashboardSettingsSection', selectedSection);
+            updateSettingsNavigationCounts();
+
+            const panel = document.querySelector('.config-panel');
+            if (panel && sourceButton) {
+                panel.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Abre e fecha a central de configuração
+        function togglePanel() {
+            const panel = document.querySelector('.config-panel');
+            const backdrop = document.getElementById('configPanelBackdrop');
+            if (!panel) return;
+
+            const opening = !panel.classList.contains('open');
+            panel.classList.toggle('open', opening);
+            panel.setAttribute('aria-hidden', opening ? 'false' : 'true');
+            if (backdrop) backdrop.classList.toggle('visible', opening);
+
+            if (opening) {
+                const savedSection = localStorage.getItem('dashboardSettingsSection') || 'station';
+                showSettingsSection(savedSection);
+                window.setTimeout(() => {
+                    const activeButton = document.querySelector('.settings-nav-button.active');
+                    if (activeButton) activeButton.focus({ preventScroll: true });
+                }, 220);
+            }
+        }
+
+        document.addEventListener('keydown', event => {
+            const pprPreview = document.getElementById('pprPreviewModal');
+            if (event.key === 'Escape' && pprPreview?.classList.contains('open')) {
+                closePprPreview();
+                return;
+            }
+            const panel = document.querySelector('.config-panel');
+            if (event.key === 'Escape' && panel && panel.classList.contains('open')) {
+                togglePanel();
+            }
+        });
 
         // Toggle tela cheia
         function toggleFullscreen() {
@@ -3619,13 +4540,30 @@
         }
 
         function buildAlertVisual(alert) {
+            if (alert.contentType === 'image') {
+                const visual = document.createElement('div');
+                visual.className = 'alert-image-only';
+                visual.style.background = alert.imageBackground || '#000000';
+                const imageSource = alert.imageUrl || alert.imageData;
+                if (imageSource) {
+                    const image = document.createElement('img');
+                    image.src = imageSource;
+                    image.alt = alert.title || alert.imageName || 'Imagem do aviso';
+                    image.style.objectFit = alert.imageFit === 'cover' ? 'cover' : 'contain';
+                    visual.appendChild(image);
+                } else {
+                    visual.appendChild(createTextElement('div', 'alert-image-only-placeholder', 'Selecione uma imagem para visualizar'));
+                }
+                return visual;
+            }
             if (alert.layoutMode === 'custom') {
                 return buildCustomAlertVisual(alert);
             }
 
             const category = getAlertCategory(alert.category);
             const visual = document.createElement('div');
-            visual.className = `alert-visual${alert.imageData ? '' : ' no-image'}`;
+            const imageSource = alert.imageUrl || alert.imageData;
+            visual.className = `alert-visual${imageSource ? '' : ' no-image'}`;
             visual.style.setProperty('--alert-color', category.color);
             visual.style.setProperty('--alert-soft', category.soft);
 
@@ -3685,10 +4623,10 @@
 
             visual.appendChild(content);
 
-            if (alert.imageData) {
+            if (imageSource) {
                 const image = document.createElement('img');
                 image.className = 'alert-visual-image';
-                image.src = alert.imageData;
+                image.src = imageSource;
                 image.alt = alert.title || 'Imagem do aviso';
                 visual.appendChild(image);
             }
@@ -3793,10 +4731,11 @@
                 visual.appendChild(footerElement);
             }
 
-            if (alert.imageData) {
+            const customImageSource = alert.imageUrl || alert.imageData;
+            if (customImageSource) {
                 const imageElement = document.createElement('img');
                 imageElement.className = 'alert-custom-element alert-custom-image';
-                imageElement.src = alert.imageData;
+                imageElement.src = customImageSource;
                 imageElement.alt = alert.title || 'Imagem do aviso';
                 imageElement.dataset.elementLabel = 'Imagem';
                 applyAlertElementLayout(imageElement, 'image', layout);
@@ -3891,7 +4830,7 @@
             if (!banner) return;
 
             const activeBanner = getActiveAlerts()
-                .find(alert => alert.displayMode === 'banner');
+                .find(alert => alert.displayMode === 'banner' && alert.contentType !== 'image');
             banner.replaceChildren();
 
             if (!activeBanner) {
@@ -3945,6 +4884,7 @@
             const list = document.getElementById('alertList');
             if (!list) return;
             list.replaceChildren();
+            updateSettingsNavigationCounts();
 
             if (alerts.length === 0) {
                 const empty = document.createElement('div');
@@ -3975,7 +4915,7 @@
                 info.appendChild(createTextElement(
                     'div',
                     'alert-list-title',
-                    alert.title
+                    alert.title || alert.imageName || 'Apresentação visual'
                 ));
 
                 const meta = document.createElement('div');
@@ -3988,7 +4928,7 @@
                 meta.appendChild(createTextElement(
                     'span',
                     'alert-badge',
-                    category.label
+                    alert.contentType === 'image' ? 'Somente imagem' : category.label
                 ));
                 meta.appendChild(createTextElement(
                     'span',
@@ -4070,6 +5010,7 @@
 
         function newAlert() {
             document.getElementById('alertId').value = '';
+            document.getElementById('alertContentType').value = 'message';
             document.getElementById('alertCategory').value = 'quality';
             document.getElementById('alertPriority').value = 'normal';
             document.getElementById('alertAreaTarget').value = '*';
@@ -4083,19 +5024,34 @@
             document.getElementById('alertDisplayMode').value = 'fullscreen';
             document.getElementById('alertDuration').value = '20';
             document.getElementById('alertLayoutMode').value = 'automatic';
+            document.getElementById('alertImageFit').value = 'contain';
+            document.getElementById('alertImageBackground').value = '#000000';
             document.getElementById('alertImage').value = '';
             alertEditorImageData = null;
+            alertEditorImageUrl = '';
+            alertEditorImageName = '';
             alertEditorLayout = getDefaultAlertLayout();
             selectedAlertElementKey = null;
             document.getElementById('removeAlertImageButton').style.display = 'none';
             document.getElementById('alertEditor').style.display = 'block';
+            updateAlertContentControls();
             updateAlertLayoutControlsVisibility();
             updateAlertPreview();
             document.getElementById('alertTitle').focus();
         }
 
+        function newImageAlert() {
+            newAlert();
+            document.getElementById('alertContentType').value = 'image';
+            updateAlertContentControls();
+            updateAlertPreview();
+            document.getElementById('alertImage').click();
+        }
+
         function getAlertDraft() {
+            const contentType = document.getElementById('alertContentType').value || 'message';
             return {
+                contentType,
                 category: document.getElementById('alertCategory').value,
                 priority: document.getElementById('alertPriority').value,
                 areaIds: [document.getElementById('alertAreaTarget').value || '*'],
@@ -4109,6 +5065,10 @@
                 displayMode: document.getElementById('alertDisplayMode').value,
                 duration: parseInt(document.getElementById('alertDuration').value, 10) || 20,
                 imageData: alertEditorImageData,
+                imageUrl: alertEditorImageUrl,
+                imageName: alertEditorImageName,
+                imageFit: document.getElementById('alertImageFit').value || 'contain',
+                imageBackground: document.getElementById('alertImageBackground').value || '#000000',
                 layoutMode: document.getElementById('alertLayoutMode').value,
                 layout: JSON.parse(JSON.stringify(
                     alertEditorLayout || getDefaultAlertLayout()
@@ -4138,6 +5098,27 @@
             updateAlertPreview();
         }
 
+        function handleAlertContentTypeChange() {
+            updateAlertContentControls();
+            updateAlertLayoutControlsVisibility();
+            updateAlertPreview();
+        }
+
+        function updateAlertContentControls() {
+            const isImageOnly = document.getElementById('alertContentType').value === 'image';
+            document.querySelectorAll('.alert-message-only, [data-alert-message-only]')
+                .forEach(element => {
+                    element.style.display = isImageOnly ? 'none' : '';
+                });
+            document.getElementById('alertImageOnlyOptions').style.display =
+                isImageOnly ? 'block' : 'none';
+            const displayMode = document.getElementById('alertDisplayMode');
+            if (isImageOnly) displayMode.value = 'fullscreen';
+            displayMode.disabled = isImageOnly;
+            document.querySelector('label[for="alertImage"]').textContent =
+                isImageOnly ? 'Imagem do aviso *' : 'Imagem opcional';
+        }
+
         function handleAlertLayoutModeChange() {
             if (document.getElementById('alertLayoutMode').value === 'custom') {
                 alertEditorLayout = normalizeAlertLayout(alertEditorLayout);
@@ -4148,16 +5129,17 @@
         }
 
         function updateAlertLayoutControlsVisibility() {
+            const isImageOnly = document.getElementById('alertContentType').value === 'image';
             const isFullscreen =
                 document.getElementById('alertDisplayMode').value === 'fullscreen';
             const isCustom =
                 document.getElementById('alertLayoutMode').value === 'custom';
             document.getElementById('alertLayoutModeContainer').style.display =
-                isFullscreen ? 'block' : 'none';
+                isFullscreen && !isImageOnly ? 'block' : 'none';
             document.getElementById('alertLayoutToolbar').style.display =
-                isFullscreen && isCustom ? 'block' : 'none';
+                isFullscreen && isCustom && !isImageOnly ? 'block' : 'none';
             document.getElementById('alertLayoutDragHint').style.display =
-                isFullscreen && isCustom ? 'inline' : 'none';
+                isFullscreen && isCustom && !isImageOnly ? 'inline' : 'none';
 
             if (!isFullscreen || !isCustom) {
                 selectedAlertElementKey = null;
@@ -4361,18 +5343,33 @@
 
         function saveAlert() {
             const draft = getAlertDraft();
-            if (!draft.title) {
+            const isImageOnly = draft.contentType === 'image';
+            if (isImageOnly && !draft.imageUrl && !draft.imageData) {
+                showToast('Selecione uma imagem para publicar', 'error');
+                return;
+            }
+            if (!isImageOnly && !draft.title) {
                 showToast('Informe um título para o aviso', 'error');
                 document.getElementById('alertTitle').focus();
                 return;
             }
-            if (!draft.body && !draft.action && !draft.imageData) {
+            if (!isImageOnly && !draft.body && !draft.action && !draft.imageUrl && !draft.imageData) {
                 showToast('Informe uma mensagem, uma ação ou uma imagem', 'error');
                 return;
             }
             if (draft.start && draft.end && new Date(draft.end) <= new Date(draft.start)) {
                 showToast('O encerramento deve ocorrer depois do início', 'error');
                 return;
+            }
+
+            if (isImageOnly) {
+                draft.title = draft.title || draft.imageName || 'Apresentação visual';
+                draft.body = '';
+                draft.action = '';
+                draft.audience = '';
+                draft.owner = '';
+                draft.displayMode = 'fullscreen';
+                draft.layoutMode = 'automatic';
             }
 
             const id = document.getElementById('alertId').value;
@@ -4409,6 +5406,7 @@
             if (!alert) return;
 
             document.getElementById('alertId').value = alert.id;
+            document.getElementById('alertContentType').value = alert.contentType || 'message';
             document.getElementById('alertCategory').value = alert.category || 'info';
             document.getElementById('alertPriority').value = alert.priority || 'normal';
             document.getElementById('alertAreaTarget').value =
@@ -4425,13 +5423,18 @@
             document.getElementById('alertDisplayMode').value = alert.displayMode || 'fullscreen';
             document.getElementById('alertDuration').value = String(alert.duration || 20);
             document.getElementById('alertLayoutMode').value = alert.layoutMode || 'automatic';
+            document.getElementById('alertImageFit').value = alert.imageFit || 'contain';
+            document.getElementById('alertImageBackground').value = alert.imageBackground || '#000000';
             document.getElementById('alertImage').value = '';
             alertEditorImageData = alert.imageData || null;
+            alertEditorImageUrl = alert.imageUrl || '';
+            alertEditorImageName = alert.imageName || '';
             alertEditorLayout = normalizeAlertLayout(alert.layout);
             selectedAlertElementKey = null;
             document.getElementById('removeAlertImageButton').style.display =
-                alertEditorImageData ? 'block' : 'none';
+                alertEditorImageData || alertEditorImageUrl ? 'block' : 'none';
             document.getElementById('alertEditor').style.display = 'block';
+            updateAlertContentControls();
             updateAlertLayoutControlsVisibility();
             updateAlertPreview();
             document.getElementById('alertEditor').scrollIntoView({ behavior: 'smooth' });
@@ -4441,6 +5444,8 @@
             document.getElementById('alertEditor').style.display = 'none';
             document.getElementById('alertImage').value = '';
             alertEditorImageData = null;
+            alertEditorImageUrl = '';
+            alertEditorImageName = '';
             alertEditorLayout = null;
             selectedAlertElementKey = null;
             alertDragState = null;
@@ -4464,7 +5469,7 @@
             alerts.push({
                 ...alert,
                 id: `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                title: `${alert.title} (cópia)`,
+                title: `${alert.title || alert.imageName || 'Apresentação visual'} (cópia)`,
                 enabled: false,
                 createdAt: now,
                 updatedAt: now
@@ -4477,7 +5482,7 @@
         function deleteAlert(id) {
             const alert = alerts.find(item => item.id === id);
             if (!alert) return;
-            if (!window.confirm(`Excluir o aviso “${alert.title}”?`)) return;
+            if (!window.confirm(`Excluir o aviso “${alert.title || alert.imageName || 'Apresentação visual'}”?`)) return;
             alerts = alerts.filter(item => item.id !== id);
             if (!saveAlertsToStorage()) return;
             renderAlertList();
@@ -4485,7 +5490,84 @@
             showToast('Aviso excluído', 'success');
         }
 
-        function handleAlertImage(event) {
+        function readFileAsDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('Falha ao ler a imagem'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function loadImageFromDataUrl(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error('A imagem não pôde ser aberta'));
+                image.src = dataUrl;
+            });
+        }
+
+        function canvasToBlob(canvas, quality) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(
+                    blob => blob ? resolve(blob) : reject(new Error('Falha ao otimizar a imagem')),
+                    'image/webp',
+                    quality
+                );
+            });
+        }
+
+        function blobToDataUrl(blob) {
+            return readFileAsDataUrl(blob);
+        }
+
+        async function optimizeAlertImage(file) {
+            const sourceDataUrl = await readFileAsDataUrl(file);
+            const image = await loadImageFromDataUrl(sourceDataUrl);
+            const scale = Math.min(1, 1920 / image.naturalWidth, 1080 / image.naturalHeight);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext('2d', { alpha: false });
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            let blob = await canvasToBlob(canvas, 0.92);
+            for (const quality of [0.84, 0.76, 0.68]) {
+                if (blob.size <= 1.8 * 1024 * 1024) break;
+                blob = await canvasToBlob(canvas, quality);
+            }
+            return {
+                blob,
+                dataUrl: await blobToDataUrl(blob)
+            };
+        }
+
+        async function uploadAlertImage(blob) {
+            const objectPath = `alerts/${Date.now()}-${Math.random().toString(16).slice(2)}.webp`;
+            const response = await fetch(
+                `${ALERT_STORAGE_PROJECT_URL}/storage/v1/object/${ALERT_STORAGE_BUCKET}/${objectPath}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        apikey: ALERT_STORAGE_PUBLISHABLE_KEY,
+                        Authorization: `Bearer ${ALERT_STORAGE_PUBLISHABLE_KEY}`,
+                        'Content-Type': 'image/webp',
+                        'cache-control': '3600'
+                    },
+                    body: blob
+                }
+            );
+            if (!response.ok) {
+                const detail = await response.text();
+                throw new Error(`Supabase Storage ${response.status}: ${detail}`);
+            }
+            return `${ALERT_STORAGE_PROJECT_URL}/storage/v1/object/public/${ALERT_STORAGE_BUCKET}/${objectPath}`;
+        }
+
+        async function handleAlertImage(event) {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -4495,23 +5577,43 @@
                 event.target.value = '';
                 return;
             }
-            if (file.size > 2 * 1024 * 1024) {
-                showToast('A imagem deve ter no máximo 2 MB', 'error');
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('A imagem original deve ter no máximo 10 MB', 'error');
                 event.target.value = '';
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onload = imageEvent => {
-                alertEditorImageData = imageEvent.target.result;
+            alertEditorImageName = file.name;
+            showToast('Preparando e enviando a imagem...', 'success');
+            try {
+                const optimized = await optimizeAlertImage(file);
+                alertEditorImageUrl = await uploadAlertImage(optimized.blob);
+                alertEditorImageData = null;
                 document.getElementById('removeAlertImageButton').style.display = 'block';
                 updateAlertPreview();
-            };
-            reader.readAsDataURL(file);
+                showToast('Imagem pronta para navegador e Roku', 'success');
+            } catch (error) {
+                console.warn('Upload da imagem indisponível; usando cópia local.', error);
+                try {
+                    const optimized = await optimizeAlertImage(file);
+                    alertEditorImageUrl = '';
+                    alertEditorImageData = optimized.dataUrl;
+                    document.getElementById('removeAlertImageButton').style.display = 'block';
+                    updateAlertPreview();
+                    showToast('Imagem guardada localmente. Configure o bucket para exibir no Roku.', 'error');
+                } catch (fallbackError) {
+                    console.error('Erro ao processar imagem:', fallbackError);
+                    event.target.value = '';
+                    alertEditorImageName = '';
+                    showToast('Não foi possível processar esta imagem', 'error');
+                }
+            }
         }
 
         function removeAlertImage() {
             alertEditorImageData = null;
+            alertEditorImageUrl = '';
+            alertEditorImageName = '';
             document.getElementById('alertImage').value = '';
             document.getElementById('removeAlertImageButton').style.display = 'none';
             updateAlertPreview();
@@ -4723,7 +5825,8 @@
                 alerts: JSON.parse(localStorage.getItem('dashboardAlertsV2') || '[]'),
                 areas: JSON.parse(localStorage.getItem('dashboardTvAreas') || '[]'),
                 stations: JSON.parse(localStorage.getItem('dashboardTvStations') || '[]'),
-                selectedStationId: localStorage.getItem('dashboardTvStationId') || ''
+                selectedStationId: localStorage.getItem('dashboardTvStationId') || '',
+                ppr: JSON.parse(localStorage.getItem('dashboardPprV1') || 'null')
             };
             const serializedConfig = JSON.stringify(config, null, 2)
                 .replace(/</g, '\\u003c');
@@ -4748,6 +5851,9 @@
                         localStorage.setItem('dashboardTvAreas', JSON.stringify(exportedConfig.areas || []));
                         localStorage.setItem('dashboardTvStations', JSON.stringify(exportedConfig.stations || []));
                         localStorage.setItem('dashboardTvStationId', exportedConfig.selectedStationId || '');
+                        if (exportedConfig.ppr) {
+                            localStorage.setItem('dashboardPprV1', JSON.stringify(exportedConfig.ppr));
+                        }
 
                         urls = exportedConfig.urls || [];
                         transitionTime = parseInt(exportedConfig.transitionTime, 10) || 30000;
@@ -4755,6 +5861,7 @@
                         transitionDuration = parseInt(exportedConfig.transitionDuration, 10) || 1400;
                         applyTransitionDuration();
                         alerts = exportedConfig.alerts || [];
+                        initializePpr(exportedConfig.ppr);
 
                         // Atualizar interface
                         updateUrlList();
@@ -5411,6 +6518,7 @@
             renderStationChip();
             renderAreaList();
             renderStationList();
+            if (pprConfig) renderPprAdmin();
         }
 
         function addArea() {
@@ -5592,10 +6700,9 @@
         function openStationSettings() {
             const panel = document.querySelector('.config-panel');
             if (panel && !panel.classList.contains('open')) {
-                panel.classList.add('open');
+                togglePanel();
             }
-            const card = document.getElementById('stationControlCard');
-            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            showSettingsSection('station');
         }
 
         function setDashboardArea(index, areaId) {
@@ -5633,6 +6740,7 @@
             const urlList = document.querySelector('.url-list');
             if (!urlList) return;
             urlList.replaceChildren();
+            updateSettingsNavigationCounts();
 
             const heading = document.createElement('h3');
             heading.textContent = 'Dashboards Configurados';
@@ -5696,6 +6804,872 @@
             });
         }
 
+        function defaultPprRules() {
+            return [
+                { min: 0, max: 74.99, message: 'Abaixo do esperado', color: '#f59e0b' },
+                { min: 75, max: 99.99, message: 'Próximo da meta', color: '#38bdf8' },
+                { min: 100, max: 124.99, message: 'Meta atingida', color: '#22c55e' },
+                { min: 125, max: 149.99, message: 'Acima da meta', color: '#14b8a6' },
+                { min: 150, max: 150, message: 'Desempenho máximo', color: '#8b5cf6' }
+            ];
+        }
+
+        function defaultPprBands() {
+            return [150, 125, 100, 75, 50, 0].map(percent => ({ percent, label: '' }));
+        }
+
+        function defaultPprIndicators() {
+            const names = [
+                ['Produtividade (Ligas Normais)', 'Ligas 6060, 6063 e 6101'],
+                ['Produtividade (Ligas Especiais)', 'Ligas 6005, 6061, 6082 e 6301'],
+                ['Eficiência Líquida', 'Acompanhamento da eficiência líquida do período'],
+                ['Índice de Devoluções', 'Acompanhamento do índice de devoluções'],
+                ['Lucratividade', 'Acompanhamento da lucratividade do período'],
+                ['Auditorias de Qualidade', 'Resultado das auditorias de qualidade']
+            ];
+            return names.map((item, index) => ({
+                id: createEntityId('ppr'),
+                name: item[0],
+                description: item[1],
+                result: null,
+                operationalValue: '',
+                targetValue: '',
+                unit: '',
+                calculationMode: 'manual',
+                performanceBands: defaultPprBands(),
+                referenceDate: '',
+                updatedAt: '',
+                order: index + 1,
+                enabled: true,
+                note: ''
+            }));
+        }
+
+        function defaultPprConfig() {
+            return {
+                version: 1,
+                enabled: false,
+                title: 'Acompanhamento do PPR',
+                referencePeriod: '2026/2027',
+                duration: 30,
+                staleDays: 35,
+                theme: 'light',
+                displayMode: 'individual',
+                sequencePosition: 'after-dashboards',
+                showSummary: true,
+                showIndicators: true,
+                areaIds: ['*'],
+                stationIds: ['*'],
+                updatedAt: '',
+                updatedBy: '',
+                indicators: defaultPprIndicators(),
+                rules: defaultPprRules(),
+                audit: []
+            };
+        }
+
+        function normalizePprConfig(value) {
+            const fallback = defaultPprConfig();
+            const source = value && typeof value === 'object' ? value : {};
+            const indicators = Array.isArray(source.indicators)
+                ? source.indicators.map((item, index) => {
+                    const rawResult = item?.result;
+                    const parsedResult = rawResult === '' || rawResult === null || rawResult === undefined
+                        ? null
+                        : Number(rawResult);
+                    return {
+                        id: String(item?.id || createEntityId('ppr')),
+                        name: String(item?.name || `Indicador ${index + 1}`),
+                        description: String(item?.description || ''),
+                        result: Number.isFinite(parsedResult) && parsedResult >= 0 && parsedResult <= 150
+                            ? parsedResult
+                            : null,
+                        operationalValue: String(item?.operationalValue || ''),
+                        targetValue: String(item?.targetValue || ''),
+                        unit: String(item?.unit || ''),
+                        calculationMode: item?.calculationMode === 'automatic' ? 'automatic' : 'manual',
+                        performanceBands: Array.isArray(item?.performanceBands)
+                            ? defaultPprBands().map(fallbackBand => {
+                                const savedBand = item.performanceBands.find(band => Number(band?.percent) === fallbackBand.percent);
+                                return { percent: fallbackBand.percent, label: String(savedBand?.label || '') };
+                            })
+                            : defaultPprBands(),
+                        referenceDate: String(item?.referenceDate || ''),
+                        updatedAt: String(item?.updatedAt || ''),
+                        order: Math.max(1, Number(item?.order) || index + 1),
+                        enabled: item?.enabled !== false,
+                        note: String(item?.note || '')
+                    };
+                })
+                : fallback.indicators;
+
+            return {
+                ...fallback,
+                ...source,
+                enabled: source.enabled === true,
+                duration: [15, 20, 30, 45, 60].includes(Number(source.duration))
+                    ? Number(source.duration)
+                    : 30,
+                staleDays: Math.max(1, Math.min(365, Number(source.staleDays) || 35)),
+                theme: source.theme === 'dark' ? 'dark' : 'light',
+                displayMode: source.displayMode === 'general' ? 'general' : 'individual',
+                sequencePosition: ['start', 'after-dashboards', 'end'].includes(source.sequencePosition)
+                    ? source.sequencePosition
+                    : 'after-dashboards',
+                showSummary: source.showSummary !== false,
+                showIndicators: source.showIndicators !== false,
+                areaIds: Array.isArray(source.areaIds) && source.areaIds.length ? source.areaIds : ['*'],
+                stationIds: Array.isArray(source.stationIds) && source.stationIds.length ? source.stationIds : ['*'],
+                indicators,
+                rules: Array.isArray(source.rules) && source.rules.length ? source.rules : fallback.rules,
+                audit: Array.isArray(source.audit) ? source.audit.slice(0, 100) : []
+            };
+        }
+
+        function initializePpr(value = undefined) {
+            const stored = value === undefined
+                ? safeReadJson('dashboardPprV1', null)
+                : value;
+            pprConfig = normalizePprConfig(stored);
+            renderPprAdmin();
+        }
+
+        function addPprAudit(action, details = {}) {
+            const entry = {
+                id: createEntityId('audit'),
+                action,
+                at: new Date().toISOString(),
+                by: String(pprConfig.updatedBy || 'Administrador local'),
+                ...details
+            };
+            pprConfig.audit = [entry, ...(pprConfig.audit || [])].slice(0, 100);
+        }
+
+        function persistPprConfig(action = '', details = {}) {
+            pprConfig.updatedAt = new Date().toISOString();
+            if (action) addPprAudit(action, details);
+            localStorage.setItem('dashboardPprV1', JSON.stringify(pprConfig));
+            renderPprAdmin();
+            updateSettingsNavigationCounts();
+            createSlides();
+        }
+
+        function selectedMultipleValues(select) {
+            const values = Array.from(select?.selectedOptions || []).map(option => option.value);
+            return values.includes('*') || values.length === 0 ? ['*'] : values;
+        }
+
+        function setMultipleSelection(select, values) {
+            const selected = Array.isArray(values) && values.length ? values : ['*'];
+            Array.from(select?.options || []).forEach(option => {
+                option.selected = selected.includes(option.value);
+            });
+        }
+
+        function populatePprTargets() {
+            const areaSelect = document.getElementById('pprAreaTargets');
+            const stationSelect = document.getElementById('pprStationTargets');
+            if (areaSelect) {
+                areaSelect.replaceChildren();
+                appendOption(areaSelect, '*', 'Todos os setores', '');
+                dashboardAreas.forEach(area => appendOption(areaSelect, area.id, area.name, ''));
+                setMultipleSelection(areaSelect, pprConfig.areaIds);
+            }
+            if (stationSelect) {
+                stationSelect.replaceChildren();
+                appendOption(stationSelect, '*', 'Todas as TVs', '');
+                dashboardStations.forEach(station => appendOption(stationSelect, station.id, station.name, ''));
+                setMultipleSelection(stationSelect, pprConfig.stationIds);
+            }
+        }
+
+        function savePprSettingsFromForm() {
+            if (!pprConfig) initializePpr();
+            const previousEnabled = pprConfig.enabled;
+            pprConfig.enabled = document.getElementById('pprEnabled').checked;
+            pprConfig.referencePeriod = document.getElementById('pprReferencePeriod').value.trim();
+            pprConfig.duration = Number(document.getElementById('pprDuration').value) || 30;
+            pprConfig.staleDays = Math.max(1, Math.min(365, Number(document.getElementById('pprStaleDays').value) || 35));
+            pprConfig.theme = document.getElementById('pprTheme').value === 'dark' ? 'dark' : 'light';
+            pprConfig.displayMode = document.getElementById('pprDisplayMode').value;
+            pprConfig.sequencePosition = document.getElementById('pprSequencePosition').value;
+            pprConfig.showSummary = document.getElementById('pprShowSummary').checked;
+            pprConfig.showIndicators = document.getElementById('pprShowIndicators').checked;
+            pprConfig.areaIds = selectedMultipleValues(document.getElementById('pprAreaTargets'));
+            pprConfig.stationIds = selectedMultipleValues(document.getElementById('pprStationTargets'));
+            pprConfig.updatedBy = document.getElementById('pprUpdatedBy').value.trim();
+            persistPprConfig(
+                previousEnabled !== pprConfig.enabled ? (pprConfig.enabled ? 'ppr_enabled' : 'ppr_disabled') : 'settings_updated'
+            );
+            showToast(pprConfig.enabled ? 'PPR atualizado e incluído na programação' : 'Configuração do PPR salva', 'success');
+        }
+
+        function formatPprPercent(value) {
+            if (!Number.isFinite(Number(value))) return 'Sem resultado';
+            return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+        }
+
+        function formatPprMeasure(value, unit = '') {
+            const cleanValue = String(value || '').trim();
+            const cleanUnit = String(unit || '').trim();
+            if (!cleanValue) return '';
+            return cleanUnit ? `${cleanValue} ${cleanUnit}` : cleanValue;
+        }
+
+        function parsePprMeasureNumber(value) {
+            let text = String(value || '').trim().replace(/\s/g, '');
+            if (!text) return null;
+            if (text.includes(',')) text = text.replace(/\./g, '').replace(',', '.');
+            else if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) text = text.replace(/\./g, '');
+            const numeric = Number(text);
+            return Number.isFinite(numeric) ? numeric : null;
+        }
+
+        function parsePprBandRange(label) {
+            const text = String(label || '').trim().toLocaleLowerCase('pt-BR');
+            const values = (text.match(/-?\d[\d.,]*/g) || []).map(parsePprMeasureNumber).filter(Number.isFinite);
+            if (!values.length) return null;
+            if (/abaixo|menor/.test(text)) return { min: -Infinity, max: values[0] - 1e-9 };
+            if (/acima|maior|ou\s+mais|\+/.test(text)) return { min: values[0], max: Infinity };
+            if (/at[eé]|no\s+m[aá]ximo|ou\s+menos/.test(text) && values.length === 1) return { min: -Infinity, max: values[0] };
+            if (values.length >= 2) return {
+                min: values[0],
+                max: values[1],
+                reversed: values[0] > values[1]
+            };
+            return { min: values[0], max: values[0] };
+        }
+
+        function getPprBandValidationIssue(bands) {
+            for (const band of bands || []) {
+                const range = parsePprBandRange(band.label);
+                if (range?.reversed) {
+                    return {
+                        percent: Number(band.percent),
+                        message: `A faixa de ${band.percent}% está invertida. Informe o menor valor antes do maior ou use “${band.percent === 150 ? '1.360 ou mais' : '1.269 ou menos'}”.`
+                    };
+                }
+            }
+            return null;
+        }
+
+        function calculatePprResultFromBands(indicator, rawValue = indicator?.operationalValue) {
+            const value = parsePprMeasureNumber(rawValue);
+            if (!Number.isFinite(value)) return null;
+            const match = (indicator?.performanceBands || [])
+                .map(band => ({ ...band, range: parsePprBandRange(band.label) }))
+                .filter(band => band.range && !band.range.reversed)
+                .sort((a, b) => Number(b.percent) - Number(a.percent))
+                .find(band => value >= band.range.min && value <= band.range.max);
+            return match ? Number(match.percent) : null;
+        }
+
+        function findPprBandOverlap(bands) {
+            const parsed = (bands || [])
+                .map(band => ({ ...band, range: parsePprBandRange(band.label) }))
+                .filter(band => band.range && !band.range.reversed);
+            for (let index = 0; index < parsed.length; index += 1) {
+                for (let otherIndex = index + 1; otherIndex < parsed.length; otherIndex += 1) {
+                    const current = parsed[index].range;
+                    const other = parsed[otherIndex].range;
+                    if (current.min <= other.max && other.min <= current.max) {
+                        return [parsed[index], parsed[otherIndex]];
+                    }
+                }
+            }
+            return null;
+        }
+
+        function pprBandsOverlap(bands) {
+            return Boolean(findPprBandOverlap(bands));
+        }
+
+        function getPprBandLabel(indicator, percent) {
+            return String((indicator?.performanceBands || []).find(band => Number(band.percent) === Number(percent))?.label || '').trim();
+        }
+
+        function formatPprDate(value, includeTime = false) {
+            if (!value) return 'Não informado';
+            const date = value.length === 10 ? new Date(`${value}T12:00:00`) : new Date(value);
+            if (Number.isNaN(date.getTime())) return 'Não informado';
+            return date.toLocaleString('pt-BR', includeTime
+                ? { dateStyle: 'short', timeStyle: 'short' }
+                : { dateStyle: 'short' });
+        }
+
+        function getPprIndicatorFreshness(indicator) {
+            if (!Number.isFinite(Number(indicator.result)) || !indicator.referenceDate) return 'missing';
+            const reference = new Date(`${indicator.referenceDate}T12:00:00`);
+            if (Number.isNaN(reference.getTime())) return 'missing';
+            const ageDays = (Date.now() - reference.getTime()) / 86400000;
+            return ageDays > (Number(pprConfig?.staleDays) || 35) ? 'stale' : 'current';
+        }
+
+        function pprIndicatorNeedsUpdate(indicator) {
+            return getPprIndicatorFreshness(indicator) !== 'current';
+        }
+
+        function getPprRule(value) {
+            const numeric = Math.max(0, Math.min(150, Number(value) || 0));
+            return (pprConfig.rules || defaultPprRules()).find(rule =>
+                numeric >= Number(rule.min) && numeric <= Number(rule.max)
+            ) || defaultPprRules()[0];
+        }
+
+        function getActivePprIndicators(includeMissing = false) {
+            return (pprConfig?.indicators || [])
+                .filter(item => item.enabled)
+                .filter(item => includeMissing || Number.isFinite(Number(item.result)))
+                .sort((a, b) => Number(a.order) - Number(b.order));
+        }
+
+        function pprTargetsCurrentStation() {
+            if (!pprConfig?.enabled) return false;
+            const station = getCurrentStation();
+            const areaId = getCurrentAreaId();
+            const areaMatch = pprConfig.areaIds.includes('*') || pprConfig.areaIds.includes(areaId);
+            const stationMatch = pprConfig.stationIds.includes('*') || pprConfig.stationIds.includes(station.id);
+            return areaMatch && stationMatch;
+        }
+
+        function renderPprAdmin() {
+            if (!pprConfig) return;
+            const values = {
+                pprEnabled: pprConfig.enabled,
+                pprReferencePeriod: pprConfig.referencePeriod,
+                pprDuration: String(pprConfig.duration),
+                pprStaleDays: String(pprConfig.staleDays),
+                pprTheme: pprConfig.theme,
+                pprDisplayMode: pprConfig.displayMode,
+                pprSequencePosition: pprConfig.sequencePosition,
+                pprShowSummary: pprConfig.showSummary,
+                pprShowIndicators: pprConfig.showIndicators,
+                pprUpdatedBy: pprConfig.updatedBy
+            };
+            Object.entries(values).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (!element) return;
+                if (element.type === 'checkbox') element.checked = Boolean(value);
+                else element.value = value ?? '';
+            });
+            const enabledLabel = document.getElementById('pprEnabledLabel');
+            if (enabledLabel) enabledLabel.textContent = pprConfig.enabled ? 'Ativado' : 'Desativado';
+            populatePprTargets();
+            renderPprIndicatorList();
+            renderPprRules();
+        }
+
+        function renderPprIndicatorList() {
+            const list = document.getElementById('pprIndicatorList');
+            if (!list || !pprConfig) return;
+            list.replaceChildren();
+            const indicators = [...pprConfig.indicators].sort((a, b) => Number(a.order) - Number(b.order));
+            const missing = indicators.filter(item => getPprIndicatorFreshness(item) === 'missing').length;
+            const stale = indicators.filter(item => getPprIndicatorFreshness(item) === 'stale').length;
+            const summary = document.getElementById('pprIndicatorSummary');
+            if (summary) summary.textContent = `${indicators.length} indicadores · ${missing} pendentes · ${stale} desatualizados`;
+
+            indicators.forEach(indicator => {
+                const item = document.createElement('article');
+                item.className = `ppr-indicator-item${indicator.enabled ? '' : ' is-inactive'}${pprIndicatorNeedsUpdate(indicator) ? ' needs-update' : ''}`;
+                const copy = document.createElement('div');
+                const name = document.createElement('div');
+                name.className = 'ppr-indicator-name';
+                name.textContent = `${indicator.order}. ${indicator.name}`;
+                const value = document.createElement('div');
+                value.className = 'ppr-indicator-value';
+                value.textContent = formatPprPercent(indicator.result);
+                const meta = document.createElement('div');
+                meta.className = 'ppr-indicator-meta';
+                const freshness = getPprIndicatorFreshness(indicator);
+                const operational = formatPprMeasure(indicator.operationalValue, indicator.unit);
+                const expectedBand = getPprBandLabel(indicator, indicator.result);
+                const statusText = freshness === 'missing'
+                    ? 'Resultado ou data de referência pendente'
+                    : freshness === 'stale'
+                        ? `Dado desatualizado · Ref. ${formatPprDate(indicator.referenceDate)}`
+                        : `${getPprRule(indicator.result).message} · Ref. ${formatPprDate(indicator.referenceDate)}`;
+                meta.textContent = [statusText, operational ? `Realizado: ${operational}` : '', expectedBand ? `Faixa: ${expectedBand}` : ''].filter(Boolean).join(' · ');
+                copy.append(name, value, meta);
+
+                const actions = document.createElement('div');
+                actions.className = 'ppr-indicator-actions';
+                [
+                    ['fa-arrow-up', 'Mover para cima', () => movePprIndicator(indicator.id, -1)],
+                    ['fa-arrow-down', 'Mover para baixo', () => movePprIndicator(indicator.id, 1)],
+                    [indicator.enabled ? 'fa-eye-slash' : 'fa-eye', indicator.enabled ? 'Desativar' : 'Ativar', () => togglePprIndicator(indicator.id)],
+                    ['fa-pen', 'Editar', () => editPprIndicator(indicator.id)],
+                    ['fa-trash', 'Excluir', () => deletePprIndicator(indicator.id), 'danger']
+                ].forEach(([icon, title, handler, extra]) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = `ppr-mini-button${extra ? ` ${extra}` : ''}`;
+                    button.title = title;
+                    button.innerHTML = `<i class="fas ${icon}"></i>`;
+                    button.addEventListener('click', handler);
+                    actions.appendChild(button);
+                });
+                item.append(copy, actions);
+                list.appendChild(item);
+            });
+            updateSettingsNavigationCounts();
+        }
+
+        function newPprIndicator() {
+            document.getElementById('pprIndicatorId').value = '';
+            document.getElementById('pprIndicatorName').value = '';
+            document.getElementById('pprIndicatorDescription').value = '';
+            document.getElementById('pprIndicatorResult').value = '';
+            document.getElementById('pprIndicatorOperationalValue').value = '';
+            document.getElementById('pprIndicatorUnit').value = '';
+            document.getElementById('pprIndicatorAutoCalculate').checked = true;
+            renderPprBandEditor(defaultPprBands());
+            togglePprAutomaticCalculation();
+            document.getElementById('pprIndicatorReferenceDate').value = '';
+            document.getElementById('pprIndicatorOrder').value = String(pprConfig.indicators.length + 1);
+            document.getElementById('pprIndicatorNote').value = '';
+            document.getElementById('pprIndicatorEnabled').checked = true;
+            document.getElementById('pprIndicatorEditor').style.display = 'block';
+            document.getElementById('pprIndicatorName').focus();
+        }
+
+        function editPprIndicator(id) {
+            const indicator = pprConfig.indicators.find(item => item.id === id);
+            if (!indicator) return;
+            document.getElementById('pprIndicatorId').value = indicator.id;
+            document.getElementById('pprIndicatorName').value = indicator.name;
+            document.getElementById('pprIndicatorDescription').value = indicator.description;
+            document.getElementById('pprIndicatorResult').value = indicator.result ?? '';
+            document.getElementById('pprIndicatorOperationalValue').value = indicator.operationalValue || '';
+            document.getElementById('pprIndicatorUnit').value = indicator.unit || '';
+            document.getElementById('pprIndicatorAutoCalculate').checked = indicator.calculationMode === 'automatic';
+            renderPprBandEditor(indicator.performanceBands || defaultPprBands());
+            togglePprAutomaticCalculation();
+            document.getElementById('pprIndicatorReferenceDate').value = indicator.referenceDate;
+            document.getElementById('pprIndicatorOrder').value = String(indicator.order);
+            document.getElementById('pprIndicatorNote').value = indicator.note;
+            document.getElementById('pprIndicatorEnabled').checked = indicator.enabled;
+            document.getElementById('pprIndicatorEditor').style.display = 'block';
+            document.getElementById('pprIndicatorName').focus();
+        }
+
+        function cancelPprIndicatorEdit() {
+            document.getElementById('pprIndicatorEditor').style.display = 'none';
+        }
+
+        function renderPprBandEditor(bands = defaultPprBands()) {
+            const list = document.getElementById('pprIndicatorBandList');
+            if (!list) return;
+            list.replaceChildren();
+            defaultPprBands().forEach(defaultBand => {
+                const saved = bands.find(band => Number(band.percent) === defaultBand.percent) || defaultBand;
+                const row = createPprElement('div', 'ppr-band-row');
+                row.appendChild(createPprElement('div', 'ppr-band-percent', `${defaultBand.percent}%`));
+                const input = createPprElement('input', 'input-field');
+                input.type = 'text';
+                input.maxLength = 60;
+                input.placeholder = defaultBand.percent === 150 ? 'Ex.: 1.360 ou mais' : defaultBand.percent === 0 ? 'Ex.: Abaixo de 1.250' : 'Ex.: 1.310 a 1.339';
+                input.value = saved.label || '';
+                input.dataset.pprBandPercent = String(defaultBand.percent);
+                input.addEventListener('input', () => row.classList.remove('invalid'));
+                row.appendChild(input);
+                list.appendChild(row);
+            });
+        }
+
+        function readPprBandsFromForm() {
+            return Array.from(document.querySelectorAll('[data-ppr-band-percent]')).map(input => ({
+                percent: Number(input.dataset.pprBandPercent),
+                label: input.value.trim()
+            }));
+        }
+
+        function togglePprAutomaticCalculation() {
+            const automatic = document.getElementById('pprIndicatorAutoCalculate')?.checked === true;
+            const resultInput = document.getElementById('pprIndicatorResult');
+            const resultLabel = document.querySelector('label[for="pprIndicatorResult"]');
+            const editor = document.getElementById('pprBandEditor');
+            if (resultInput) {
+                resultInput.disabled = automatic;
+                resultInput.placeholder = automatic ? 'Calculado pelo valor realizado' : '0 a 150';
+            }
+            if (resultLabel) resultLabel.textContent = automatic ? 'Resultado (%) calculado automaticamente' : 'Resultado atual (%) *';
+            if (editor) editor.open = automatic;
+        }
+
+        function savePprIndicator() {
+            const id = document.getElementById('pprIndicatorId').value;
+            const existing = pprConfig.indicators.find(item => item.id === id);
+            const name = document.getElementById('pprIndicatorName').value.trim();
+            const description = document.getElementById('pprIndicatorDescription').value.trim();
+            const automatic = document.getElementById('pprIndicatorAutoCalculate').checked;
+            const operationalValue = document.getElementById('pprIndicatorOperationalValue').value.trim();
+            const performanceBands = readPprBandsFromForm();
+            const resultText = document.getElementById('pprIndicatorResult').value.replace(',', '.');
+            const draftIndicator = { operationalValue, performanceBands };
+            const result = automatic ? calculatePprResultFromBands(draftIndicator) : Number(resultText);
+            let referenceDate = document.getElementById('pprIndicatorReferenceDate').value;
+            if (automatic && operationalValue !== String(existing?.operationalValue || '')) {
+                referenceDate = new Date().toISOString().slice(0, 10);
+                document.getElementById('pprIndicatorReferenceDate').value = referenceDate;
+            }
+            if (!name || !description || !referenceDate || (automatic ? !operationalValue : resultText === '')) {
+                showToast(automatic ? 'Preencha nome, descrição, valor realizado e data de referência' : 'Preencha nome, descrição, resultado e data de referência', 'error');
+                return;
+            }
+            if (automatic && !performanceBands.some(band => parsePprBandRange(band.label))) {
+                showToast('Configure pelo menos uma faixa de valor esperado', 'error');
+                return;
+            }
+            document.querySelectorAll('.ppr-band-row.invalid')
+                .forEach(row => row.classList.remove('invalid'));
+            const bandIssue = automatic ? getPprBandValidationIssue(performanceBands) : null;
+            if (bandIssue) {
+                const input = document.querySelector(`[data-ppr-band-percent="${bandIssue.percent}"]`);
+                input?.closest('.ppr-band-row')?.classList.add('invalid');
+                input?.focus();
+                showToast(bandIssue.message, 'error');
+                return;
+            }
+            const overlap = automatic ? findPprBandOverlap(performanceBands) : null;
+            if (overlap) {
+                overlap.forEach(band => {
+                    document.querySelector(`[data-ppr-band-percent="${band.percent}"]`)
+                        ?.closest('.ppr-band-row')?.classList.add('invalid');
+                });
+                showToast(`As faixas de ${overlap[0].percent}% e ${overlap[1].percent}% estão sobrepostas. Revise os limites destacados.`, 'error');
+                return;
+            }
+            if (automatic && !Number.isFinite(result)) {
+                showToast('O valor realizado não pertence a nenhuma faixa configurada', 'error');
+                return;
+            }
+            if (!Number.isFinite(result) || result < 0 || result > 150) {
+                showToast('O resultado deve estar entre 0% e 150%', 'error');
+                return;
+            }
+
+            if (existing && Number(existing.result) !== result && Number.isFinite(Number(existing.result))) {
+                if (!window.confirm(`Substituir o resultado de ${formatPprPercent(existing.result)} por ${formatPprPercent(result)}?`)) return;
+            }
+            const indicator = {
+                id: existing?.id || createEntityId('ppr'),
+                name,
+                description,
+                result,
+                operationalValue,
+                targetValue: '',
+                unit: document.getElementById('pprIndicatorUnit').value.trim(),
+                calculationMode: automatic ? 'automatic' : 'manual',
+                performanceBands,
+                referenceDate,
+                updatedAt: new Date().toISOString(),
+                order: Math.max(1, Number(document.getElementById('pprIndicatorOrder').value) || 1),
+                enabled: document.getElementById('pprIndicatorEnabled').checked,
+                note: document.getElementById('pprIndicatorNote').value.trim()
+            };
+            if (existing) {
+                pprConfig.indicators = pprConfig.indicators.map(item => item.id === id ? indicator : item);
+            } else {
+                pprConfig.indicators.push(indicator);
+            }
+            persistPprConfig(existing ? 'indicator_updated' : 'indicator_created', {
+                indicatorId: indicator.id,
+                indicatorName: indicator.name,
+                previousValue: existing?.result ?? null,
+                newValue: result
+            });
+            cancelPprIndicatorEdit();
+            showToast('Indicador do PPR salvo', 'success');
+        }
+
+        function togglePprIndicator(id) {
+            const indicator = pprConfig.indicators.find(item => item.id === id);
+            if (!indicator) return;
+            indicator.enabled = !indicator.enabled;
+            indicator.updatedAt = new Date().toISOString();
+            persistPprConfig(indicator.enabled ? 'indicator_enabled' : 'indicator_disabled', { indicatorId: id, indicatorName: indicator.name });
+        }
+
+        function deletePprIndicator(id) {
+            const indicator = pprConfig.indicators.find(item => item.id === id);
+            if (!indicator || !window.confirm(`Excluir o indicador “${indicator.name}”? Os resultados serão removidos.`)) return;
+            pprConfig.indicators = pprConfig.indicators.filter(item => item.id !== id);
+            persistPprConfig('indicator_deleted', { indicatorId: id, indicatorName: indicator.name, previousValue: indicator.result });
+            showToast('Indicador excluído', 'success');
+        }
+
+        function movePprIndicator(id, direction) {
+            const ordered = [...pprConfig.indicators].sort((a, b) => Number(a.order) - Number(b.order));
+            const index = ordered.findIndex(item => item.id === id);
+            const nextIndex = index + direction;
+            if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return;
+            [ordered[index], ordered[nextIndex]] = [ordered[nextIndex], ordered[index]];
+            ordered.forEach((item, position) => { item.order = position + 1; });
+            pprConfig.indicators = ordered;
+            persistPprConfig('indicator_reordered', { indicatorId: id });
+        }
+
+        function renderPprRules() {
+            const list = document.getElementById('pprRuleList');
+            if (!list || !pprConfig) return;
+            list.replaceChildren();
+            pprConfig.rules.forEach((rule, index) => {
+                const row = document.createElement('div');
+                row.className = 'ppr-rule-row';
+                row.innerHTML = `
+                    <input class="input-field" type="number" min="0" max="150" step="0.01" value="${Number(rule.min)}" data-ppr-rule="min" data-index="${index}" aria-label="Início da faixa">
+                    <input class="input-field" type="number" min="0" max="150" step="0.01" value="${Number(rule.max)}" data-ppr-rule="max" data-index="${index}" aria-label="Fim da faixa">
+                    <input class="input-field" maxlength="60" value="${String(rule.message).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" data-ppr-rule="message" data-index="${index}" aria-label="Mensagem da faixa">
+                    <input type="color" value="${rule.color}" data-ppr-rule="color" data-index="${index}" aria-label="Cor da faixa">
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function savePprRulesFromForm() {
+            const rows = Array.from(document.querySelectorAll('.ppr-rule-row'));
+            const rules = rows.map(row => ({
+                min: Number(row.querySelector('[data-ppr-rule="min"]').value),
+                max: Number(row.querySelector('[data-ppr-rule="max"]').value),
+                message: row.querySelector('[data-ppr-rule="message"]').value.trim(),
+                color: row.querySelector('[data-ppr-rule="color"]').value
+            })).sort((a, b) => a.min - b.min);
+            const invalid = rules.some(rule => !Number.isFinite(rule.min) || !Number.isFinite(rule.max) || rule.min < 0 || rule.max > 150 || rule.min > rule.max || !rule.message);
+            const coverageInvalid = rules[0]?.min !== 0 || rules[rules.length - 1]?.max !== 150 || rules.some((rule, index) => index > 0 && Math.abs(rule.min - rules[index - 1].max) > 0.02);
+            if (invalid || coverageInvalid) {
+                showToast('Revise as faixas: elas devem cobrir continuamente de 0% a 150%', 'error');
+                return;
+            }
+            pprConfig.rules = rules;
+            persistPprConfig('rules_updated');
+            showToast('Faixas do PPR atualizadas', 'success');
+        }
+
+        function resetPprRules() {
+            if (!window.confirm('Restaurar as mensagens e faixas padrão do PPR?')) return;
+            pprConfig.rules = defaultPprRules();
+            persistPprConfig('rules_reset');
+        }
+
+        function createPprElement(tag, className = '', text = '') {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (text !== '') element.textContent = text;
+            return element;
+        }
+
+        function buildPprHeader(screen) {
+            const header = createPprElement('header', 'ppr-screen-header');
+            const titleGroup = createPprElement('div', 'ppr-header-copy');
+            titleGroup.append(
+                createPprElement('div', 'ppr-screen-kicker', 'Programa de Participação nos Resultados'),
+                createPprElement('div', 'ppr-screen-title', 'Acompanhamento do PPR')
+            );
+            header.append(titleGroup, createPprElement('div', 'ppr-period-badge', `Período ${pprConfig.referencePeriod || 'não informado'}`));
+            screen.appendChild(header);
+        }
+
+        function buildPprThermometer(indicator) {
+            const value = Math.max(0, Math.min(150, Number(indicator.result) || 0));
+            const rule = getPprRule(value);
+            const wrap = createPprElement('div', 'ppr-thermometer-wrap');
+            const thermometer = createPprElement('div', 'ppr-thermometer');
+            thermometer.style.setProperty('--ppr-color', rule.color);
+            const fill = createPprElement('div', 'ppr-fill');
+            fill.style.setProperty('--ppr-fill', `${(value / 150) * 100}%`);
+            const scale = createPprElement('div', 'ppr-scale');
+            [
+                [150, 100, false], [125, 83.333, false], [100, 66.667, true],
+                [75, 50, false], [50, 33.333, false], [0, 0, false]
+            ].forEach(([label, bottom, meta]) => {
+                const tick = createPprElement('div', `ppr-tick${meta ? ' meta' : ''}`);
+                tick.appendChild(createPprElement('span', 'ppr-tick-percent', meta ? '100% Meta' : `${label}%`));
+                const expected = getPprBandLabel(indicator, label);
+                if (expected) {
+                    const unit = String(indicator.unit || '').trim();
+                    const expectedText = unit && !expected.toLocaleLowerCase('pt-BR').includes(unit.toLocaleLowerCase('pt-BR')) ? `${expected} ${unit}` : expected;
+                    tick.appendChild(createPprElement('span', 'ppr-tick-expected', expectedText));
+                }
+                tick.style.bottom = `${bottom}%`;
+                scale.appendChild(tick);
+            });
+            thermometer.append(fill, scale);
+            wrap.appendChild(thermometer);
+            return wrap;
+        }
+
+        function buildPprSummaryScreen() {
+            const screen = createPprElement('div', `ppr-screen ppr-summary-screen ppr-theme-${pprConfig.theme || 'light'}`);
+            buildPprHeader(screen);
+            const indicators = getActivePprIndicators();
+            const average = indicators.length
+                ? indicators.reduce((sum, item) => sum + Number(item.result), 0) / indicators.length
+                : 0;
+            const reached = indicators.filter(item => Number(item.result) >= 100).length;
+            const latest = indicators.map(item => item.updatedAt).filter(Boolean).sort().pop() || pprConfig.updatedAt;
+            const hero = createPprElement('div', 'ppr-summary-hero');
+            const scoreCard = createPprElement('section', 'ppr-score-card');
+            const scoreRing = createPprElement('div', 'ppr-score-ring');
+            scoreRing.style.setProperty('--ppr-score-angle', `${Math.max(0, Math.min(360, (average / 150) * 360))}deg`);
+            scoreRing.appendChild(createPprElement('div', 'ppr-score-ring-value', formatPprPercent(average)));
+            const scoreCopy = createPprElement('div', 'ppr-score-copy');
+            scoreCopy.append(
+                createPprElement('small', '', 'Índice consolidado'),
+                createPprElement('strong', '', reached === indicators.length && indicators.length ? 'Todos os indicadores na meta' : `${reached} de ${indicators.length} indicadores na meta`),
+                createPprElement('span', '', 'Leitura executiva do desempenho atual do programa.')
+            );
+            scoreCard.append(scoreRing, scoreCopy);
+
+            const stats = createPprElement('div', 'ppr-summary-stats');
+            [
+                ['Indicadores ativos', indicators.length, 'fa-chart-simple', '#2563eb'],
+                ['Meta atingida', reached, 'fa-circle-check', '#22c55e'],
+                ['Pontos de atenção', Math.max(0, indicators.length - reached), 'fa-arrow-trend-up', '#f59e0b']
+            ].forEach(([label, value, iconName, color]) => {
+                const card = createPprElement('div', 'ppr-stat-card');
+                card.style.setProperty('--stat-color', color);
+                const icon = createPprElement('div', 'ppr-stat-icon');
+                icon.appendChild(createPprElement('i', `fas ${iconName}`));
+                card.append(icon, createPprElement('div', 'ppr-stat-label', String(label)), createPprElement('div', 'ppr-stat-value', String(value)));
+                stats.appendChild(card);
+            });
+            hero.append(scoreCard, stats);
+            screen.appendChild(hero);
+            const grid = createPprElement('div', 'ppr-summary-grid');
+            indicators.forEach(indicator => {
+                const rule = getPprRule(indicator.result);
+                const card = createPprElement('div', 'ppr-summary-indicator');
+                card.style.setProperty('--ppr-color', rule.color);
+                const head = createPprElement('div', 'ppr-indicator-head');
+                head.append(createPprElement('strong', '', indicator.name), createPprElement('em', 'ppr-indicator-status', rule.message));
+                const resultRow = createPprElement('div', 'ppr-indicator-result');
+                const operational = formatPprMeasure(indicator.operationalValue, indicator.unit);
+                const expectedBand = getPprBandLabel(indicator, indicator.result);
+                resultRow.append(createPprElement('span', '', formatPprPercent(indicator.result)), createPprElement('small', '', operational ? `Realizado ${operational}` : 'Resultado informado'));
+                const progress = createPprElement('div', 'ppr-progress');
+                const progressFill = createPprElement('span', 'ppr-progress-fill');
+                progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+                progress.appendChild(progressFill);
+                const meta = createPprElement('div', 'ppr-indicator-meta');
+                meta.append(createPprElement('span', '', expectedBand ? `Faixa ${expectedBand}` : 'Faixa não informada'), createPprElement('span', '', 'Meta 100%'));
+                card.append(head, resultRow, progress, meta);
+                grid.appendChild(card);
+            });
+            if (!indicators.length) grid.appendChild(createPprElement('div', 'ppr-stat-card', 'Nenhum resultado atualizado para exibição.'));
+            screen.appendChild(grid);
+            screen.appendChild(createPprElement('div', 'ppr-result-footer', `Última atualização: ${formatPprDate(latest, true)} · A média é apenas um resumo visual e não substitui o resultado oficial.`));
+            return screen;
+        }
+
+        function buildPprIndividualScreen(indicator) {
+            const screen = createPprElement('div', `ppr-screen ppr-individual-screen ppr-theme-${pprConfig.theme || 'light'}`);
+            buildPprHeader(screen);
+            const layout = createPprElement('div', 'ppr-individual-layout');
+            layout.appendChild(buildPprThermometer(indicator));
+            const rule = getPprRule(indicator.result);
+            const copy = createPprElement('div', 'ppr-result-copy');
+            copy.style.setProperty('--ppr-color', rule.color);
+            copy.appendChild(createPprElement('div', 'ppr-performance-label', 'Desempenho atual'));
+            const value = createPprElement('div', 'ppr-result-value');
+            value.append(document.createTextNode(Number(indicator.result).toLocaleString('pt-BR', { maximumFractionDigits: 2 })), createPprElement('span', '', '%'));
+            const goalContext = Number(indicator.result) >= 100
+                ? `${Number(indicator.result) === 100 ? 'Meta atingida' : `${formatPprPercent(Number(indicator.result) - 100)} acima da meta`}`
+                : `Faltam ${formatPprPercent(100 - Number(indicator.result))} para atingir a meta`;
+            copy.append(value, createPprElement('div', 'ppr-goal-context', goalContext), createPprElement('div', 'ppr-result-name', indicator.name), createPprElement('div', 'ppr-result-description', indicator.description));
+            const operationalValues = createPprElement('div', 'ppr-operational-values');
+            const operational = formatPprMeasure(indicator.operationalValue, indicator.unit);
+            const expectedBand = getPprBandLabel(indicator, indicator.result);
+            if (operational) {
+                const card = createPprElement('div', 'ppr-operational-value');
+                card.append(createPprElement('small', '', 'Valor realizado'), createPprElement('strong', '', operational));
+                operationalValues.appendChild(card);
+            }
+            if (expectedBand) {
+                const card = createPprElement('div', 'ppr-operational-value');
+                card.append(createPprElement('small', '', 'Faixa esperada'), createPprElement('strong', '', expectedBand));
+                operationalValues.appendChild(card);
+            }
+            if (operationalValues.childElementCount) copy.appendChild(operationalValues);
+            const progress = createPprElement('div', 'ppr-progress');
+            const progressFill = createPprElement('span', 'ppr-progress-fill');
+            progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+            progress.appendChild(progressFill);
+            copy.appendChild(progress);
+            copy.append(createPprElement('div', 'ppr-status-message', rule.message), createPprElement('div', 'ppr-result-footer', `Referência: ${formatPprDate(indicator.referenceDate)} · Atualizado em ${formatPprDate(indicator.updatedAt, true)}${indicator.note ? ` · ${indicator.note}` : ''}`));
+            layout.appendChild(copy);
+            screen.appendChild(layout);
+            return screen;
+        }
+
+        function buildPprGeneralScreen() {
+            const screen = createPprElement('div', `ppr-screen ppr-general-screen ppr-theme-${pprConfig.theme || 'light'}`);
+            buildPprHeader(screen);
+            const grid = createPprElement('div', 'ppr-general-grid');
+            getActivePprIndicators().forEach(indicator => {
+                const rule = getPprRule(indicator.result);
+                const card = createPprElement('article', 'ppr-general-card');
+                card.style.setProperty('--ppr-color', rule.color);
+                const mini = createPprElement('div', 'ppr-mini-thermometer');
+                const fill = createPprElement('div', 'ppr-fill');
+                fill.style.setProperty('--ppr-fill', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+                mini.appendChild(fill);
+                const copy = createPprElement('div');
+                copy.append(
+                    createPprElement('div', 'ppr-general-value', formatPprPercent(indicator.result)),
+                    createPprElement('div', 'ppr-general-name', indicator.name),
+                    createPprElement('div', 'ppr-general-status', rule.message)
+                );
+                const operational = formatPprMeasure(indicator.operationalValue, indicator.unit);
+                const expectedBand = getPprBandLabel(indicator, indicator.result);
+                if (operational || expectedBand) copy.appendChild(createPprElement('div', 'ppr-general-operational', [operational ? `Realizado ${operational}` : '', expectedBand ? `Faixa ${expectedBand}` : ''].filter(Boolean).join(' · ')));
+                const progress = createPprElement('div', 'ppr-progress');
+                const progressFill = createPprElement('span', 'ppr-progress-fill');
+                progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+                progress.appendChild(progressFill);
+                card.append(mini, copy, progress);
+                grid.appendChild(card);
+            });
+            screen.appendChild(grid);
+            screen.appendChild(createPprElement('div', 'ppr-result-footer', `Escala oficial de ganho: 0% · 50% · 75% · 100% Meta · 125% · 150%`));
+            return screen;
+        }
+
+        function buildPprSlides() {
+            if (!pprTargetsCurrentStation()) return [];
+            const indicators = getActivePprIndicators();
+            const slides = [];
+            const addScreen = screen => {
+                const slide = createPprElement('section', 'mySlides ppr-slide');
+                slide.dataset.slideType = 'ppr';
+                slide.dataset.duration = String(pprConfig.duration || 30);
+                slide.appendChild(screen);
+                slides.push(slide);
+            };
+            if (pprConfig.showSummary) addScreen(buildPprSummaryScreen());
+            if (pprConfig.showIndicators && indicators.length) {
+                if (pprConfig.displayMode === 'general') addScreen(buildPprGeneralScreen());
+                else indicators.forEach(indicator => addScreen(buildPprIndividualScreen(indicator)));
+            }
+            return slides;
+        }
+
+        function openPprPreview() {
+            const modal = document.getElementById('pprPreviewModal');
+            const content = document.getElementById('pprPreviewContent');
+            if (!modal || !content) return;
+            content.replaceChildren();
+            const indicators = getActivePprIndicators();
+            if (pprConfig.displayMode === 'individual' && indicators.length) content.appendChild(buildPprIndividualScreen(indicators[0]));
+            else if (pprConfig.showIndicators && indicators.length) content.appendChild(buildPprGeneralScreen());
+            else content.appendChild(buildPprSummaryScreen());
+            modal.classList.add('open');
+        }
+
+        function closePprPreview() {
+            document.getElementById('pprPreviewModal')?.classList.remove('open');
+        }
+
         function getVisibleDashboards() {
             ensureAreaSystem();
             const areaId = getCurrentAreaId();
@@ -5727,8 +7701,9 @@
             const visibleUrls = getVisibleDashboards();
             const fullscreenAlerts = getActiveAlerts()
                 .filter(alert => alert.displayMode === 'fullscreen');
+            const pprSlides = buildPprSlides();
 
-            if (visibleUrls.length === 0 && fullscreenAlerts.length === 0) {
+            if (visibleUrls.length === 0 && fullscreenAlerts.length === 0 && pprSlides.length === 0) {
                 const areaName = getAreaLabel(getCurrentAreaId());
                 container.innerHTML = `
                     <div class="empty-state" id="emptyState">
@@ -5741,7 +7716,7 @@
                 return;
             }
 
-            visibleUrls.forEach(item => {
+            const dashboardSlides = visibleUrls.map(item => {
                 const iframe = document.createElement('iframe');
                 iframe.className = 'mySlides';
                 iframe.src = item.combined;
@@ -5749,18 +7724,26 @@
                 iframe.dataset.slideType = 'dashboard';
                 iframe.dataset.dashboardId = item.id;
                 iframe.title = item.name || 'Dashboard Power BI';
-                container.appendChild(iframe);
+                return iframe;
             });
 
-            fullscreenAlerts.forEach(alert => {
+            const alertSlides = fullscreenAlerts.map(alert => {
                 const alertSlide = document.createElement('section');
                 alertSlide.className = 'mySlides alert-slide';
                 alertSlide.dataset.slideType = 'alert';
                 alertSlide.dataset.duration = String(alert.duration || 20);
                 alertSlide.dataset.alertId = alert.id;
                 alertSlide.appendChild(buildAlertVisual(alert));
-                container.appendChild(alertSlide);
+                return alertSlide;
             });
+
+            const position = pprConfig?.sequencePosition || 'after-dashboards';
+            const orderedSlides = position === 'start'
+                ? [...pprSlides, ...dashboardSlides, ...alertSlides]
+                : position === 'end'
+                    ? [...dashboardSlides, ...alertSlides, ...pprSlides]
+                    : [...dashboardSlides, ...pprSlides, ...alertSlides];
+            orderedSlides.forEach(slide => container.appendChild(slide));
 
             renderAlertBanner();
             slideIndex = -1;
@@ -5779,6 +7762,7 @@
             renderAreaSystem();
             updateUrlList();
             renderAlertList();
+            renderPprAdmin();
             activeAlertSignature = '';
             createSlides();
             updateEmptyState();
@@ -5788,7 +7772,8 @@
             const emptyState = document.getElementById('emptyState');
             const hasVisibleContent =
                 getVisibleDashboards().length > 0 ||
-                getActiveAlerts().some(alert => alert.displayMode === 'fullscreen');
+                getActiveAlerts().some(alert => alert.displayMode === 'fullscreen') ||
+                buildPprSlides().length > 0;
             if (!hasVisibleContent && !emptyState) {
                 createSlides();
             } else if (hasVisibleContent && emptyState) {
@@ -5799,9 +7784,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             ensureAreaSystem();
             applyStationFromUrl();
+            initializePpr();
             renderAreaSystem();
             updateUrlList();
             renderAlertList();
+            showSettingsSection(localStorage.getItem('dashboardSettingsSection') || 'station');
             createSlides();
         });
     </script>
@@ -5821,6 +7808,7 @@
                 'dashboardTvAreas',
                 'dashboardTvStations',
                 'dashboardAlertsV2',
+                'dashboardPprV1',
                 'transitionTime',
                 'transitionEffect',
                 'transitionDuration',
@@ -5882,6 +7870,7 @@
                     areas: parseStoredJson('dashboardTvAreas', []),
                     stations: parseStoredJson('dashboardTvStations', []),
                     alerts: parseStoredJson('dashboardAlertsV2', []),
+                    ppr: parseStoredJson('dashboardPprV1', defaultPprConfig()),
                     settings: {
                         transitionTime:
                             Number(localStorage.getItem('transitionTime')) || 30000,
@@ -5901,7 +7890,8 @@
                     (Array.isArray(payload.urls) && payload.urls.length > 0) ||
                     (Array.isArray(payload.areas) && payload.areas.length > 0) ||
                     (Array.isArray(payload.stations) && payload.stations.length > 0) ||
-                    (Array.isArray(payload.alerts) && payload.alerts.length > 0)
+                    (Array.isArray(payload.alerts) && payload.alerts.length > 0) ||
+                    (payload.ppr && typeof payload.ppr === 'object')
                 );
             }
 
@@ -5953,6 +7943,10 @@
                         JSON.stringify(Array.isArray(state.alerts) ? state.alerts : [])
                     );
                     localStorage.setItem(
+                        'dashboardPprV1',
+                        JSON.stringify(normalizePprConfig(state.ppr))
+                    );
+                    localStorage.setItem(
                         'transitionTime',
                         String(Number(settings.transitionTime) || 30000)
                     );
@@ -5971,6 +7965,7 @@
 
                     urls = Array.isArray(state.urls) ? state.urls : [];
                     alerts = Array.isArray(state.alerts) ? state.alerts : [];
+                    pprConfig = normalizePprConfig(state.ppr);
                     transitionTime = Number(settings.transitionTime) || 30000;
                     currentTransitionEffect = settings.transitionEffect || 'fade';
                     transitionDuration = Number(settings.transitionDuration) || 1400;
