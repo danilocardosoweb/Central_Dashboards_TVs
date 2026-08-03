@@ -10,6 +10,7 @@ import {
 
 function createStorageMock(initial = {}) {
   const objects = new Map(Object.entries(initial));
+  const uploads = [];
   const bucket = {
     async download(path) {
       if (!objects.has(path)) {
@@ -20,13 +21,15 @@ function createStorageMock(initial = {}) {
       }
       return { data: new Blob([objects.get(path)]), error: null };
     },
-    async upload(path, body) {
+    async upload(path, body, options) {
+      uploads.push({ path, options });
       objects.set(path, Buffer.from(body).toString('utf8'));
       return { data: { path }, error: null };
     }
   };
   return {
     objects,
+    uploads,
     client: {
       storage: { from: () => bucket },
       from() {
@@ -63,6 +66,7 @@ test('salva e le o estado central pelo Storage', async () => {
   const row = await readStorageState(mock.client, config);
   assert.equal(row.revision, 3);
   assert.equal(row.payload.urls[0].id, 'dash-1');
+  assert.equal(mock.uploads[0].options.contentType, 'application/json');
 });
 
 test('inicializa o Storage mesmo quando o banco esta indisponivel', async () => {

@@ -8911,7 +8911,7 @@
                             const error = await response.json().catch(() => ({}));
                             if (response.status === 409) continue;
                             throw new Error(
-                                error.message || `Falha ao salvar (${response.status}).`
+                                error.error || error.message || `Falha ao salvar (${response.status}).`
                             );
                         }
                         savedRow = await response.json();

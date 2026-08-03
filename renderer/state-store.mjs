@@ -60,7 +60,8 @@ export async function writeStorageState(supabase, config, row) {
   const { error } = await supabase.storage
     .from(stateBucketName(config))
     .upload(stateObjectName(config), body, {
-      contentType: 'application/json; charset=utf-8',
+      // O bucket central-state restringe uploads ao MIME application/json.
+      contentType: 'application/json',
       cacheControl: '0',
       upsert: true
     });

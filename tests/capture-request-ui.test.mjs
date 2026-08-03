@@ -16,3 +16,7 @@ test('solicitacao preserva o payload central e cria fila para todos os dashboard
   assert.match(html, /queue: dashboards\.map/);
   assert.match(html, /status: 'pending'/);
 });
+
+test('sincronizacao exibe a mensagem detalhada devolvida pela API', () => {
+  assert.match(html, /error\.error \|\| error\.message \|\| `Falha ao salvar/);
+});
