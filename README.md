@@ -119,7 +119,8 @@ próxima sincronização.
 2. Aguarde o deploy de produção e abra a Central Web.
 3. Entre em **PPR**, preencha os resultados e use **Visualizar em 16:9**.
 4. Ative o módulo apenas depois de revisar os setores e TVs selecionados.
-5. Para Roku, gere e reinstale `dist/Central_Dashboards_TVs_Roku.zip`.
+5. Para Roku, gere e reinstale o ZIP numerado da versão atual, por exemplo
+   `dist/Central_Dashboard_Tvs_Roku_V_17.zip`.
 
 Antes de publicar, execute:
 
@@ -139,7 +140,7 @@ Supabase da Central Web, mas funciona somente como visualizador:
 - a TV escolhe uma estação usando o controle remoto;
 - o Roku recebe a programação e filtra dashboards e avisos por área;
 - a estação escolhida fica salva localmente na TV;
-- alterações da Central são consultadas automaticamente a cada 10 segundos.
+- alterações da Central são consultadas automaticamente a cada 60 segundos.
 
 Como o Roku não possui o navegador usado pelo player web, cada dashboard pode
 receber uma **Imagem para o aplicativo Roku**. O campo fica no formulário de
@@ -154,8 +155,11 @@ npm.cmd run roku:check
 npm.cmd run roku:package
 ```
 
-O pacote será criado em `dist/Central_Dashboards_TVs_Roku.zip`. As instruções
-de instalação por modo desenvolvedor estão em [`roku/README.md`](roku/README.md).
+O pacote recebe automaticamente o `build_version` do manifesto no nome, por
+exemplo `dist/Central_Dashboard_Tvs_Roku_V_17.zip`. Os ZIPs anteriores são
+preservados na pasta `dist`, permitindo reinstalar rapidamente a última versão
+estável. As instruções de instalação por modo desenvolvedor estão em
+[`roku/README.md`](roku/README.md).
 
 ## Capturas manuais para o Roku
 

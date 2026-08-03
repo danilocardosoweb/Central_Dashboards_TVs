@@ -1,22 +1,37 @@
 param(
     [string]$SourceDirectory = "roku",
-    [string]$OutputFile = "dist/Central_Dashboards_TVs_Roku.zip"
+    [string]$OutputFile = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $sourcePath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $SourceDirectory))
-$outputPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputFile))
-$distPath = Split-Path -Parent $outputPath
+$manifestPath = Join-Path $sourcePath "manifest"
 
-if (-not (Test-Path -LiteralPath (Join-Path $sourcePath "manifest"))) {
+if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Manifesto Roku não encontrado em $sourcePath"
 }
 
+$versionLine = Get-Content -LiteralPath $manifestPath |
+    Where-Object { $_ -match '^build_version=(\d+)\s*$' } |
+    Select-Object -First 1
+
+if (-not $versionLine -or $versionLine -notmatch '^build_version=(\d+)\s*$') {
+    throw "build_version não encontrado no manifesto Roku."
+}
+
+$buildVersion = [int]$Matches[1]
+if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+    $OutputFile = "dist/Central_Dashboard_TVs_Roku_V_$buildVersion.zip"
+}
+
+$outputPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputFile))
+$distPath = Split-Path -Parent $outputPath
+
 New-Item -ItemType Directory -Force -Path $distPath | Out-Null
 if (Test-Path -LiteralPath $outputPath) {
-    Remove-Item -LiteralPath $outputPath -Force
+    throw "O pacote V_$buildVersion ja existe. Incremente build_version para preservar a versao anterior."
 }
 
 Add-Type -AssemblyName System.IO.Compression
@@ -58,3 +73,4 @@ finally {
 }
 
 Write-Output "Pacote Roku criado: $outputPath"
+Write-Output "Versão do pacote: V_$buildVersion"

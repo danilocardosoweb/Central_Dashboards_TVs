@@ -1,25 +1,33 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { readConfiguration } from '../renderer/capture.mjs';
+import { readResilientState, updateResilientState } from '../renderer/state-store.mjs';
 import {
-  readResilientState,
-  updateResilientState
-} from '../renderer/state-store.mjs';
+  errorDetails,
+  logEvent,
+  summarizeStateRow,
+  traceIdFromRequest
+} from '../renderer/telemetry.mjs';
 
 const MAX_STATE_BYTES = 8 * 1024 * 1024;
 
-function setCommonHeaders(response) {
+function setCommonHeaders(response, traceId = '') {
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store, max-age=0');
   response.setHeader('Access-Control-Allow-Origin', '*');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Central-Trace-Id');
   response.setHeader('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS');
+  response.setHeader('Access-Control-Expose-Headers', 'X-Central-Trace-Id, X-Central-State-Revision');
+  if (traceId) response.setHeader('X-Central-Trace-Id', traceId);
 }
 
-function json(response, status, payload) {
+function json(response, status, payload, traceId = '') {
   response.status(status);
-  setCommonHeaders(response);
-  response.end(JSON.stringify(payload));
+  setCommonHeaders(response, traceId);
+  if (payload?.revision != null) {
+    response.setHeader('X-Central-State-Revision', String(payload.revision));
+  }
+  response.end(JSON.stringify(traceId ? { ...payload, traceId } : payload));
 }
 
 function requestBody(request) {
@@ -50,84 +58,108 @@ function captureEndpoint(request) {
   return `${protocol}://${host}/api/capture`;
 }
 
-async function readState(response, supabase, config) {
-  const result = await readResilientState(supabase, config, {
-    databaseFallback: false
-  });
+async function readState(response, supabase, config, traceId) {
+  const startedAt = Date.now();
+  const result = await readResilientState(supabase, config, { databaseFallback: false });
   if (!result.row) {
+    logEvent('state-api', 'read.missing', {
+      traceId,
+      source: result.source,
+      elapsedMs: Date.now() - startedAt
+    }, 'warn');
     return json(response, 404, {
       ok: false,
       missing: true,
       source: result.source,
       message: 'O estado central ainda não foi criado no Storage.'
-    });
+    }, traceId);
   }
+
+  const summary = summarizeStateRow(result.row);
+  logEvent('state-api', 'read.complete', {
+    traceId,
+    source: result.source,
+    elapsedMs: Date.now() - startedAt,
+    ...summary
+  });
   return json(response, 200, {
     ...result.row,
     source: result.source,
     service: 'central-dashboards-state',
-    version: 'storage-v3'
-  });
+    version: 'storage-v4-observable'
+  }, traceId);
 }
 
-async function saveState(request, response, supabase, config) {
+async function saveState(request, response, supabase, config, traceId) {
+  const startedAt = Date.now();
   const body = requestBody(request);
-  const payload = body.payload && typeof body.payload === 'object'
-    ? body.payload
-    : null;
+  const payload = body.payload && typeof body.payload === 'object' ? body.payload : null;
   if (!payload) {
-    return json(response, 400, { ok: false, error: 'Payload inválido.' });
+    logEvent('state-api', 'save.rejected', { traceId, reason: 'invalid-payload' }, 'warn');
+    return json(response, 400, { ok: false, error: 'Payload inválido.' }, traceId);
   }
 
   const serialized = JSON.stringify(payload);
-  if (Buffer.byteLength(serialized, 'utf8') > MAX_STATE_BYTES) {
+  const payloadBytes = Buffer.byteLength(serialized, 'utf8');
+  if (payloadBytes > MAX_STATE_BYTES) {
+    logEvent('state-api', 'save.rejected', { traceId, reason: 'payload-too-large', payloadBytes }, 'warn');
     return json(response, 413, {
       ok: false,
       error: 'A configuração ultrapassou o limite de 8 MB.'
-    });
+    }, traceId);
   }
 
-  const result = await updateResilientState(
-    supabase,
-    config,
-    () => payload,
-    {
-      expectedRevision: body.expectedRevision,
-      updatedAt: body.updatedAt,
-      databaseFallback: false
-    }
-  );
+  const result = await updateResilientState(supabase, config, () => payload, {
+    expectedRevision: body.expectedRevision,
+    updatedAt: body.updatedAt,
+    databaseFallback: false
+  });
   if (result.conflict) {
+    logEvent('state-api', 'save.conflict', {
+      traceId,
+      expectedRevision: body.expectedRevision,
+      currentRevision: result.row?.revision,
+      elapsedMs: Date.now() - startedAt
+    }, 'warn');
     return json(response, 409, {
       ok: false,
       conflict: true,
       row: result.row,
       error: 'A configuração mudou em outro dispositivo.'
-    });
+    }, traceId);
   }
 
+  const summary = summarizeStateRow(result.row);
+  logEvent('state-api', 'save.complete', {
+    traceId,
+    expectedRevision: body.expectedRevision,
+    payloadBytes,
+    elapsedMs: Date.now() - startedAt,
+    ...summary
+  });
   return json(response, 200, {
     ...result.row,
     ok: true,
     source: 'storage',
     service: 'central-dashboards-state',
-    version: 'storage-v3'
-  });
+    version: 'storage-v4-observable'
+  }, traceId);
 }
 
-async function processNextCapture(request, response) {
+async function processNextCapture(request, response, traceId) {
   if (!process.env.CAPTURE_API_SECRET) {
     return json(response, 503, {
       ok: false,
       error: 'CAPTURE_API_SECRET não configurada na Vercel.'
-    });
+    }, traceId);
   }
 
   const captureResponse = await fetch(captureEndpoint(request), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.CAPTURE_API_SECRET}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Central-Trace-Id': traceId
     },
     body: '{}'
   });
@@ -135,13 +167,21 @@ async function processNextCapture(request, response) {
     ok: false,
     error: `Capturador retornou ${captureResponse.status}.`
   }));
-  return json(response, captureResponse.status, payload);
+  logEvent('state-api', 'capture-next.complete', {
+    traceId,
+    status: captureResponse.status,
+    ok: payload?.ok === true,
+    skipped: payload?.skipped === true,
+    dashboardCount: Array.isArray(payload?.dashboards) ? payload.dashboards.length : 0
+  }, captureResponse.ok ? 'info' : 'error');
+  return json(response, captureResponse.status, payload, traceId);
 }
 
 export default async function handler(request, response) {
+  const traceId = traceIdFromRequest(request);
   if (request.method === 'OPTIONS') {
     response.status(204);
-    setCommonHeaders(response);
+    setCommonHeaders(response, traceId);
     return response.end();
   }
 
@@ -149,32 +189,32 @@ export default async function handler(request, response) {
     return json(response, 503, {
       ok: false,
       error: 'SUPABASE_RENDERER_KEY não configurada na Vercel.'
-    });
+    }, traceId);
   }
 
   try {
     const { config, supabase } = createStateClient();
-    if (request.method === 'GET') {
-      return await readState(response, supabase, config);
-    }
-    if (request.method === 'PUT') {
-      return await saveState(request, response, supabase, config);
-    }
+    if (request.method === 'GET') return await readState(response, supabase, config, traceId);
+    if (request.method === 'PUT') return await saveState(request, response, supabase, config, traceId);
     if (request.method === 'POST') {
       const body = requestBody(request);
       if (body.action === 'capture-next') {
-        return await processNextCapture(request, response);
+        return await processNextCapture(request, response, traceId);
       }
-      return json(response, 400, { ok: false, error: 'Ação desconhecida.' });
+      return json(response, 400, { ok: false, error: 'Ação desconhecida.' }, traceId);
     }
 
     response.setHeader('Allow', 'GET, PUT, POST, OPTIONS');
-    return json(response, 405, { ok: false, error: 'Método não permitido.' });
+    return json(response, 405, { ok: false, error: 'Método não permitido.' }, traceId);
   } catch (error) {
-    console.error('[estado] Falha geral:', error);
+    logEvent('state-api', 'request.failed', {
+      traceId,
+      method: request.method,
+      error: errorDetails(error)
+    }, 'error');
     return json(response, 500, {
       ok: false,
       error: error instanceof Error ? error.message : String(error)
-    });
+    }, traceId);
   }
 }

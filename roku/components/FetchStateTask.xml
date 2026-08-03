@@ -4,6 +4,10 @@
         <field id="endpoint" type="string" />
         <field id="result" type="assocarray" />
         <field id="error" type="string" />
+        <field id="traceId" type="string" />
+        <field id="statusCode" type="integer" />
+        <field id="fromCache" type="boolean" />
+        <field id="warning" type="string" />
     </interface>
     <script type="text/brightscript" uri="pkg:/components/FetchStateTask.brs" />
 </component>

@@ -14,6 +14,7 @@ import {
   readResilientState,
   updateResilientState
 } from './state-store.mjs';
+import { logEvent } from './telemetry.mjs';
 
 const DEFAULT_SUPABASE_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
 const DEFAULT_PUBLISHABLE_KEY =
@@ -436,6 +437,7 @@ async function persistCaptureStarts(supabase, config, dashboards) {
 }
 
 export async function runCaptureCycle(config) {
+  const cycleStartedAt = Date.now();
   await fs.mkdir(config.outputDirectory, { recursive: true });
 
   const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
@@ -451,6 +453,15 @@ export async function runCaptureCycle(config) {
     ? centralRow.payload.urls
     : [];
   const dashboards = selectDashboardsForCapture(allDashboards, config);
+  logEvent('capture-renderer', 'cycle-start', {
+    revision: Number(centralRow.revision) || 0,
+    configuredDashboards: allDashboards.length,
+    selectedDashboards: dashboards.length,
+    selectedIds: dashboards.map(item => item.id),
+    localOnly: config.localOnly,
+    width: config.outputWidth,
+    height: config.outputHeight
+  });
 
   if (!dashboards.length) {
     console.log('[captura] Nenhum dashboard disponível.');
@@ -485,6 +496,8 @@ export async function runCaptureCycle(config) {
   try {
     for (const dashboard of dashboards) {
       const page = await context.newPage();
+      const dashboardStartedAt = Date.now();
+      logEvent('capture-renderer', 'dashboard-start', { dashboardId: dashboard.id });
       console.log(`[captura] Abrindo: ${dashboard.name || dashboard.id}`);
       const result = await captureDashboard(page, dashboard, config);
       await page.close().catch(() => {});
@@ -509,6 +522,14 @@ export async function runCaptureCycle(config) {
         );
       }
       results.push(result);
+      logEvent('capture-renderer', 'dashboard-complete', {
+        dashboardId: dashboard.id,
+        ok: result.ok,
+        elapsedMs: Date.now() - dashboardStartedAt,
+        reportDetected: result.reportDetected === true,
+        capturedAt: result.capturedAt,
+        error: result.error || null
+      }, result.ok ? 'info' : 'error');
 
       if (!config.localOnly) {
         const { image, ...serializable } = result;
@@ -529,6 +550,12 @@ export async function runCaptureCycle(config) {
   }
 
   const successes = results.filter((result) => result.ok).length;
+  logEvent('capture-renderer', 'cycle-complete', {
+    elapsedMs: Date.now() - cycleStartedAt,
+    successes,
+    failures: results.length - successes,
+    dashboardIds: results.map(item => item.id)
+  }, successes === results.length ? 'info' : 'warn');
   const failures = results.length - successes;
   return { successes, failures, results };
 }

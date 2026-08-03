@@ -14,6 +14,11 @@ import {
   completeCapture
 } from '../renderer/capture-queue.mjs';
 import { updateResilientState } from '../renderer/state-store.mjs';
+import {
+  errorDetails,
+  logEvent,
+  traceIdFromRequest
+} from '../renderer/telemetry.mjs';
 
 export function isAuthorized(authorizationHeader, expectedSecret) {
   if (!expectedSecret || typeof authorizationHeader !== 'string') return false;
@@ -43,11 +48,14 @@ export function sanitizedSummary(summary, elapsedMs) {
   };
 }
 
-function json(response, status, payload) {
+function json(response, status, payload, traceId = '') {
   response.status(status);
   response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.setHeader('Cache-Control', 'no-store');
-  response.end(JSON.stringify(payload));
+  response.setHeader('Access-Control-Allow-Origin', '*');
+  response.setHeader('Access-Control-Expose-Headers', 'X-Central-Trace-Id');
+  if (traceId) response.setHeader('X-Central-Trace-Id', traceId);
+  response.end(JSON.stringify(traceId ? { ...payload, traceId } : payload));
 }
 
 async function captureHealth() {
@@ -115,6 +123,7 @@ async function finishQueuedDashboard(supabase, config, dashboardId, result) {
 }
 
 export default async function handler(request, response) {
+  const traceId = traceIdFromRequest(request);
   if (request.method === 'GET') {
     const payload = {
       ok: true,
@@ -134,14 +143,16 @@ export default async function handler(request, response) {
         };
       }
     }
-    return json(response, 200, payload);
+    logEvent('capture-api', 'health', { traceId, ...payload });
+    return json(response, 200, payload, traceId);
   }
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'GET, POST');
-    return json(response, 405, { ok: false, error: 'Use GET ou POST.' });
+    return json(response, 405, { ok: false, error: 'Use GET ou POST.' }, traceId);
   }
 
   if (!isAuthorized(request.headers.authorization, process.env.CAPTURE_API_SECRET)) {
+    logEvent('capture-api', 'unauthorized', { traceId }, 'warn');
     return json(response, 401, { ok: false, error: 'Não autorizado.' });
   }
 
@@ -162,6 +173,11 @@ export default async function handler(request, response) {
       ? request.body.dashboardIds.map(String).filter(Boolean)
       : [];
     let queuedDashboardId = '';
+    logEvent('capture-api', 'request-start', {
+      traceId,
+      mode: explicitDashboardIds.length ? 'explicit' : 'queue',
+      requestedCount: explicitDashboardIds.length
+    });
 
     if (!explicitDashboardIds.length) {
       const claim = await claimQueuedDashboard(supabase, baseConfig);
@@ -175,6 +191,7 @@ export default async function handler(request, response) {
         });
       }
       queuedDashboardId = claim.dashboardId;
+      logEvent('capture-api', 'queue-claimed', { traceId, dashboardId: queuedDashboardId });
     }
 
     chromiumBinary.setGraphicsMode = false;
@@ -193,8 +210,7 @@ export default async function handler(request, response) {
           process.env.CAPTURE_NAVIGATION_TIMEOUT_MS || '60000',
         CAPTURE_DETECTION_TIMEOUT_MS:
           process.env.CAPTURE_DETECTION_TIMEOUT_MS || '30000',
-        CAPTURE_MAX_DASHBOARDS:
-          process.env.CAPTURE_MAX_DASHBOARDS || '1',
+        CAPTURE_MAX_DASHBOARDS: String(Math.max(1, dashboardIds.length)),
         CAPTURE_ONLY_IDS: dashboardIds.join(',') || process.env.CAPTURE_ONLY_IDS || ''
       },
       []
@@ -235,13 +251,24 @@ export default async function handler(request, response) {
       : null;
     const payload = sanitizedSummary(summary, Date.now() - startedAt);
     if (captureRequest) payload.captureRequest = captureRequest;
-    return json(response, summary.failures > 0 ? 207 : 200, payload);
+    logEvent('capture-api', 'request-complete', {
+      traceId,
+      elapsedMs: payload.elapsedMs,
+      successes: payload.successes,
+      failures: payload.failures,
+      dashboardIds: payload.dashboards.map(item => item.id)
+    }, summary.failures > 0 ? 'warn' : 'info');
+    return json(response, summary.failures > 0 ? 207 : 200, payload, traceId);
   } catch (error) {
-    console.error('[captura-cloud] Falha geral:', error);
+    logEvent('capture-api', 'request-error', {
+      traceId,
+      elapsedMs: Date.now() - startedAt,
+      ...errorDetails(error)
+    }, 'error');
     return json(response, 500, {
       ok: false,
       elapsedMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : String(error)
-    });
+    }, traceId);
   }
 }
