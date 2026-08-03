@@ -104,6 +104,7 @@ sub init()
     m.pendingImageUri = ""
     m.pendingSlide = invalid
     m.introPlaying = false
+    m.preservePlaybackOnBuild = false
 
     applyResolutionScale()
     startIntroVideo()
@@ -193,6 +194,7 @@ sub onFetchResult()
         return
     end if
 
+    m.preservePlaybackOnBuild = m.state <> invalid
     m.lastRevision = revision
     m.lastUpdatedAt = updatedAt
     m.state = payload
@@ -325,6 +327,15 @@ end sub
 sub buildPlaylist()
     if m.state = invalid or m.currentStation = invalid then return
 
+    previousSlide = invalid
+    previousSlideSignature = ""
+    preservePlayback = m.preservePlaybackOnBuild
+    m.preservePlaybackOnBuild = false
+    if preservePlayback and m.slideIndex >= 0 and m.slideIndex < m.slides.Count()
+        previousSlide = m.slides[m.slideIndex]
+        previousSlideSignature = FormatJson(previousSlide)
+    end if
+
     areaId = valueOr(m.currentStation, "areaId", "geral")
     urls = arrayOrEmpty(valueOr(m.state, "urls", []))
     alerts = arrayOrEmpty(valueOr(m.state, "alerts", []))
@@ -336,6 +347,7 @@ sub buildPlaylist()
     for each dashboard in urls
         if belongsToArea(dashboard, areaId)
             dashboardSlides.Push({
+                id: valueOr(dashboard, "id", "")
                 kind: "dashboard"
                 title: valueOr(dashboard, "name", "Dashboard")
                 body: "Conteúdo cadastrado na Central Web."
@@ -352,6 +364,7 @@ sub buildPlaylist()
                 bannerAlerts.Push(alert)
             else
                 alertSlides.Push({
+                    id: valueOr(alert, "id", "")
                     kind: "alert"
                     source: alert
                     title: valueOr(alert, "title", "Comunicado")
@@ -385,11 +398,25 @@ sub buildPlaylist()
         appendSlides(m.slides, alertSlides)
     end if
 
-    renderActiveBanner()
     stationName = valueOr(m.currentStation, "name", "Esta TV")
     m.stationLabel.text = stationName + "  •  " + getAreaName(areaId)
 
-    m.slideIndex = -1
+    preservedIndex = findSlideIndex(m.slides, previousSlide)
+    if preservedIndex >= 0
+        m.slideIndex = preservedIndex
+        renderActiveBanner()
+        currentSlideSignature = FormatJson(m.slides[preservedIndex])
+        if currentSlideSignature = previousSlideSignature
+            ' A sincronização alterou outro item (por exemplo, uma captura
+            ' ainda em andamento). Manter a tela e o cronômetro atuais evita
+            ' voltar ao primeiro dashboard a cada revisão do estado.
+            updateSlideStatus()
+            return
+        end if
+        m.slideIndex = preservedIndex - 1
+    else
+        m.slideIndex = -1
+    end if
     if m.slides.Count() = 0
         showEmptyState()
     else
@@ -677,19 +704,20 @@ function buildPprSlides(ppr as dynamic) as object
     indicators = activePprIndicators(ppr)
     duration = valueOr(ppr, "duration", 30)
     if valueOr(ppr, "showSummary", true)
-        result.Push({ kind: "ppr-summary", source: ppr, duration: duration })
+        result.Push({ id: "ppr-summary", kind: "ppr-summary", source: ppr, duration: duration })
     end if
     if valueOr(ppr, "showIndicators", true) and indicators.Count() > 0
         if LCase(valueOr(ppr, "displayMode", "individual")) = "general"
-            result.Push({ kind: "ppr-general", source: ppr, duration: duration })
+            result.Push({ id: "ppr-general", kind: "ppr-general", source: ppr, duration: duration })
         else
             for each indicator in indicators
-                result.Push({ kind: "ppr-individual", source: ppr, indicator: indicator, duration: duration })
+                indicatorId = valueOr(indicator, "id", valueOr(indicator, "name", "ppr-indicator"))
+                result.Push({ id: "ppr-" + indicatorId, kind: "ppr-individual", source: ppr, indicator: indicator, duration: duration })
             end for
         end if
     end if
     if result.Count() = 0
-        result.Push({ kind: "ppr-summary", source: ppr, duration: duration })
+        result.Push({ id: "ppr-summary", kind: "ppr-summary", source: ppr, duration: duration })
     end if
     return result
 end function
@@ -1189,6 +1217,24 @@ function arrayOrEmpty(value as dynamic) as object
         return value
     end if
     return []
+end function
+
+function slideIdentity(slide as dynamic) as string
+    if slide = invalid then return ""
+    kind = valueOr(slide, "kind", "slide")
+    id = valueOr(slide, "id", "")
+    if id <> "" then return kind + ":" + id
+    return kind + ":" + valueOr(slide, "title", "")
+end function
+
+function findSlideIndex(slides as object, previousSlide as dynamic) as integer
+    identity = slideIdentity(previousSlide)
+    if identity = "" then return -1
+    if slides.Count() = 0 then return -1
+    for index = 0 to slides.Count() - 1
+        if slideIdentity(slides[index]) = identity then return index
+    end for
+    return -1
 end function
 
 function belongsToArea(item as dynamic, areaId as string) as boolean

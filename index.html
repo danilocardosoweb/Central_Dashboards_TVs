@@ -8371,6 +8371,7 @@
             let cloudSaveQueued = false;
             let cloudRevision = 0;
             let cloudPayloadSignature = '';
+            let cloudPlaybackSignature = '';
             let cloudPollTimer = null;
             let captureWorkerRunning = false;
             const cloudDirtySections = new Set();
@@ -8466,6 +8467,28 @@
 
             function payloadSignature(payload) {
                 return JSON.stringify(payload || {});
+            }
+
+            function playbackPayloadSignature(payload) {
+                const state = payload && typeof payload === 'object' ? payload : {};
+                const dashboards = (Array.isArray(state.urls) ? state.urls : []).map(item => {
+                    const dashboard = item && typeof item === 'object' ? { ...item } : {};
+                    delete dashboard.rokuImageUrl;
+                    delete dashboard.rokuCapturedAt;
+                    delete dashboard.rokuCaptureAttemptedAt;
+                    delete dashboard.rokuCaptureStatus;
+                    delete dashboard.rokuCaptureError;
+                    delete dashboard.snapshotUrl;
+                    return dashboard;
+                });
+                return JSON.stringify({
+                    urls: dashboards,
+                    areas: Array.isArray(state.areas) ? state.areas : [],
+                    stations: Array.isArray(state.stations) ? state.stations : [],
+                    alerts: Array.isArray(state.alerts) ? state.alerts : [],
+                    ppr: state.ppr || {},
+                    settings: state.settings || {}
+                });
             }
 
             function dashboardIdentity(item) {
@@ -8739,6 +8762,8 @@
             function applyCloudPayload(payload) {
                 const state = payload && typeof payload === 'object' ? payload : {};
                 const settings = state.settings || {};
+                const nextPlaybackSignature = playbackPayloadSignature(state);
+                const playbackChanged = nextPlaybackSignature !== cloudPlaybackSignature;
                 cloudApplyingState = true;
 
                 try {
@@ -8813,7 +8838,17 @@
                             String(Number(settings.refreshInterval) || 5);
                     }
                     applyTransitionDuration();
-                    refreshAreaExperience();
+                    if (playbackChanged) {
+                        refreshAreaExperience();
+                    } else {
+                        // O progresso da captura e as URLs das imagens do Roku
+                        // não alteram a apresentação no navegador. Atualizar
+                        // somente os controles evita recarregar todos os iframes
+                        // e voltar ao primeiro dashboard a cada captura.
+                        updateUrlList();
+                        updatePresentationEstimate();
+                    }
+                    cloudPlaybackSignature = nextPlaybackSignature;
                     renderCaptureRequestStatus(state.capture);
                 } finally {
                     cloudApplyingState = false;

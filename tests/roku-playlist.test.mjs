@@ -54,3 +54,11 @@ test('sincroniza quando updated_at muda mesmo sem nova revisao', () => {
   assert.match(scene, /m\.lastUpdatedAt = ""/);
   assert.match(scene, /revision = m\.lastRevision and updatedAt = m\.lastUpdatedAt/);
 });
+
+test('sincronizacao preserva o slide atual quando outro item foi atualizado', () => {
+  assert.match(scene, /m\.preservePlaybackOnBuild = m\.state <> invalid/);
+  assert.match(scene, /previousSlideSignature = FormatJson\(previousSlide\)/);
+  assert.match(scene, /preservedIndex = findSlideIndex\(m\.slides, previousSlide\)/);
+  assert.match(scene, /if currentSlideSignature = previousSlideSignature/);
+  assert.match(scene, /updateSlideStatus\(\)\s+return/);
+});
