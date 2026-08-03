@@ -117,6 +117,7 @@ sub startIntroVideo()
     content = CreateObject("roSGNode", "ContentNode")
     content.url = "pkg:/videos/intro.mp4"
     content.streamFormat = "mp4"
+    m.introVideo.visible = true
     m.introVideo.content = content
     m.introGroup.visible = true
     m.introPlaying = true
@@ -126,7 +127,7 @@ end sub
 
 sub onIntroVideoState()
     state = m.introVideo.state
-    if state = "finished" or state = "error"
+    if state = "finished" or state = "error" or state = "stopped"
         finishIntroVideo()
     end if
 end sub
@@ -140,6 +141,8 @@ sub finishIntroVideo()
     m.introPlaying = false
     m.introFallbackTimer.control = "stop"
     m.introVideo.control = "stop"
+    m.introVideo.visible = false
+    m.introVideo.content = invalid
     m.introGroup.visible = false
 
     if m.stationOverlay.visible
