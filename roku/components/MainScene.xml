@@ -85,7 +85,7 @@
                         text="PROGRAMA DE PARTICIPAÇÃO NOS RESULTADOS" color="0x38BDF8FF"
                         font="font:MediumBoldSystemFont" />
                     <Label id="pprTitle" translation="[92,118]" width="1300" height="76"
-                        text="Acompanhamento do PPR" color="0xF8FAFCFF"
+                        text="Acompanhamento do PPR" color="0x0F172AFF"
                         font="font:LargeBoldSystemFont" />
                     <Label id="pprPeriod" translation="[1430,82]" width="390" height="58"
                         horizAlign="center" color="0x1E40AFFF" font="font:MediumBoldSystemFont" />
@@ -106,13 +106,13 @@
                     <Label id="pprValueCaption" translation="[650,278]" width="1050" height="42"
                         text="DESEMPENHO ATUAL" color="0x2563EBFF" font="font:MediumBoldSystemFont" />
                     <Label id="pprValue" translation="[650,320]" width="1050" height="150"
-                        color="0xF8FAFCFF" font="font:LargeBoldSystemFont" />
+                        color="0x0F172AFF" font="font:LargeBoldSystemFont" />
                     <Label id="pprGoalContext" translation="[650,462]" width="1080" height="48"
                         color="0x2563EBFF" font="font:MediumBoldSystemFont" />
                     <Label id="pprName" translation="[650,522]" width="1080" height="82" wrap="true"
-                        color="0xF8FAFCFF" font="font:LargeBoldSystemFont" />
+                        color="0x0F172AFF" font="font:LargeBoldSystemFont" />
                     <Label id="pprDescription" translation="[650,612]" width="1080" height="90" wrap="true"
-                        color="0xCBD5E1FF" font="font:MediumSystemFont" />
+                        color="0x64748BFF" font="font:MediumSystemFont" />
                     <Rectangle id="pprProgressTrack" translation="[650,718]" width="1020" height="12" color="0xCBD5E1FF" />
                     <Rectangle id="pprProgressFill" translation="[650,718]" width="0" height="12" color="0x2563EBFF" />
                     <Rectangle id="pprStatusBackground" translation="[650,756]" width="1020" height="86" color="0x166534FF" />
@@ -231,14 +231,15 @@
                     height="1080"
                     visible="true"
                     loop="false"
+                    notificationInterval="1"
                     enableUI="false" />
             </Group>
 
             <Timer id="slideTimer" repeat="false" />
             <Timer id="syncTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />
-            <Timer id="imageLoadTimer" duration="12" repeat="false" />
-            <Timer id="introFallbackTimer" duration="15" repeat="false" />
+            <Timer id="imageLoadTimer" duration="8" repeat="false" />
+            <Timer id="introFallbackTimer" duration="12" repeat="false" />
             <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">
                 <FloatFieldInterpolator
                     key="[0.0,1.0]"

@@ -81,6 +81,7 @@ sub init()
     m.transitionTimer.ObserveField("fire", "onTransitionTimer")
     m.imageLoadTimer.ObserveField("fire", "onImageLoadTimer")
     m.introVideo.ObserveField("state", "onIntroVideoState")
+    m.introVideo.ObserveField("position", "onIntroVideoPosition")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
     m.dashboardImageA.ObserveField("loadStatus", "onImageALoadStatus")
     m.dashboardImageB.ObserveField("loadStatus", "onImageBLoadStatus")
@@ -103,7 +104,9 @@ sub init()
     m.pendingImageName = ""
     m.pendingImageUri = ""
     m.pendingSlide = invalid
+    m.pendingImageAttempts = 0
     m.introPlaying = false
+    m.introRemoved = false
     m.preservePlaybackOnBuild = false
 
     applyResolutionScale()
@@ -132,6 +135,11 @@ sub onIntroVideoState()
     end if
 end sub
 
+sub onIntroVideoPosition()
+    if not m.introPlaying then return
+    if m.introVideo.position >= 9.5 then finishIntroVideo()
+end sub
+
 sub onIntroFallbackTimer()
     finishIntroVideo()
 end sub
@@ -144,6 +152,11 @@ sub finishIntroVideo()
     m.introVideo.visible = false
     m.introVideo.content = invalid
     m.introGroup.visible = false
+    m.introGroup.translation = [2500.0, 0.0]
+    if not m.introRemoved
+        m.introGroup.RemoveChild(m.introVideo)
+        m.introRemoved = true
+    end if
 
     if m.stationOverlay.visible
         m.stationList.SetFocus(true)
@@ -208,9 +221,9 @@ end sub
 
 sub onFetchError()
     errorMessage = m.fetchTask.error
-    if errorMessage = "" then return
     m.fetching = false
-    m.syncLabel.text = "Sem sincronização • nova tentativa em 10s"
+    if errorMessage = "" then errorMessage = "Não foi possível consultar a Central."
+    m.syncLabel.text = "Sem sincronização • nova tentativa em 60s"
     m.loading.control = "stop"
     m.loading.visible = false
 
@@ -348,7 +361,7 @@ sub buildPlaylist()
     pprSlides = []
 
     for each dashboard in urls
-        if belongsToArea(dashboard, areaId)
+        if isDashboardActive(dashboard) and belongsToArea(dashboard, areaId)
             dashboardSlides.Push({
                 id: valueOr(dashboard, "id", "")
                 kind: "dashboard"
@@ -478,6 +491,7 @@ sub queueImageSlide(slide as object, imageUrl as string)
     cancelPendingImage()
     m.pendingSlide = slide
     m.pendingImageUri = imageUrl
+    m.pendingImageAttempts = 0
     if m.currentImageName = "A"
         m.pendingImageName = "B"
     else
@@ -508,19 +522,8 @@ sub handlePendingImageStatus(status as string)
     if status = "ready"
         beginImageTransition()
     else if status = "failed"
-        failedSlide = m.pendingSlide
-        failedTarget = posterFor(m.pendingImageName)
-        failedTarget.visible = false
-        failedTarget.uri = ""
-        m.imageLoadTimer.control = "stop"
-        m.pendingImageName = ""
-        m.pendingImageUri = ""
-        m.pendingSlide = invalid
-        if m.currentImageName = ""
-            renderDashboardPlaceholder(failedSlide)
-            m.messagePanel.visible = true
-        end if
-        startSlideTimer(failedSlide)
+        if retryPendingImage() then return
+        showImageLoadFailure(m.pendingSlide)
     end if
 end sub
 
@@ -531,18 +534,38 @@ sub onImageLoadTimer()
         beginImageTransition()
         return
     end if
+    if retryPendingImage() then return
+    showImageLoadFailure(m.pendingSlide)
+end sub
 
-    timedOutSlide = m.pendingSlide
-    target.visible = false
+function retryPendingImage() as boolean
+    if m.pendingImageName = "" or m.pendingSlide = invalid then return false
+    if m.pendingImageAttempts >= 1 then return false
+    m.pendingImageAttempts = m.pendingImageAttempts + 1
+    target = posterFor(m.pendingImageName)
+    separator = "?"
+    if Instr(1, m.pendingImageUri, "?") > 0 then separator = "&"
+    now = CreateObject("roDateTime")
     target.uri = ""
-    m.pendingImageName = ""
-    m.pendingImageUri = ""
-    m.pendingSlide = invalid
-    if m.currentImageName = ""
-        renderDashboardPlaceholder(timedOutSlide)
-        m.messagePanel.visible = true
+    target.uri = m.pendingImageUri + separator + "roku_retry=" + m.pendingImageAttempts.ToStr() + "-" + now.AsSeconds().ToStr()
+    m.imageLoadTimer.control = "start"
+    return true
+end function
+
+sub showImageLoadFailure(slide as dynamic)
+    if slide = invalid then return
+    hideDashboardImages()
+    m.pprPanel.visible = false
+    m.messagePanel.visible = true
+    if valueOr(slide, "kind", "dashboard") = "alert"
+        renderAlertSlide(slide)
+    else
+        renderDashboardLoadFailure(slide)
     end if
-    startSlideTimer(timedOutSlide)
+    m.contentGroup.opacity = 0.0
+    m.fadeIn.control = "start"
+    updateSlideStatus()
+    startSlideTimer(slide)
 end sub
 
 sub beginImageTransition()
@@ -644,6 +667,7 @@ sub cancelPendingImage()
     m.pendingImageName = ""
     m.pendingImageUri = ""
     m.pendingSlide = invalid
+    m.pendingImageAttempts = 0
 end sub
 
 sub hideDashboardImages()
@@ -658,6 +682,7 @@ sub hideDashboardImages()
     m.pendingImageName = ""
     m.pendingImageUri = ""
     m.pendingSlide = invalid
+    m.pendingImageAttempts = 0
 end sub
 
 sub startSlideTimer(slide as dynamic)
@@ -679,7 +704,8 @@ function pprTargetsStation(ppr as dynamic, station as dynamic, areaId as string)
     stationIds = arrayOrEmpty(valueOr(ppr, "stationIds", ["*"]))
     areaIds = arrayOrEmpty(valueOr(ppr, "areaIds", ["*"]))
     stationId = valueOr(station, "id", "")
-    return targetListMatches(stationIds, stationId) and targetListMatches(areaIds, areaId)
+    areaMatches = areaId = "__all__" or targetListMatches(areaIds, areaId)
+    return targetListMatches(stationIds, stationId) and areaMatches
 end function
 
 function targetListMatches(values as object, currentValue as string) as boolean
@@ -1057,6 +1083,17 @@ sub renderDashboardPlaceholder(slide as object)
     m.meta.text = "O link do Power BI continua sendo exibido normalmente no player para navegador."
 end sub
 
+sub renderDashboardLoadFailure(slide as object)
+    m.accent.color = "0xF59E0BFF"
+    m.kicker.color = "0xFBBF24FF"
+    m.kicker.text = "DASHBOARD TEMPORARIAMENTE INDISPONÍVEL"
+    m.headline.text = valueOr(slide, "title", "Dashboard")
+    m.body.text = "A imagem desta página não pôde ser carregada. A apresentação continuará automaticamente."
+    m.action.text = "Verifique a conexão da TV. Na próxima volta, o aplicativo tentará carregar esta página novamente."
+    m.actionBackground.visible = true
+    m.meta.text = "As demais telas continuam na sequência."
+end sub
+
 sub renderAlertSlide(slide as object)
     alert = valueOr(slide, "source", {})
     category = valueOr(alert, "category", "info")
@@ -1248,6 +1285,10 @@ function belongsToArea(item as dynamic, areaId as string) as boolean
         if itemArea = "*" or itemArea = areaId then return true
     end for
     return false
+end function
+
+function isDashboardActive(dashboard as dynamic) as boolean
+    return valueOr(dashboard, "enabled", true)
 end function
 
 function dashboardImageUrl(dashboard as dynamic) as string

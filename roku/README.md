@@ -51,8 +51,12 @@ npm.cmd run roku:package
 O arquivo para instalar será criado em:
 
 ```text
-dist/Central_Dashboards_TVs_Roku.zip
+dist/Central_Dashboard_Tvs_Roku_V_17.zip
 ```
+
+O número vem de `build_version` no manifesto e deve aumentar em toda nova
+entrega. O gerador não apaga os pacotes de versões anteriores; mantenha-os para
+uma eventual reversão.
 
 ## Instalar na TV
 
