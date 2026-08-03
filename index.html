@@ -8048,6 +8048,28 @@
             let cloudRevision = 0;
             let cloudPayloadSignature = '';
             let cloudPollTimer = null;
+            const cloudDirtySections = new Set();
+
+            function cloudSectionForStorageKey(key) {
+                const sections = {
+                    dashboardUrls: 'urls',
+                    dashboardTvAreas: 'areas',
+                    dashboardTvStations: 'stations',
+                    dashboardAlertsV2: 'alerts',
+                    dashboardPprV1: 'ppr',
+                    transitionTime: 'settings',
+                    transitionEffect: 'settings',
+                    transitionDuration: 'settings',
+                    refreshInterval: 'settings',
+                    messageConfig: 'messageConfig'
+                };
+                return sections[String(key)] || '';
+            }
+
+            function markCloudSectionDirty(key) {
+                const section = cloudSectionForStorageKey(key);
+                if (section) cloudDirtySections.add(section);
+            }
 
             const originalStorageSetItem = Storage.prototype.setItem;
             if (!Storage.prototype.__dashboardCloudPatched) {
@@ -8058,6 +8080,7 @@
                         CLOUD_TRACKED_KEYS.has(String(key)) &&
                         !cloudApplyingState
                     ) {
+                        markCloudSectionDirty(key);
                         scheduleCloudSave();
                     }
                 };
@@ -8120,6 +8143,70 @@
 
             function payloadSignature(payload) {
                 return JSON.stringify(payload || {});
+            }
+
+            function dashboardIdentity(item) {
+                return String(item?.id || item?.name || '');
+            }
+
+            function mergeDashboardCaptureFields(remoteUrls, localUrls) {
+                const remoteById = new Map(
+                    (Array.isArray(remoteUrls) ? remoteUrls : [])
+                        .map(item => [dashboardIdentity(item), item])
+                        .filter(([id]) => id)
+                );
+                const captureFields = [
+                    'rokuImageUrl',
+                    'rokuCapturedAt',
+                    'rokuCaptureAttemptedAt',
+                    'rokuCaptureStatus',
+                    'rokuCaptureError',
+                    'rokuCaptureZoom'
+                ];
+
+                return (Array.isArray(localUrls) ? localUrls : []).map(local => {
+                    const remote = remoteById.get(dashboardIdentity(local));
+                    if (!remote) return local;
+                    const localTime = Date.parse(
+                        local.rokuCaptureAttemptedAt || local.rokuCapturedAt || 0
+                    ) || 0;
+                    const remoteTime = Date.parse(
+                        remote.rokuCaptureAttemptedAt || remote.rokuCapturedAt || 0
+                    ) || 0;
+                    if (remoteTime < localTime) return local;
+
+                    const merged = { ...local };
+                    captureFields.forEach(field => {
+                        if (Object.prototype.hasOwnProperty.call(remote, field)) {
+                            merged[field] = remote[field];
+                        }
+                    });
+                    return merged;
+                });
+            }
+
+            function mergeCloudPayload(remotePayload, localPayload, dirtySections) {
+                const remote = remotePayload && typeof remotePayload === 'object'
+                    ? remotePayload
+                    : {};
+                const local = localPayload && typeof localPayload === 'object'
+                    ? localPayload
+                    : {};
+                const merged = { ...remote, version: Math.max(1, Number(remote.version) || 1) };
+
+                dirtySections.forEach(section => {
+                    if (section === 'urls') {
+                        merged.urls = mergeDashboardCaptureFields(
+                            remote.urls,
+                            local.urls
+                        );
+                    } else if (section === 'messageConfig') {
+                        // Configuração legada: mantida localmente, sem alterar o player.
+                    } else if (Object.prototype.hasOwnProperty.call(local, section)) {
+                        merged[section] = local[section];
+                    }
+                });
+                return merged;
             }
 
             function formatCloudTime(value) {
@@ -8265,6 +8352,8 @@
 
                 cloudSaveInFlight = true;
                 cloudSaveQueued = false;
+                const sectionsToSave = new Set(cloudDirtySections);
+                cloudDirtySections.clear();
                 setCloudStatus(
                     'saving',
                     'Salvando na base central',
@@ -8272,44 +8361,78 @@
                 );
 
                 try {
-                    const payload = collectCloudPayload();
-                    const nextRevision = Math.max(0, cloudRevision) + 1;
-                    const response = await fetch(
-                        `${CLOUD_STATE_ENDPOINT}?on_conflict=id`,
-                        {
-                            method: 'POST',
-                            headers: cloudHeaders({
-                                Prefer:
-                                    'resolution=merge-duplicates,return=representation'
-                            }),
-                            body: JSON.stringify({
-                                id: CLOUD_ROW_ID,
-                                payload,
-                                revision: nextRevision,
-                                updated_at: new Date().toISOString()
-                            })
+                    if (options.force && sectionsToSave.size === 0) {
+                        const row = await readCloudRow();
+                        if (row) {
+                            cloudRevision = Number(row.revision) || 0;
+                            cloudPayloadSignature = payloadSignature(row.payload);
+                            applyCloudPayload(row.payload);
+                            setCloudStatus(
+                                'online',
+                                'Base central sincronizada',
+                                `Dados recebidos às ${formatCloudTime(row.updated_at)}.`
+                            );
+                            return;
                         }
-                    );
-
-                    if (!response.ok) {
-                        const error = await response.json().catch(() => ({}));
-                        throw new Error(
-                            error.message || `Falha ao salvar (${response.status}).`
-                        );
                     }
 
-                    const rows = await response.json();
-                    const savedRow = Array.isArray(rows) ? rows[0] : null;
-                    cloudRevision = Number(savedRow?.revision) || nextRevision;
+                    if (sectionsToSave.size === 0) return;
+                    let savedRow = null;
+                    let payload = null;
+                    for (let attempt = 0; attempt < 4; attempt += 1) {
+                        const remoteRow = await readCloudRow();
+                        const remoteRevision = Number(remoteRow?.revision) || 0;
+                        payload = mergeCloudPayload(
+                            remoteRow?.payload,
+                            collectCloudPayload(),
+                            sectionsToSave
+                        );
+                        const nextRevision = remoteRevision + 1;
+                        const now = new Date().toISOString();
+                        const isInsert = !remoteRow;
+                        const endpoint = isInsert
+                            ? `${CLOUD_STATE_ENDPOINT}?on_conflict=id`
+                            : `${CLOUD_STATE_ENDPOINT}?id=eq.${encodeURIComponent(CLOUD_ROW_ID)}&revision=eq.${remoteRevision}`;
+                        const response = await fetch(endpoint, {
+                            method: isInsert ? 'POST' : 'PATCH',
+                            headers: cloudHeaders({
+                                Prefer: isInsert
+                                    ? 'resolution=merge-duplicates,return=representation'
+                                    : 'return=representation'
+                            }),
+                            body: JSON.stringify({
+                                ...(isInsert ? { id: CLOUD_ROW_ID } : {}),
+                                payload,
+                                revision: nextRevision,
+                                updated_at: now
+                            })
+                        });
+                        if (!response.ok) {
+                            const error = await response.json().catch(() => ({}));
+                            throw new Error(
+                                error.message || `Falha ao salvar (${response.status}).`
+                            );
+                        }
+                        const rows = await response.json();
+                        savedRow = Array.isArray(rows) ? rows[0] : null;
+                        if (savedRow) break;
+                    }
+                    if (!savedRow) {
+                        throw new Error('A base mudou durante o salvamento. Tente novamente.');
+                    }
+
+                    cloudRevision = Number(savedRow.revision) || cloudRevision + 1;
                     cloudPayloadSignature = payloadSignature(payload);
                     cloudReady = true;
                     cloudPendingBeforeReady = false;
+                    applyCloudPayload(payload);
                     setCloudStatus(
                         'online',
                         'Base central sincronizada',
                         `Último envio às ${formatCloudTime(savedRow?.updated_at)}.`
                     );
                 } catch (error) {
+                    sectionsToSave.forEach(section => cloudDirtySections.add(section));
                     console.error('Erro ao salvar configuração central:', error);
                     setCloudStatus(
                         navigator.onLine ? 'error' : 'offline',
@@ -8323,6 +8446,8 @@
                     if (cloudSaveQueued) {
                         cloudSaveQueued = false;
                         scheduleCloudSave(250);
+                    } else if (cloudDirtySections.size > 0) {
+                        scheduleCloudSave(1200);
                     }
                 }
             }
@@ -8385,10 +8510,15 @@
                     if (!row) {
                         cloudReady = true;
                         cloudRevision = 0;
+                        ['urls', 'areas', 'stations', 'alerts', 'ppr', 'settings']
+                            .forEach(section => cloudDirtySections.add(section));
                         await saveCloudState({ force: true });
                     } else {
                         cloudRevision = Number(row.revision) || 0;
-                        if (hasCloudContent(row.payload)) {
+                        if (cloudDirtySections.size > 0) {
+                            cloudReady = true;
+                            await saveCloudState({ force: true });
+                        } else if (hasCloudContent(row.payload)) {
                             cloudPayloadSignature = payloadSignature(row.payload);
                             applyCloudPayload(row.payload);
                             setCloudStatus(
@@ -8399,6 +8529,8 @@
                         } else {
                             cloudReady = true;
                             cloudPayloadSignature = payloadSignature(localPayload);
+                            ['urls', 'areas', 'stations', 'alerts', 'ppr', 'settings']
+                                .forEach(section => cloudDirtySections.add(section));
                             await saveCloudState({ force: true });
                         }
                     }
