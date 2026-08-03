@@ -9,6 +9,12 @@ import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 
+import {
+  readDatabaseState,
+  readResilientState,
+  updateResilientState
+} from './state-store.mjs';
+
 const DEFAULT_SUPABASE_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
 const DEFAULT_PUBLISHABLE_KEY =
   'sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv';
@@ -28,7 +34,10 @@ export function readConfiguration(env = process.env, argv = process.argv.slice(2
       env.SUPABASE_PUBLISHABLE_KEY ||
       DEFAULT_PUBLISHABLE_KEY,
     bucket: env.SUPABASE_SNAPSHOT_BUCKET || 'roku-snapshots',
+    stateBucket: env.SUPABASE_STATE_BUCKET || 'central-state',
     rowId: env.SUPABASE_STATE_ROW_ID || 'central',
+    stateObject: env.SUPABASE_STATE_OBJECT || 'state/central.json',
+    mirrorDatabase: env.SUPABASE_MIRROR_DATABASE === 'true',
     outputDirectory: path.resolve(env.CAPTURE_OUTPUT_DIR || 'renderer/output'),
     outputWidth,
     outputHeight,
@@ -166,16 +175,19 @@ export function mergeCaptureStarts(payload, dashboards, attemptedAt) {
 }
 
 export async function readCentralRow(supabase, rowId) {
-  const { data, error } = await supabase
-    .from('tv_app_state')
-    .select('id,payload,revision,updated_at')
-    .eq('id', rowId)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw new Error(`Falha ao ler o estado central: ${error.message}`);
+  const data = await readDatabaseState(supabase, rowId);
   if (!data) throw new Error(`A linha central "${rowId}" não foi encontrada.`);
   return data;
+}
+
+export async function readCentralState(supabase, config) {
+  const result = await readResilientState(supabase, config, {
+    allowEmptyOnDatabaseError: false
+  });
+  if (!result.row) {
+    throw new Error('O arquivo central ainda não foi criado no Storage.');
+  }
+  return result.row;
 }
 
 async function waitForPowerBi(page, config) {
@@ -390,26 +402,14 @@ async function persistCaptureResults(supabase, config, results) {
   const maxAttempts = 4;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const latest = await readCentralRow(supabase, config.rowId);
-    const payload = mergeCaptureResults(latest.payload, results);
-    const nextRevision = Number(latest.revision || 0) + 1;
-
-    const { data, error } = await supabase
-      .from('tv_app_state')
-      .update({
-        payload,
-        revision: nextRevision,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', config.rowId)
-      .eq('revision', latest.revision)
-      .select('id,revision,updated_at');
-
-    if (error) {
-      throw new Error(`Falha ao atualizar o estado central: ${error.message}`);
-    }
-
-    if (Array.isArray(data) && data.length === 1) return data[0];
+    const current = await readCentralState(supabase, config);
+    const saved = await updateResilientState(
+      supabase,
+      config,
+      payload => mergeCaptureResults(payload, results),
+      { expectedRevision: current.revision }
+    );
+    if (saved.updated) return saved.row;
     if (attempt < maxAttempts) await delay(250 * attempt);
   }
 
@@ -422,19 +422,14 @@ async function persistCaptureStarts(supabase, config, dashboards) {
   const attemptedAt = new Date().toISOString();
   const maxAttempts = 4;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const latest = await readCentralRow(supabase, config.rowId);
-    const payload = mergeCaptureStarts(latest.payload, dashboards, attemptedAt);
-    const nextRevision = Number(latest.revision || 0) + 1;
-    const { data, error } = await supabase
-      .from('tv_app_state')
-      .update({ payload, revision: nextRevision, updated_at: attemptedAt })
-      .eq('id', config.rowId)
-      .eq('revision', latest.revision)
-      .select('id,revision,updated_at');
-    if (error) {
-      throw new Error(`Falha ao registrar o inÃ­cio da captura: ${error.message}`);
-    }
-    if (Array.isArray(data) && data.length === 1) return data[0];
+    const current = await readCentralState(supabase, config);
+    const saved = await updateResilientState(
+      supabase,
+      config,
+      payload => mergeCaptureStarts(payload, dashboards, attemptedAt),
+      { expectedRevision: current.revision, updatedAt: attemptedAt }
+    );
+    if (saved.updated) return saved.row;
     if (attempt < maxAttempts) await delay(250 * attempt);
   }
   throw new Error('A base mudou durante o inÃ­cio da captura. Tente novamente.');
@@ -451,7 +446,7 @@ export async function runCaptureCycle(config) {
     }
   });
 
-  const centralRow = await readCentralRow(supabase, config.rowId);
+  const centralRow = await readCentralState(supabase, config);
   const allDashboards = Array.isArray(centralRow.payload?.urls)
     ? centralRow.payload.urls
     : [];

@@ -1,6 +1,5 @@
 sub init()
-    m.endpoint = "https://ypwpumtzbdraldccctfd.supabase.co/rest/v1/tv_app_state?select=id,payload,revision,updated_at&id=eq.central&limit=1"
-    m.apiKey = "sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv"
+    m.endpoint = "https://central-dashboards-t-vs.vercel.app/api/state"
 
     m.canvas = m.top.FindNode("canvas")
     m.contentGroup = m.top.FindNode("contentGroup")
@@ -167,7 +166,6 @@ sub fetchCentralState()
 
     task = CreateObject("roSGNode", "FetchStateTask")
     task.endpoint = m.endpoint
-    task.apiKey = m.apiKey
     task.ObserveField("result", "onFetchResult")
     task.ObserveField("error", "onFetchError")
     m.fetchTask = task

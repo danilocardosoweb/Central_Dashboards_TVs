@@ -3,4 +3,5 @@ dist/
 .env
 .env.*
 !.env.vercel.example
+!.env.capture.example
 renderer/output/

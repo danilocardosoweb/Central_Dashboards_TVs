@@ -4,6 +4,9 @@
     "api/capture.mjs": {
       "maxDuration": 300,
       "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    },
+    "api/state.mjs": {
+      "maxDuration": 300
     }
   }
 }

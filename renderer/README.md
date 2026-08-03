@@ -5,6 +5,9 @@ O capturador transforma os links públicos do Power BI em imagens PNG
 
 ## Fluxo
 
+O estado principal fica em `central-state/state/central.json`. A tabela
+`tv_app_state` é usada apenas como compatibilidade opcional.
+
 1. Lê `tv_app_state.payload.urls`.
 2. Abre o campo `combined` de cada dashboard no Chromium.
 3. Aguarda a superfície do relatório e um tempo adicional de estabilização.
@@ -50,6 +53,11 @@ npm.cmd run capture:once -- --local-only
 ```
 
 ## Capturar e enviar ao Roku
+
+O atalho `Capturar_e_Enviar_para_TV.cmd` oferece o mesmo fluxo por duplo
+clique. Na primeira execução ele cria o `.env`; preencha a chave secreta e
+execute novamente. Todos os dashboards cadastrados são processados, sem limite
+fixo, e enviados ao Storage.
 
 Depois de executar o SQL:
 

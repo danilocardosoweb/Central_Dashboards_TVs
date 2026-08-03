@@ -10,6 +10,11 @@ const context = { Array, Date, Map, Math, Number, Object, Set, String };
 vm.createContext(context);
 vm.runInContext(web.slice(start, end), context);
 
+test('Central usa a API resiliente e nao acessa a tabela diretamente', () => {
+  assert.match(web, /CLOUD_STATE_ENDPOINT = `\$\{CLOUD_API_ORIGIN\}\/api\/state`/);
+  assert.doesNotMatch(web, /rest\/v1\/tv_app_state/);
+});
+
 test('salvamento altera somente as secoes realmente editadas', () => {
   const remote = {
     urls: [{ id: 'dash-1', name: 'Remoto' }],

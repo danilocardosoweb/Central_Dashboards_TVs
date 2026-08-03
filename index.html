@@ -8343,11 +8343,10 @@
 
     <script>
         (() => {
-            const SUPABASE_PROJECT_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
-            const SUPABASE_PUBLISHABLE_KEY =
-                'sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv';
-            const CLOUD_STATE_ENDPOINT =
-                `${SUPABASE_PROJECT_URL}/rest/v1/tv_app_state`;
+            const CLOUD_API_ORIGIN = location.protocol === 'file:'
+                ? 'https://central-dashboards-t-vs.vercel.app'
+                : '';
+            const CLOUD_STATE_ENDPOINT = `${CLOUD_API_ORIGIN}/api/state`;
             const CLOUD_ROW_ID = 'central';
             const CLOUD_POLL_INTERVAL = 10000;
             const CLOUD_SAVE_DELAY = 850;
@@ -8373,6 +8372,7 @@
             let cloudRevision = 0;
             let cloudPayloadSignature = '';
             let cloudPollTimer = null;
+            let captureWorkerRunning = false;
             const cloudDirtySections = new Set();
 
             function cloudSectionForStorageKey(key) {
@@ -8418,8 +8418,6 @@
 
             function cloudHeaders(extra = {}) {
                 return {
-                    apikey: SUPABASE_PUBLISHABLE_KEY,
-                    Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
                     'Content-Type': 'application/json',
                     ...extra
                 };
@@ -8657,32 +8655,31 @@
                             completedAt: null
                         };
                         const payload = { ...(row.payload || {}), capture };
-                        const nextRevision = Number(row.revision || 0) + 1;
                         const response = await fetch(
-                            `${CLOUD_STATE_ENDPOINT}?id=eq.${encodeURIComponent(CLOUD_ROW_ID)}&revision=eq.${row.revision}`,
+                            CLOUD_STATE_ENDPOINT,
                             {
-                                method: 'PATCH',
-                                headers: cloudHeaders({ Prefer: 'return=representation' }),
+                                method: 'PUT',
+                                headers: cloudHeaders(),
                                 body: JSON.stringify({
                                     payload,
-                                    revision: nextRevision,
-                                    updated_at: requestedAt
+                                    expectedRevision: Number(row.revision) || 0,
+                                    updatedAt: requestedAt
                                 })
                             }
                         );
                         if (!response.ok) {
                             const error = await response.json().catch(() => ({}));
+                            if (response.status === 409) continue;
                             throw new Error(error.message || `Falha ao solicitar (${response.status}).`);
                         }
-                        const rows = await response.json();
-                        const saved = Array.isArray(rows) ? rows[0] : null;
+                        const saved = await response.json();
                         if (!saved) continue;
 
-                        cloudRevision = Number(saved.revision) || nextRevision;
+                        cloudRevision = Number(saved.revision) || Number(row.revision) + 1;
                         cloudPayloadSignature = payloadSignature(saved.payload || payload);
                         applyCloudPayload(saved.payload || payload);
                         showToast(`${dashboards.length} dashboard(s) enviado(s) para atualizaÃ§Ã£o.`);
-                        setTimeout(pollCloudState, 1200);
+                        processCaptureQueue();
                         return;
                     }
                     throw new Error('A Central foi alterada ao mesmo tempo. Tente novamente.');
@@ -8696,6 +8693,48 @@
                     ).active) latest.disabled = false;
                 }
             };
+
+            async function processCaptureQueue() {
+                if (captureWorkerRunning) return;
+                captureWorkerRunning = true;
+                try {
+                    while (true) {
+                        const row = await readCloudRow();
+                        const progress = captureQueueProgress(row?.payload?.capture);
+                        if (!progress.active) break;
+
+                        const response = await fetch(CLOUD_STATE_ENDPOINT, {
+                            method: 'POST',
+                            headers: cloudHeaders(),
+                            body: JSON.stringify({ action: 'capture-next' })
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(
+                                result.error || `Falha na captura (${response.status}).`
+                            );
+                        }
+
+                        const refreshed = await readCloudRow();
+                        if (refreshed) {
+                            cloudRevision = Number(refreshed.revision) || cloudRevision;
+                            cloudPayloadSignature = payloadSignature(refreshed.payload);
+                            applyCloudPayload(refreshed.payload);
+                        }
+                        if (result.skipped && result.reason === 'busy') break;
+                    }
+                } catch (error) {
+                    console.error('Erro ao processar a fila de capturas:', error);
+                    showToast(
+                        error instanceof Error ? error.message : String(error),
+                        'error'
+                    );
+                } finally {
+                    captureWorkerRunning = false;
+                    const row = await readCloudRow().catch(() => null);
+                    if (row) renderCaptureRequestStatus(row.payload?.capture);
+                }
+            }
 
             function applyCloudPayload(payload) {
                 const state = payload && typeof payload === 'object' ? payload : {};
@@ -8782,19 +8821,19 @@
             }
 
             async function readCloudRow() {
-                const query =
-                    '?select=id,payload,revision,updated_at' +
-                    `&id=eq.${encodeURIComponent(CLOUD_ROW_ID)}&limit=1`;
-                const response = await fetch(`${CLOUD_STATE_ENDPOINT}${query}`, {
+                const response = await fetch(
+                    `${CLOUD_STATE_ENDPOINT}?t=${Date.now()}`,
+                    {
                     method: 'GET',
                     headers: cloudHeaders(),
                     cache: 'no-store'
-                });
+                    }
+                );
 
                 if (!response.ok) {
                     const error = await response.json().catch(() => ({}));
+                    if (response.status === 404 && error.missing) return null;
                     const databaseMissing =
-                        response.status === 404 ||
                         error.code === 'PGRST205' ||
                         error.code === '42P01';
                     const cloudError = new Error(
@@ -8806,8 +8845,9 @@
                     throw cloudError;
                 }
 
-                const rows = await response.json();
-                return Array.isArray(rows) && rows.length ? rows[0] : null;
+                const data = await response.json();
+                if (Array.isArray(data)) return data.length ? data[0] : null;
+                return data?.row || data || null;
             }
 
             async function saveCloudState(options = {}) {
@@ -8857,34 +8897,24 @@
                             collectCloudPayload(),
                             sectionsToSave
                         );
-                        const nextRevision = remoteRevision + 1;
                         const now = new Date().toISOString();
-                        const isInsert = !remoteRow;
-                        const endpoint = isInsert
-                            ? `${CLOUD_STATE_ENDPOINT}?on_conflict=id`
-                            : `${CLOUD_STATE_ENDPOINT}?id=eq.${encodeURIComponent(CLOUD_ROW_ID)}&revision=eq.${remoteRevision}`;
-                        const response = await fetch(endpoint, {
-                            method: isInsert ? 'POST' : 'PATCH',
-                            headers: cloudHeaders({
-                                Prefer: isInsert
-                                    ? 'resolution=merge-duplicates,return=representation'
-                                    : 'return=representation'
-                            }),
+                        const response = await fetch(CLOUD_STATE_ENDPOINT, {
+                            method: 'PUT',
+                            headers: cloudHeaders(),
                             body: JSON.stringify({
-                                ...(isInsert ? { id: CLOUD_ROW_ID } : {}),
                                 payload,
-                                revision: nextRevision,
-                                updated_at: now
+                                expectedRevision: remoteRevision,
+                                updatedAt: now
                             })
                         });
                         if (!response.ok) {
                             const error = await response.json().catch(() => ({}));
+                            if (response.status === 409) continue;
                             throw new Error(
                                 error.message || `Falha ao salvar (${response.status}).`
                             );
                         }
-                        const rows = await response.json();
-                        savedRow = Array.isArray(rows) ? rows[0] : null;
+                        savedRow = await response.json();
                         if (savedRow) break;
                     }
                     if (!savedRow) {
@@ -8955,6 +8985,9 @@
                             `Dados atualizados às ${formatCloudTime(row.updated_at)}.`
                         );
                     }
+                    if (captureQueueProgress(row.payload?.capture).active) {
+                        processCaptureQueue();
+                    }
                 } catch (error) {
                     setCloudStatus(
                         navigator.onLine ? 'error' : 'offline',
@@ -9014,6 +9047,10 @@
                             pollCloudState,
                             CLOUD_POLL_INTERVAL
                         );
+                    }
+                    const currentRow = await readCloudRow().catch(() => null);
+                    if (captureQueueProgress(currentRow?.payload?.capture).active) {
+                        processCaptureQueue();
                     }
                 } catch (error) {
                     console.error('Erro ao iniciar sincronização central:', error);

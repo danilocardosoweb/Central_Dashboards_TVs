@@ -40,6 +40,6 @@ test('GET informa a versao segura do capturador', async () => {
   const body = JSON.parse(output.body);
   assert.equal(output.statusCode, 200);
   assert.equal(body.service, 'central-dashboards-capture');
-  assert.equal(body.version, 'flow-v4');
+  assert.equal(body.version, 'flow-v5-storage');
   assert.equal('SUPABASE_RENDERER_KEY' in body, false);
 });
