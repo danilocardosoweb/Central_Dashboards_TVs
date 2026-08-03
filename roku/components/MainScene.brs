@@ -70,6 +70,9 @@ sub init()
     m.introGroup = m.top.FindNode("introGroup")
     m.introVideo = m.top.FindNode("introVideo")
     m.introFallbackTimer = m.top.FindNode("introFallbackTimer")
+    m.fetchWatchdogTimer = m.top.FindNode("fetchWatchdogTimer")
+    m.diagnosticsOverlay = m.top.FindNode("diagnosticsOverlay")
+    m.diagnosticsText = m.top.FindNode("diagnosticsText")
     m.fadeIn = m.top.FindNode("fadeIn")
     m.imageEnter = m.top.FindNode("imageEnter")
     m.imageEnterOpacity = m.top.FindNode("imageEnterOpacity")
@@ -83,6 +86,7 @@ sub init()
     m.introVideo.ObserveField("state", "onIntroVideoState")
     m.introVideo.ObserveField("position", "onIntroVideoPosition")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
+    m.fetchWatchdogTimer.ObserveField("fire", "onFetchWatchdogTimer")
     m.dashboardImageA.ObserveField("loadStatus", "onImageALoadStatus")
     m.dashboardImageB.ObserveField("loadStatus", "onImageBLoadStatus")
     m.stationList.ObserveField("itemSelected", "onStationSelected")
@@ -108,9 +112,14 @@ sub init()
     m.introPlaying = false
     m.introRemoved = false
     m.preservePlaybackOnBuild = false
+    m.sessionId = currentClock().Replace(":", "")
+    m.lastTraceId = ""
+    m.lastError = ""
+    m.stateSource = "network"
 
     applyResolutionScale()
     startIntroVideo()
+    logEvent("app-start", { build: 18, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -126,10 +135,12 @@ sub startIntroVideo()
     m.introPlaying = true
     m.introFallbackTimer.control = "start"
     m.introVideo.control = "play"
+    logEvent("intro-start", {})
 end sub
 
 sub onIntroVideoState()
     state = m.introVideo.state
+    logEvent("intro-state", { state: state })
     if state = "finished" or state = "error" or state = "stopped"
         finishIntroVideo()
     end if
@@ -141,6 +152,7 @@ sub onIntroVideoPosition()
 end sub
 
 sub onIntroFallbackTimer()
+    logEvent("intro-fallback", {})
     finishIntroVideo()
 end sub
 
@@ -163,6 +175,7 @@ sub finishIntroVideo()
     else
         m.top.SetFocus(true)
     end if
+    logEvent("intro-finish", {})
 end sub
 
 sub applyResolutionScale()
@@ -180,6 +193,8 @@ end sub
 sub fetchCentralState()
     if m.fetching then return
     m.fetching = true
+    m.fetchWatchdogTimer.control = "start"
+    logEvent("fetch-start", { endpoint: m.endpoint })
 
     task = CreateObject("roSGNode", "FetchStateTask")
     task.endpoint = m.endpoint
@@ -192,6 +207,15 @@ end sub
 sub onFetchResult()
     row = m.fetchTask.result
     m.fetching = false
+    m.fetchWatchdogTimer.control = "stop"
+    m.lastTraceId = m.fetchTask.traceId
+    if m.fetchTask.fromCache
+        m.stateSource = "cache"
+        m.lastError = m.fetchTask.warning
+    else
+        m.stateSource = "network"
+        m.lastError = ""
+    end if
     if row = invalid then return
 
     revision = valueOr(row, "revision", 0)
@@ -199,6 +223,13 @@ sub onFetchResult()
     m.syncLabel.text = "Sincronizado " + currentClock()
     m.loading.control = "stop"
     m.loading.visible = false
+    logEvent("fetch-result", {
+        revision: revision
+        updatedAt: updatedAt
+        traceId: m.lastTraceId
+        source: m.stateSource
+        statusCode: m.fetchTask.statusCode
+    })
 
     if revision = m.lastRevision and updatedAt = m.lastUpdatedAt and m.state <> invalid
         return
@@ -222,6 +253,9 @@ end sub
 sub onFetchError()
     errorMessage = m.fetchTask.error
     m.fetching = false
+    m.fetchWatchdogTimer.control = "stop"
+    m.lastError = errorMessage
+    logEvent("fetch-error", { error: errorMessage, traceId: m.fetchTask.traceId, statusCode: m.fetchTask.statusCode })
     if errorMessage = "" then errorMessage = "Não foi possível consultar a Central."
     m.syncLabel.text = "Sem sincronização • nova tentativa em 60s"
     m.loading.control = "stop"
@@ -415,6 +449,17 @@ sub buildPlaylist()
     end if
 
     stationName = valueOr(m.currentStation, "name", "Esta TV")
+    logEvent("playlist-built", {
+        revision: m.lastRevision
+        stationId: valueOr(m.currentStation, "id", "")
+        areaId: areaId
+        dashboards: dashboardSlides.Count()
+        ppr: pprSlides.Count()
+        alerts: alertSlides.Count()
+        banners: bannerAlerts.Count()
+        total: m.slides.Count()
+    })
+    updateDiagnostics()
     m.stationLabel.text = stationName + "  •  " + getAreaName(areaId)
 
     preservedIndex = findSlideIndex(m.slides, previousSlide)
@@ -458,6 +503,14 @@ end sub
 sub renderSlide(slide as object)
     cancelPendingImage()
     m.slideTimer.control = "stop"
+    logEvent("slide-start", {
+        index: m.slideIndex
+        total: m.slides.Count()
+        id: valueOr(slide, "id", "")
+        kind: valueOr(slide, "kind", "")
+        title: valueOr(slide, "title", "")
+    })
+    updateDiagnostics()
     imageUrl = valueOr(slide, "imageUrl", "")
 
     if imageUrl <> ""
@@ -506,6 +559,7 @@ sub queueImageSlide(slide as object, imageUrl as string)
     target.uri = ""
     target.uri = imageUrl
     m.imageLoadTimer.control = "start"
+    logEvent("image-load-start", { id: valueOr(slide, "id", ""), attempt: 1 })
 end sub
 
 sub onImageALoadStatus()
@@ -520,11 +574,21 @@ end sub
 
 sub handlePendingImageStatus(status as string)
     if status = "ready"
+        logEvent("image-ready", { id: valueOr(m.pendingSlide, "id", ""), attempt: m.pendingImageAttempts + 1 })
         beginImageTransition()
     else if status = "failed"
+        logEvent("image-failed", { id: valueOr(m.pendingSlide, "id", ""), attempt: m.pendingImageAttempts + 1 })
         if retryPendingImage() then return
         showImageLoadFailure(m.pendingSlide)
     end if
+end sub
+
+sub onFetchWatchdogTimer()
+    if not m.fetching then return
+    m.fetching = false
+    m.lastError = "A consulta da Central excedeu 20 segundos."
+    logEvent("fetch-watchdog", { error: m.lastError })
+    if m.state = invalid then showError(m.lastError)
 end sub
 
 sub onImageLoadTimer()
@@ -549,6 +613,7 @@ function retryPendingImage() as boolean
     target.uri = ""
     target.uri = m.pendingImageUri + separator + "roku_retry=" + m.pendingImageAttempts.ToStr() + "-" + now.AsSeconds().ToStr()
     m.imageLoadTimer.control = "start"
+    logEvent("image-retry", { id: valueOr(m.pendingSlide, "id", ""), attempt: m.pendingImageAttempts + 1 })
     return true
 end function
 
@@ -566,6 +631,9 @@ sub showImageLoadFailure(slide as dynamic)
     m.fadeIn.control = "start"
     updateSlideStatus()
     startSlideTimer(slide)
+    m.lastError = "Falha ao carregar imagem " + valueOr(slide, "id", "")
+    logEvent("image-contingency", { id: valueOr(slide, "id", ""), kind: valueOr(slide, "kind", "") })
+    updateDiagnostics()
 end sub
 
 sub beginImageTransition()
@@ -1200,6 +1268,41 @@ sub onSyncTimer()
     fetchCentralState()
 end sub
 
+sub updateDiagnostics()
+    if m.diagnosticsText = invalid then return
+    stationId = "-"
+    if m.currentStation <> invalid then stationId = valueOr(m.currentStation, "id", "-")
+    currentId = "-"
+    currentKind = "-"
+    if m.slideIndex >= 0 and m.slideIndex < m.slides.Count()
+        currentId = valueOr(m.slides[m.slideIndex], "id", "-")
+        currentKind = valueOr(m.slides[m.slideIndex], "kind", "-")
+    end if
+    textValue = "Build: V18 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
+    textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
+    textValue = textValue + Chr(10) + "Ultimo erro: " + m.lastError
+    m.diagnosticsText.text = textValue
+end sub
+
+sub logEvent(eventName as string, fields as dynamic)
+    record = {
+        scope: "central-tv"
+        event: eventName
+        build: 18
+        sessionId: m.sessionId
+        revision: m.lastRevision
+        traceId: m.lastTraceId
+        timestamp: currentClock()
+    }
+    if fields <> invalid and GetInterface(fields, "ifAssociativeArray") <> invalid
+        for each key in fields
+            record[key] = fields[key]
+        end for
+    end if
+    print "[central-tv] "; FormatJson(record)
+end sub
+
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
@@ -1222,6 +1325,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     if key = "options" or key = "OK" or key = "down"
         showStationSelector()
+        return true
+    else if key = "up"
+        m.diagnosticsOverlay.visible = not m.diagnosticsOverlay.visible
+        updateDiagnostics()
         return true
     else if key = "right"
         showNextSlide()

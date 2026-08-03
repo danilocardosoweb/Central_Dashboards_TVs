@@ -1,70 +1,59 @@
-# Player Roku — protótipo
+# Player Roku V18
 
-Aplicativo nativo Roku para exibir a programação criada na Central de
-Dashboards. Esta primeira versão não usa login e lê a linha `central` da tabela
-`tv_app_state` no Supabase.
+Aplicativo nativo Roku que consulta a API central da Vercel e monta uma unica
+lista com dashboards, avisos em tela cheia e telas do PPR. Itens desativados e
+itens destinados a outra TV ou setor sao ignorados.
 
-## O que já funciona
+## Recuperacao e diagnostico
 
-- Leitura automática do Supabase a cada 10 segundos.
-- Seleção da estação ou diretamente da área com o controle remoto.
-- Persistência da estação escolhida na própria TV.
-- Filtro de dashboards e avisos pela área da estação.
-- Rotação automática, pausa e navegação manual.
-- Avisos em tela cheia e avisos em faixa inferior.
-- Imagens remotas em HTTPS para dashboards.
-- Interface adaptada para televisores HD e Full HD.
-- Continuidade da programação em memória quando uma sincronização falha.
+- A consulta da Central e assincrona e possui timeout de 15 segundos.
+- A ultima programacao valida fica salva no cache da TV.
+- Se a rede falhar, o player usa o cache e continua a rotacao.
+- Um watchdog de 20 segundos libera uma consulta que tenha travado.
+- Imagens possuem timeout, uma nova tentativa com quebra de cache e tela de
+  contingencia. Uma imagem com erro nao interrompe as proximas telas.
+- O video de abertura termina por evento, por posicao, por controle remoto ou
+  pelo limite de 12 segundos.
+- O console de desenvolvimento registra eventos com o prefixo `[central-tv]`.
 
 ## Controles
 
-- `OK`, `*` ou `↓`: escolher a estação ou o setor desta TV.
-- `←` e `→`: trocar a tela.
+- `OK`, `*` ou seta para baixo: escolher a TV ou setor.
+- Setas esquerda/direita: navegar entre as telas.
 - `Play/Pause`: pausar ou continuar.
+- Seta para cima: mostrar/ocultar o painel de diagnostico.
+- Durante a abertura, `OK` ou `Back`: pular o video.
 
-## Limitação do Power BI
+O painel de diagnostico mostra build, sessao, origem dos dados (rede ou cache),
+revisao, trace ID, TV selecionada, total de telas, tela atual e ultimo erro.
 
-O Roku não renderiza o `iframe` do Power BI. Para testar um dashboard real,
-abra a Central Web, clique no botão de TV ao lado do dashboard e informe um
-link direto HTTPS para uma imagem PNG, JPEG ou WebP.
-
-Se não houver uma imagem, o player mostra um cartão com o nome do dashboard e
-informa que a captura ainda está pendente.
-
-## Telas do PPR
-
-O pacote também exibe o Acompanhamento do PPR configurado na Central Web.
-Não é necessário cadastrar imagens para essas telas: resumo, painel geral e
-termômetro individual são desenhados nativamente pelo Roku. O direcionamento
-por estação e setor, a ordem e o tempo de permanência vêm do estado central.
-
-## Gerar o pacote
-
-Na raiz do repositório:
+## Gerar e instalar
 
 ```powershell
 npm.cmd install
+npm.cmd test
 npm.cmd run roku:check
 npm.cmd run roku:package
 ```
 
-O arquivo para instalar será criado em:
+O V18 e gerado como:
 
 ```text
-dist/Central_Dashboard_Tvs_Roku_V_17.zip
+dist/Central_Dashboard_TVs_Roku_V_18.zip
 ```
 
-O número vem de `build_version` no manifesto e deve aumentar em toda nova
-entrega. O gerador não apaga os pacotes de versões anteriores; mantenha-os para
-uma eventual reversão.
+O gerador recusa substituir um ZIP existente. Para uma nova entrega, incremente
+`build_version` no manifesto. Instale o arquivo pela pagina de desenvolvimento
+da TV usando `Install with zip`. Somente um aplicativo sideload pode permanecer
+instalado por vez.
 
-## Instalar na TV
+## Teste de ponta a ponta
 
-1. Ative o modo desenvolvedor da TV Roku.
-2. Abra no navegador o endereço IP mostrado pela TV.
-3. Entre com o usuário `rokudev` e a senha configurada.
-4. Envie o ZIP da pasta `dist`.
-5. Pressione **Install**.
+Depois que a Vercel publicar a mesma versao do repositorio:
 
-Somente um aplicativo instalado por sideload pode permanecer na TV de cada
-vez.
+```powershell
+npm.cmd run audit:e2e -- https://central-dashboards-t-vs.vercel.app
+```
+
+O teste valida o estado central, a lista calculada por TV e todas as imagens,
+incluindo resposta HTTP, tipo, dimensoes 1920x1080 e quantidade dinamica.

@@ -23,7 +23,7 @@ if (-not $versionLine -or $versionLine -notmatch '^build_version=(\d+)\s*$') {
 
 $buildVersion = [int]$Matches[1]
 if ([string]::IsNullOrWhiteSpace($OutputFile)) {
-    $OutputFile = "dist/Central_Dashboard_Tvs_Roku_V_$buildVersion.zip"
+    $OutputFile = "dist/Central_Dashboard_TVs_Roku_V_$buildVersion.zip"
 }
 
 $outputPath = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputFile))
@@ -31,7 +31,7 @@ $distPath = Split-Path -Parent $outputPath
 
 New-Item -ItemType Directory -Force -Path $distPath | Out-Null
 if (Test-Path -LiteralPath $outputPath) {
-    Remove-Item -LiteralPath $outputPath -Force
+    throw "O pacote V_$buildVersion ja existe. Incremente build_version para preservar a versao anterior."
 }
 
 Add-Type -AssemblyName System.IO.Compression

@@ -86,3 +86,22 @@ test('abertura sempre libera a camada de video antes do carrossel', () => {
 test('Roku consulta atualizacoes sem intervalo agressivo', () => {
   assert.match(xml, /id="syncTimer" duration="60"/);
 });
+
+test('consulta de estado possui timeout, cache local e retomada do ciclo', () => {
+  assert.match(fetchTask, /AsyncGetToString\(\)/);
+  assert.match(fetchTask, /Wait\(15000, port\)/);
+  assert.match(fetchTask, /cachefs:\/central-dashboard-state\.json/);
+  assert.match(fetchTask, /useCachedState/);
+  assert.doesNotMatch(fetchTask, /transfer\.GetToString\(\)/);
+  assert.match(xml, /id="fetchWatchdogTimer" duration="20"/);
+  assert.match(scene, /sub onFetchWatchdogTimer\(\)/);
+});
+
+test('player registra a playlist e oferece diagnostico pelo controle', () => {
+  assert.match(scene, /logEvent\("playlist-built"/);
+  assert.match(scene, /logEvent\("slide-start"/);
+  assert.match(scene, /logEvent\("image-failed"/);
+  assert.match(xml, /id="diagnosticsOverlay"/);
+  assert.match(scene, /key = "up"/);
+  assert.match(scene, /Build: V18/);
+});

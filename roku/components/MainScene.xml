@@ -235,11 +235,20 @@
                     enableUI="false" />
             </Group>
 
+            <Group id="diagnosticsOverlay" visible="false">
+                <Rectangle translation="[50,50]" width="1820" height="300" color="0x050B14F4" />
+                <Label id="diagnosticsTitle" translation="[90,78]" width="1720" height="48"
+                    text="DIAGNOSTICO DO PLAYER" color="0x60A5FAFF" font="font:MediumBoldSystemFont" />
+                <Label id="diagnosticsText" translation="[90,138]" width="1720" height="185"
+                    wrap="true" color="0xE2E8F0FF" font="font:MediumSystemFont" />
+            </Group>
+
             <Timer id="slideTimer" repeat="false" />
             <Timer id="syncTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />
             <Timer id="imageLoadTimer" duration="8" repeat="false" />
             <Timer id="introFallbackTimer" duration="12" repeat="false" />
+            <Timer id="fetchWatchdogTimer" duration="20" repeat="false" />
             <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">
                 <FloatFieldInterpolator
                     key="[0.0,1.0]"
