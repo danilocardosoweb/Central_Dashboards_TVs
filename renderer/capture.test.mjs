@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  captureObjectName,
   mergeCaptureResults,
   normalizeDashboardUrl,
   readConfiguration,
@@ -23,6 +24,19 @@ test('seleciona o link combinado e aceita somente Power BI em HTTPS', () => {
 
 test('normaliza o nome do objeto sem caracteres inseguros', () => {
   assert.equal(safeObjectName('Produção / Página 01'), 'producao-pagina-01');
+});
+
+test('alterna a imagem entre tres enderecos estaveis por dashboard', () => {
+  const first = captureObjectName({
+    id: 'Produção / Página 01',
+    capturedAt: '2026-08-03T12:00:00.000Z'
+  });
+  const next = captureObjectName({
+    id: 'Produção / Página 01',
+    capturedAt: '2026-08-03T12:02:00.000Z'
+  });
+  assert.match(first, /^dashboards\/producao-pagina-01\/slot-[0-2]\.png$/);
+  assert.notEqual(first, next);
 });
 
 test('mescla a captura sem apagar outras configurações', () => {

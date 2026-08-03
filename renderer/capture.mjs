@@ -100,6 +100,12 @@ export function safeObjectName(value) {
     .slice(0, 90) || 'dashboard';
 }
 
+export function captureObjectName(capture) {
+  const capturedAt = Date.parse(String(capture?.capturedAt || '')) || Date.now();
+  const slot = Math.floor(capturedAt / 60000) % 3;
+  return `dashboards/${safeObjectName(capture?.id)}/slot-${slot}.png`;
+}
+
 export function mergeCaptureResults(payload, captureResults) {
   const source = payload && typeof payload === 'object' ? payload : {};
   const urls = Array.isArray(source.urls) ? source.urls : [];
@@ -159,7 +165,7 @@ export function mergeCaptureStarts(payload, dashboards, attemptedAt) {
   };
 }
 
-async function readCentralRow(supabase, rowId) {
+export async function readCentralRow(supabase, rowId) {
   const { data, error } = await supabase
     .from('tv_app_state')
     .select('id,payload,revision,updated_at')
@@ -360,7 +366,9 @@ async function captureDashboard(page, dashboard, config) {
 }
 
 async function uploadCapture(supabase, capture, config) {
-  const objectName = `dashboards/${safeObjectName(capture.id)}.png`;
+  // Três endereços alternados por dashboard evitam que a TV reutilize a
+  // imagem anterior sem permitir que o bucket cresça indefinidamente.
+  const objectName = captureObjectName(capture);
   const { error } = await supabase.storage
     .from(config.bucket)
     .upload(objectName, capture.image, {
