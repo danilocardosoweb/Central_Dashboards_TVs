@@ -132,6 +132,33 @@ export function mergeCaptureResults(payload, captureResults) {
   };
 }
 
+export function mergeCaptureStarts(payload, dashboards, attemptedAt) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const selectedIds = new Set(
+    (Array.isArray(dashboards) ? dashboards : []).map(item => String(item.id))
+  );
+  return {
+    ...source,
+    capture: {
+      ...(source.capture && typeof source.capture === 'object'
+        ? source.capture
+        : {}),
+      lastCycleStartedAt: attemptedAt,
+      dashboardIds: [...selectedIds]
+    },
+    urls: (Array.isArray(source.urls) ? source.urls : []).map(dashboard =>
+      selectedIds.has(String(dashboard.id))
+        ? {
+            ...dashboard,
+            rokuCaptureStatus: 'processing',
+            rokuCaptureError: null,
+            rokuCaptureAttemptedAt: attemptedAt
+          }
+        : dashboard
+    )
+  };
+}
+
 async function readCentralRow(supabase, rowId) {
   const { data, error } = await supabase
     .from('tv_app_state')
@@ -383,6 +410,28 @@ async function persistCaptureResults(supabase, config, results) {
   );
 }
 
+async function persistCaptureStarts(supabase, config, dashboards) {
+  const attemptedAt = new Date().toISOString();
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const latest = await readCentralRow(supabase, config.rowId);
+    const payload = mergeCaptureStarts(latest.payload, dashboards, attemptedAt);
+    const nextRevision = Number(latest.revision || 0) + 1;
+    const { data, error } = await supabase
+      .from('tv_app_state')
+      .update({ payload, revision: nextRevision, updated_at: attemptedAt })
+      .eq('id', config.rowId)
+      .eq('revision', latest.revision)
+      .select('id,revision,updated_at');
+    if (error) {
+      throw new Error(`Falha ao registrar o inÃ­cio da captura: ${error.message}`);
+    }
+    if (Array.isArray(data) && data.length === 1) return data[0];
+    if (attempt < maxAttempts) await delay(250 * attempt);
+  }
+  throw new Error('A base mudou durante o inÃ­cio da captura. Tente novamente.');
+}
+
 export async function runCaptureCycle(config) {
   await fs.mkdir(config.outputDirectory, { recursive: true });
 
@@ -403,6 +452,10 @@ export async function runCaptureCycle(config) {
   if (!dashboards.length) {
     console.log('[captura] Nenhum dashboard disponível.');
     return { successes: 0, failures: 0, results: [] };
+  }
+
+  if (!config.localOnly) {
+    await persistCaptureStarts(supabase, config, dashboards);
   }
 
   console.log(

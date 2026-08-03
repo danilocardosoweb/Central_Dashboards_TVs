@@ -90,9 +90,11 @@ sub init()
     m.state = invalid
     m.stations = []
     m.stationChoices = []
+    m.bannerAlerts = []
     m.slides = []
     m.slideIndex = -1
     m.lastRevision = -1
+    m.lastUpdatedAt = ""
     m.fetching = false
     m.paused = false
     m.defaultDuration = 30
@@ -178,11 +180,12 @@ sub onFetchResult()
     if row = invalid then return
 
     revision = valueOr(row, "revision", 0)
+    updatedAt = valueOr(row, "updated_at", "")
     m.syncLabel.text = "Sincronizado " + currentClock()
     m.loading.control = "stop"
     m.loading.visible = false
 
-    if revision = m.lastRevision and m.state <> invalid
+    if revision = m.lastRevision and updatedAt = m.lastUpdatedAt and m.state <> invalid
         return
     end if
 
@@ -193,6 +196,7 @@ sub onFetchResult()
     end if
 
     m.lastRevision = revision
+    m.lastUpdatedAt = updatedAt
     m.state = payload
     m.stations = arrayOrEmpty(valueOr(payload, "stations", []))
     configureDefaultDuration(payload)
@@ -328,6 +332,7 @@ sub buildPlaylist()
     alerts = arrayOrEmpty(valueOr(m.state, "alerts", []))
     dashboardSlides = []
     alertSlides = []
+    bannerAlerts = []
     pprSlides = []
 
     for each dashboard in urls
@@ -342,12 +347,11 @@ sub buildPlaylist()
         end if
     end for
 
-    banner = invalid
     for each alert in alerts
         if isAlertActive(alert) and belongsToArea(alert, areaId)
             mode = LCase(valueOr(alert, "displayMode", "fullscreen"))
             if mode = "banner"
-                if banner = invalid then banner = alert
+                bannerAlerts.Push(alert)
             else
                 alertSlides.Push({
                     kind: "alert"
@@ -367,6 +371,7 @@ sub buildPlaylist()
     end if
 
     m.slides = []
+    m.bannerAlerts = bannerAlerts
     pprPosition = LCase(valueOr(ppr, "sequencePosition", "after-dashboards"))
     if pprPosition = "start"
         appendSlides(m.slides, pprSlides)
@@ -382,7 +387,7 @@ sub buildPlaylist()
         appendSlides(m.slides, alertSlides)
     end if
 
-    renderBanner(banner)
+    renderActiveBanner()
     stationName = valueOr(m.currentStation, "name", "Esta TV")
     m.stationLabel.text = stationName + "  •  " + getAreaName(areaId)
 
@@ -397,6 +402,7 @@ end sub
 sub showNextSlide()
     if m.slides.Count() = 0 then return
     m.slideIndex = (m.slideIndex + 1) mod m.slides.Count()
+    renderActiveBanner()
     renderSlide(m.slides[m.slideIndex])
 end sub
 
@@ -404,6 +410,7 @@ sub showPreviousSlide()
     if m.slides.Count() = 0 then return
     m.slideIndex = m.slideIndex - 1
     if m.slideIndex < 0 then m.slideIndex = m.slides.Count() - 1
+    renderActiveBanner()
     renderSlide(m.slides[m.slideIndex])
 end sub
 
@@ -682,6 +689,9 @@ function buildPprSlides(ppr as dynamic) as object
                 result.Push({ kind: "ppr-individual", source: ppr, indicator: indicator, duration: duration })
             end for
         end if
+    end if
+    if result.Count() = 0
+        result.Push({ kind: "ppr-summary", source: ppr, duration: duration })
     end if
     return result
 end function
@@ -1062,6 +1072,16 @@ sub renderBanner(alert as dynamic)
     if bodyText <> "" then title = title + " • " + bodyText
     m.bannerBody.text = title
     m.bannerGroup.visible = true
+end sub
+
+sub renderActiveBanner()
+    if m.bannerAlerts = invalid or m.bannerAlerts.Count() = 0
+        renderBanner(invalid)
+        return
+    end if
+    index = m.slideIndex
+    if index < 0 then index = 0
+    renderBanner(m.bannerAlerts[index mod m.bannerAlerts.Count()])
 end sub
 
 sub showLoading(message as string)

@@ -78,7 +78,7 @@ export default async function handler(request, response) {
         CAPTURE_DETECTION_TIMEOUT_MS:
           process.env.CAPTURE_DETECTION_TIMEOUT_MS || '30000',
         CAPTURE_MAX_DASHBOARDS:
-          process.env.CAPTURE_MAX_DASHBOARDS || '2',
+          process.env.CAPTURE_MAX_DASHBOARDS || '1',
         CAPTURE_ONLY_IDS: dashboardIds || process.env.CAPTURE_ONLY_IDS || ''
       },
       []

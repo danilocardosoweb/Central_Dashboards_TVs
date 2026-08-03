@@ -12,6 +12,8 @@ sub fetchState()
     transfer.AddHeader("apikey", m.top.apiKey)
     transfer.AddHeader("Authorization", "Bearer " + m.top.apiKey)
     transfer.AddHeader("Accept", "application/json")
+    transfer.AddHeader("Cache-Control", "no-cache, no-store")
+    transfer.AddHeader("Pragma", "no-cache")
 
     response = transfer.GetToString()
     if response = invalid or response = ""
