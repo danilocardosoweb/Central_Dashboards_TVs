@@ -7,7 +7,7 @@ Dashboards. Esta primeira versão não usa login e lê a linha `central` da tabe
 ## O que já funciona
 
 - Leitura automática do Supabase a cada 10 segundos.
-- Seleção da estação com o controle remoto.
+- Seleção da estação ou diretamente da área com o controle remoto.
 - Persistência da estação escolhida na própria TV.
 - Filtro de dashboards e avisos pela área da estação.
 - Rotação automática, pausa e navegação manual.
@@ -18,9 +18,9 @@ Dashboards. Esta primeira versão não usa login e lê a linha `central` da tabe
 
 ## Controles
 
-- `*`: escolher a estação.
+- `OK`, `*` ou `↓`: escolher a estação ou o setor desta TV.
 - `←` e `→`: trocar a tela.
-- `OK` ou `Play/Pause`: pausar ou continuar.
+- `Play/Pause`: pausar ou continuar.
 
 ## Limitação do Power BI
 
@@ -30,6 +30,13 @@ link direto HTTPS para uma imagem PNG, JPEG ou WebP.
 
 Se não houver uma imagem, o player mostra um cartão com o nome do dashboard e
 informa que a captura ainda está pendente.
+
+## Telas do PPR
+
+O pacote também exibe o Acompanhamento do PPR configurado na Central Web.
+Não é necessário cadastrar imagens para essas telas: resumo, painel geral e
+termômetro individual são desenhados nativamente pelo Roku. O direcionamento
+por estação e setor, a ordem e o tempo de permanência vêm do estado central.
 
 ## Gerar o pacote
 

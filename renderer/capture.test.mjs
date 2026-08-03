@@ -5,7 +5,8 @@ import {
   mergeCaptureResults,
   normalizeDashboardUrl,
   readConfiguration,
-  safeObjectName
+  safeObjectName,
+  selectDashboardsForCapture
 } from './capture.mjs';
 
 test('seleciona o link combinado e aceita somente Power BI em HTTPS', () => {
@@ -57,6 +58,10 @@ test('mescla a captura sem apagar outras configurações', () => {
     'https://cdn.example/dashboard-1.png?v=10'
   );
   assert.equal(merged.urls[0].rokuCaptureStatus, 'ok');
+  assert.equal(
+    merged.urls[0].rokuCaptureAttemptedAt,
+    '2026-07-30T20:00:00.000Z'
+  );
   assert.equal(merged.urls[1].rokuCaptureStatus, 'error');
   assert.equal(merged.urls[1].rokuCaptureError, 'Tempo esgotado');
   assert.equal(merged.urls[1].name, 'PCP');
@@ -68,6 +73,7 @@ test('lê opções de execução com padrões seguros', () => {
       CAPTURE_WIDTH: '1280',
       CAPTURE_HEIGHT: '720',
       CAPTURE_CHROME_BOTTOM: '60',
+      CAPTURE_MAX_DASHBOARDS: '2',
       CAPTURE_ONLY_IDS: 'a,b'
     },
     ['--local-only']
@@ -77,5 +83,19 @@ test('lê opções de execução com padrões seguros', () => {
   assert.equal(config.outputHeight, 720);
   assert.equal(config.browserHeight, 780);
   assert.equal(config.localOnly, true);
+  assert.equal(config.maxDashboardsPerCycle, 2);
   assert.deepEqual([...config.onlyDashboardIds], ['a', 'b']);
+});
+
+test('prioriza dashboards sem imagem e limita o lote da nuvem', () => {
+  const selected = selectDashboardsForCapture([
+    { id: 'recente', rokuCapturedAt: '2026-08-03T12:00:00.000Z' },
+    { id: 'novo' },
+    { id: 'antigo', rokuCapturedAt: '2026-07-31T12:00:00.000Z' }
+  ], {
+    onlyDashboardIds: new Set(),
+    maxDashboardsPerCycle: 2
+  });
+
+  assert.deepEqual(selected.map(item => item.id), ['novo', 'antigo']);
 });

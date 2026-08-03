@@ -8,7 +8,15 @@
         <Group id="canvas">
             <Group id="contentGroup">
                 <Poster
-                    id="dashboardImage"
+                    id="dashboardImageA"
+                    width="1920"
+                    height="1080"
+                    loadWidth="1920"
+                    loadHeight="1080"
+                    loadDisplayMode="scaleToFit"
+                    visible="false" />
+                <Poster
+                    id="dashboardImageB"
                     width="1920"
                     height="1080"
                     loadWidth="1920"
@@ -65,6 +73,72 @@
                         color="0x94A3B8FF"
                         font="font:MediumSystemFont" />
                 </Group>
+
+                <Group id="pprPanel" visible="false">
+                    <Rectangle id="pprBackground" width="1920" height="1080" color="0xF8FAFCFF" />
+                    <Rectangle translation="[0,0]" width="1920" height="12" color="0x38BDF8FF" />
+                    <Rectangle id="pprHeaderLine" translation="[92,205]" width="1736" height="2" color="0xDBEAFEFF" />
+                    <Rectangle id="pprPeriodBackground" translation="[1420,62]" width="400" height="76" color="0xDBEAFEFF" />
+                    <Rectangle id="pprGaugeCard" translation="[82,232]" width="500" height="760" color="0xFFFFFFFF" />
+                    <Rectangle id="pprContentCard" translation="[612,232]" width="1216" height="760" color="0xFFFFFFFF" />
+                    <Label id="pprKicker" translation="[92,64]" width="1120" height="48"
+                        text="PROGRAMA DE PARTICIPAÇÃO NOS RESULTADOS" color="0x38BDF8FF"
+                        font="font:MediumBoldSystemFont" />
+                    <Label id="pprTitle" translation="[92,118]" width="1300" height="76"
+                        text="Acompanhamento do PPR" color="0xF8FAFCFF"
+                        font="font:LargeBoldSystemFont" />
+                    <Label id="pprPeriod" translation="[1430,82]" width="390" height="58"
+                        horizAlign="center" color="0x1E40AFFF" font="font:MediumBoldSystemFont" />
+
+                    <Group id="pprThermometerGroup" visible="false">
+                        <Rectangle id="pprThermometerTrack" translation="[174,260]" width="112" height="620" color="0xFFFFFFFF" />
+                        <Rectangle id="pprThermometerFill" translation="[186,868]" width="88" height="0" color="0x22C55EFF" />
+                        <Rectangle id="pprBulbTrack" translation="[148,858]" width="164" height="164" color="0xFFFFFFFF" />
+                        <Rectangle id="pprBulb" translation="[164,874]" width="132" height="132" color="0x22C55EFF" />
+                        <Label id="pprScale150" translation="[315,244]" width="520" height="45" text="150%" color="0x475569FF" font="font:MediumSystemFont" />
+                        <Label id="pprScale125" translation="[315,345]" width="520" height="45" text="125%" color="0x475569FF" font="font:MediumSystemFont" />
+                        <Label id="pprScale100" translation="[315,448]" width="520" height="52" text="100%  META" color="0x0F172AFF" font="font:MediumBoldSystemFont" />
+                        <Label id="pprScale75" translation="[315,551]" width="520" height="45" text="75%" color="0x475569FF" font="font:MediumSystemFont" />
+                        <Label id="pprScale50" translation="[315,654]" width="520" height="45" text="50%" color="0x475569FF" font="font:MediumSystemFont" />
+                        <Label id="pprScale0" translation="[315,848]" width="520" height="45" text="0%" color="0x475569FF" font="font:MediumSystemFont" />
+                    </Group>
+
+                    <Label id="pprValueCaption" translation="[650,278]" width="1050" height="42"
+                        text="DESEMPENHO ATUAL" color="0x2563EBFF" font="font:MediumBoldSystemFont" />
+                    <Label id="pprValue" translation="[650,320]" width="1050" height="150"
+                        color="0xF8FAFCFF" font="font:LargeBoldSystemFont" />
+                    <Label id="pprGoalContext" translation="[650,462]" width="1080" height="48"
+                        color="0x2563EBFF" font="font:MediumBoldSystemFont" />
+                    <Label id="pprName" translation="[650,522]" width="1080" height="82" wrap="true"
+                        color="0xF8FAFCFF" font="font:LargeBoldSystemFont" />
+                    <Label id="pprDescription" translation="[650,612]" width="1080" height="90" wrap="true"
+                        color="0xCBD5E1FF" font="font:MediumSystemFont" />
+                    <Rectangle id="pprProgressTrack" translation="[650,718]" width="1020" height="12" color="0xCBD5E1FF" />
+                    <Rectangle id="pprProgressFill" translation="[650,718]" width="0" height="12" color="0x2563EBFF" />
+                    <Rectangle id="pprStatusBackground" translation="[650,756]" width="1020" height="86" color="0x166534FF" />
+                    <Label id="pprStatus" translation="[684,775]" width="950" height="52"
+                        color="0xFFFFFFFF" font="font:MediumBoldSystemFont" />
+                    <Label id="pprDetails" translation="[650,865]" width="1080" height="90" wrap="true"
+                        color="0x94A3B8FF" font="font:MediumSystemFont" />
+
+                    <Group id="pprSummaryGroup" visible="false">
+                        <Rectangle id="pprSummaryScoreCard" translation="[92,250]" width="430" height="220" color="0xFFFFFFFF" />
+                        <Rectangle id="pprSummaryTotalCard" translation="[548,250]" width="390" height="220" color="0xFFFFFFFF" />
+                        <Rectangle id="pprSummaryReachedCard" translation="[964,250]" width="390" height="220" color="0xFFFFFFFF" />
+                        <Rectangle id="pprSummaryAttentionCard" translation="[1380,250]" width="390" height="220" color="0xFFFFFFFF" />
+                        <Label translation="[124,278]" width="360" height="40" text="ÍNDICE CONSOLIDADO" color="0x64748BFF" font="font:MediumBoldSystemFont" />
+                        <Label id="pprSummaryAverage" translation="[124,326]" width="360" height="105" color="0x2563EBFF" font="font:LargeBoldSystemFont" />
+                        <Label translation="[580,278]" width="320" height="40" text="INDICADORES ATIVOS" color="0x64748BFF" font="font:MediumBoldSystemFont" />
+                        <Label id="pprSummaryTotal" translation="[580,326]" width="320" height="105" color="0x0F172AFF" font="font:LargeBoldSystemFont" />
+                        <Label translation="[996,278]" width="320" height="40" text="META ATINGIDA" color="0x64748BFF" font="font:MediumBoldSystemFont" />
+                        <Label id="pprSummaryReached" translation="[996,326]" width="320" height="105" color="0x22C55EFF" font="font:LargeBoldSystemFont" />
+                        <Label translation="[1412,278]" width="320" height="40" text="PONTOS DE ATENÇÃO" color="0x64748BFF" font="font:MediumBoldSystemFont" />
+                        <Label id="pprSummaryAttention" translation="[1412,326]" width="320" height="105" color="0xF59E0BFF" font="font:LargeBoldSystemFont" />
+                        <Rectangle id="pprSummaryListCard" translation="[92,500]" width="1678" height="460" color="0xFFFFFFFF" />
+                        <Label translation="[130,530]" width="1600" height="42" text="RESULTADOS DO PERÍODO" color="0x2563EBFF" font="font:MediumBoldSystemFont" />
+                        <Label id="pprSummaryList" translation="[130,590]" width="1600" height="325" wrap="true" color="0x334155FF" font="font:MediumSystemFont" />
+                    </Group>
+                </Group>
             </Group>
 
             <Group id="bannerGroup" translation="[0,900]" visible="false">
@@ -86,7 +160,7 @@
                     font="font:MediumSystemFont" />
             </Group>
 
-            <Group id="statusGroup">
+            <Group id="statusGroup" visible="false">
                 <Rectangle translation="[0,0]" width="1920" height="66" color="0x050B14E8" />
                 <Label
                     id="stationLabel"
@@ -112,7 +186,7 @@
                     translation="[420,215]"
                     width="1080"
                     height="72"
-                    text="Escolha esta TV"
+                    text="Escolha o setor desta TV"
                     color="0xF8FAFCFF"
                     font="font:LargeBoldSystemFont" />
                 <Label
@@ -120,7 +194,7 @@
                     translation="[420,300]"
                     width="1080"
                     height="64"
-                    text="Use as setas e pressione OK. Depois, use * para trocar."
+                    text="Use as setas e pressione OK. Para trocar depois, pressione OK ou *."
                     color="0x94A3B8FF"
                     font="font:MediumSystemFont" />
                 <LabelList
@@ -149,13 +223,43 @@
                 posterUri="pkg:/images/spinner.png"
                 control="stop" />
 
+            <Group id="introGroup" visible="true">
+                <Rectangle width="1920" height="1080" color="0x000000FF" />
+                <Video
+                    id="introVideo"
+                    width="1920"
+                    height="1080"
+                    visible="true"
+                    enableUI="false" />
+            </Group>
+
             <Timer id="slideTimer" repeat="false" />
             <Timer id="syncTimer" duration="10" repeat="true" />
+            <Timer id="transitionTimer" repeat="false" />
+            <Timer id="imageLoadTimer" duration="12" repeat="false" />
+            <Timer id="introFallbackTimer" duration="15" repeat="false" />
             <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">
                 <FloatFieldInterpolator
                     key="[0.0,1.0]"
                     keyValue="[0.0,1.0]"
                     fieldToInterp="contentGroup.opacity" />
+            </Animation>
+            <Animation id="imageEnter" duration="1.4" easeFunction="inOutQuad">
+                <FloatFieldInterpolator
+                    id="imageEnterOpacity"
+                    key="[0.0,1.0]"
+                    keyValue="[0.0,1.0]"
+                    fieldToInterp="dashboardImageB.opacity" />
+                <Vector2DFieldInterpolator
+                    id="imageEnterTranslation"
+                    key="[0.0,1.0]"
+                    keyValue="[[0.0,0.0],[0.0,0.0]]"
+                    fieldToInterp="dashboardImageB.translation" />
+                <Vector2DFieldInterpolator
+                    id="imageEnterScale"
+                    key="[0.0,1.0]"
+                    keyValue="[[1.0,1.0],[1.0,1.0]]"
+                    fieldToInterp="dashboardImageB.scale" />
             </Animation>
         </Group>
     </children>

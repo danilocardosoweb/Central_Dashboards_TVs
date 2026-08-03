@@ -29,7 +29,16 @@ $archive = [System.IO.Compression.ZipFile]::Open(
 
 try {
     $files = Get-ChildItem -LiteralPath $sourcePath -File -Recurse -Force |
-        Where-Object { $_.Name -notin @("README.md", "bsconfig.json") }
+        Where-Object {
+            $_.Name -notin @(
+                "README.md",
+                "bsconfig.json",
+                "splash_hd.png",
+                "splash_fhd.png",
+                "splash_hd.jpg",
+                "splash_fhd.jpg"
+            )
+        }
 
     foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($sourcePath.Length)
