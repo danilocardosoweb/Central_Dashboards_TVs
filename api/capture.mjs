@@ -43,9 +43,18 @@ function json(response, status, payload) {
 }
 
 export default async function handler(request, response) {
+  if (request.method === 'GET') {
+    return json(response, 200, {
+      ok: true,
+      service: 'central-dashboards-capture',
+      version: 'flow-v2',
+      rendererConfigured: Boolean(process.env.SUPABASE_RENDERER_KEY),
+      authorizationConfigured: Boolean(process.env.CAPTURE_API_SECRET)
+    });
+  }
   if (request.method !== 'POST') {
-    response.setHeader('Allow', 'POST');
-    return json(response, 405, { ok: false, error: 'Use POST.' });
+    response.setHeader('Allow', 'GET, POST');
+    return json(response, 405, { ok: false, error: 'Use GET ou POST.' });
   }
 
   if (!isAuthorized(request.headers.authorization, process.env.CAPTURE_API_SECRET)) {
