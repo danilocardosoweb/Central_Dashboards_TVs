@@ -52,14 +52,13 @@ function captureEndpoint(request) {
 
 async function readState(response, supabase, config) {
   const result = await readResilientState(supabase, config, {
-    allowEmptyOnDatabaseError: true
+    databaseFallback: false
   });
   if (!result.row) {
     return json(response, 404, {
       ok: false,
       missing: true,
       source: result.source,
-      databaseError: result.databaseError || null,
       message: 'O estado central ainda não foi criado no Storage.'
     });
   }
@@ -67,7 +66,7 @@ async function readState(response, supabase, config) {
     ...result.row,
     source: result.source,
     service: 'central-dashboards-state',
-    version: 'storage-v2'
+    version: 'storage-v3'
   });
 }
 
@@ -112,7 +111,7 @@ async function saveState(request, response, supabase, config) {
     ok: true,
     source: 'storage',
     service: 'central-dashboards-state',
-    version: 'storage-v2'
+    version: 'storage-v3'
   });
 }
 
