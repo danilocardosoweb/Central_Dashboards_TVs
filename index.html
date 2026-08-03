@@ -8348,7 +8348,7 @@
                 : '';
             const CLOUD_STATE_ENDPOINT = `${CLOUD_API_ORIGIN}/api/state`;
             const CLOUD_ROW_ID = 'central';
-            const CLOUD_POLL_INTERVAL = 10000;
+            const CLOUD_POLL_INTERVAL = 60000;
             const CLOUD_SAVE_DELAY = 850;
             const CLOUD_TRACKED_KEYS = new Set([
                 'dashboardUrls',
@@ -8638,7 +8638,8 @@
                         const currentCapture = row.payload?.capture || {};
                         if (captureQueueProgress(currentCapture).active) {
                             renderCaptureRequestStatus(currentCapture);
-                            showToast('JÃ¡ existe uma atualizaÃ§Ã£o em andamento.', 'error');
+                            showToast('Retomando a atualizaÃ§Ã£o solicitada.');
+                            processCaptureQueue();
                             return;
                         }
 
@@ -9020,9 +9021,6 @@
                             `Dados atualizados às ${formatCloudTime(row.updated_at)}.`
                         );
                     }
-                    if (captureQueueProgress(row.payload?.capture).active) {
-                        processCaptureQueue();
-                    }
                 } catch (error) {
                     setCloudStatus(
                         navigator.onLine ? 'error' : 'offline',
@@ -9084,9 +9082,7 @@
                         );
                     }
                     const currentRow = await readCloudRow().catch(() => null);
-                    if (captureQueueProgress(currentRow?.payload?.capture).active) {
-                        processCaptureQueue();
-                    }
+                    if (currentRow) renderCaptureRequestStatus(currentRow.payload?.capture);
                 } catch (error) {
                     console.error('Erro ao iniciar sincronização central:', error);
                     cloudReady = false;

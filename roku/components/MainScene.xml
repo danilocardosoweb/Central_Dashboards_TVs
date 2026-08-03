@@ -235,7 +235,7 @@
             </Group>
 
             <Timer id="slideTimer" repeat="false" />
-            <Timer id="syncTimer" duration="10" repeat="true" />
+            <Timer id="syncTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />
             <Timer id="imageLoadTimer" duration="12" repeat="false" />
             <Timer id="introFallbackTimer" duration="15" repeat="false" />

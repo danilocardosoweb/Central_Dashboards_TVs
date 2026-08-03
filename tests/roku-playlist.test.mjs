@@ -71,3 +71,7 @@ test('abertura sempre libera a camada de video antes do carrossel', () => {
   assert.match(scene, /m\.introVideo\.content = invalid/);
   assert.match(scene, /if key = "OK" or key = "back"[\s\S]*?finishIntroVideo\(\)/);
 });
+
+test('Roku consulta atualizacoes sem intervalo agressivo', () => {
+  assert.match(xml, /id="syncTimer" duration="60"/);
+});
