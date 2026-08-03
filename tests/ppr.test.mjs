@@ -55,6 +55,16 @@ test('escala mantém os seis marcos e o resultado decimal', () => {
     assert.match(web, /value \/ 150/);
 });
 
+test('layout do PPR respeita a area segura de TVs 16:9', () => {
+    assert.match(web, /PPR TV safe area/);
+    assert.match(web, /\.ppr-individual-screen\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\)/);
+    assert.match(web, /\.ppr-individual-layout\s*\{[\s\S]*?grid-template-columns:\s*minmax\(410px, 31%\) minmax\(0, 1fr\)/);
+    assert.match(web, /\.ppr-thermometer-wrap\s*\{[\s\S]*?overflow:\s*hidden/);
+    assert.match(web, /\.ppr-tick\s*\{[\s\S]*?grid-template-columns:\s*var\(--ppr-tick-line\) max-content minmax\(0, 1fr\)/);
+    assert.match(web, /\.ppr-indicator-meta > span\s*\{/);
+    assert.doesNotMatch(web, /\.ppr-summary-indicator span\s*\{/);
+});
+
 test('valor realizado encontra automaticamente a faixa configurada', () => {
     const start = web.indexOf('function parsePprMeasureNumber');
     const end = web.indexOf('function getPprBandLabel', start);

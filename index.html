@@ -2730,7 +2730,7 @@
         .ppr-summary-indicator { position: relative; overflow: hidden; padding: 0.95rem 1rem; border: 1px solid rgba(148,163,184,0.2); border-radius: 0.9rem; background: rgba(15,23,42,0.56); }
         .ppr-summary-indicator::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--ppr-color); }
         .ppr-summary-indicator strong { display: block; color: #f8fafc; font-size: clamp(0.75rem, 1.15vw, 1.05rem); }
-        .ppr-summary-indicator span { display: block; margin-top: 0.25rem; color: var(--ppr-color); font-size: clamp(1.3rem, 2.4vw, 2.4rem); font-weight: 850; }
+        .ppr-indicator-result > span { display: block; margin-top: 0.25rem; color: var(--ppr-color); font-size: clamp(1.3rem, 2.4vw, 2.4rem); font-weight: 850; }
 
         .ppr-general-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: clamp(0.7rem, 1.5vw, 1.4rem); }
         .ppr-general-card { display: grid; grid-template-columns: 56px 1fr; gap: 1rem; align-items: end; min-height: 220px; padding: 1rem; border: 1px solid rgba(148,163,184,0.2); border-radius: 1rem; background: rgba(15,23,42,0.62); }
@@ -2913,6 +2913,229 @@
             .ppr-thermometer { height: 46vh; }
             .ppr-summary-stats { grid-template-columns: repeat(2, 1fr); }
             .ppr-summary-grid, .ppr-general-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* PPR TV safe area: mantém textos e escalas dentro do quadro 16:9. */
+        .ppr-screen,
+        .ppr-screen *,
+        .ppr-screen *::before,
+        .ppr-screen *::after { box-sizing: border-box; }
+
+        .ppr-individual-screen {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+        }
+
+        .ppr-individual-screen .ppr-screen-header {
+            min-width: 0;
+            margin-bottom: clamp(.75rem, 1.15vw, 1.2rem);
+        }
+
+        .ppr-individual-layout {
+            grid-template-columns: minmax(410px, 31%) minmax(0, 1fr);
+            gap: clamp(1.35rem, 2.4vw, 2.85rem);
+            align-items: stretch;
+            height: auto;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .ppr-thermometer-wrap {
+            min-width: 0;
+            min-height: 0;
+            justify-content: flex-start;
+            overflow: hidden;
+            padding: clamp(1rem, 1.5vw, 1.45rem) clamp(.7rem, 1vw, 1rem)
+                     clamp(1.1rem, 1.7vw, 1.65rem) clamp(2.1rem, 4.2vw, 5rem);
+        }
+
+        .ppr-thermometer {
+            flex: 0 0 auto;
+            width: clamp(72px, 5.7vw, 104px);
+            height: min(52vh, 540px);
+            max-height: calc(100% - 1rem);
+        }
+
+        .ppr-scale {
+            inset: 8px auto 8px 100%;
+            width: clamp(220px, 14vw, 270px);
+        }
+
+        .ppr-tick {
+            --ppr-tick-line: 28px;
+            display: grid;
+            grid-template-columns: var(--ppr-tick-line) max-content minmax(0, 1fr);
+            align-items: center;
+            column-gap: clamp(.3rem, .45vw, .5rem);
+            width: 100%;
+            white-space: normal;
+            line-height: 1.12;
+        }
+
+        .ppr-tick::before {
+            width: 100%;
+            margin: 0;
+        }
+
+        .ppr-tick.meta { --ppr-tick-line: 42px; }
+        .ppr-tick.meta::before { width: 100%; }
+
+        .ppr-tick-percent { white-space: nowrap; }
+        .ppr-tick-expected {
+            min-width: 0;
+            margin-left: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-result-copy {
+            display: flex;
+            min-width: 0;
+            min-height: 0;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+            padding: clamp(1rem, 1.55vw, 1.7rem);
+        }
+
+        .ppr-result-value {
+            margin-top: clamp(.3rem, .55vw, .55rem);
+            font-size: clamp(3.2rem, 6.5vw, 7rem);
+        }
+
+        .ppr-result-name {
+            margin-top: clamp(.55rem, .8vw, .8rem);
+            max-width: 100%;
+            font-size: clamp(1.3rem, 2.35vw, 2.55rem);
+            line-height: 1.08;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-result-description {
+            display: -webkit-box;
+            max-width: 100%;
+            overflow: hidden;
+            line-height: 1.3;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+
+        .ppr-operational-values {
+            flex-wrap: nowrap;
+            min-width: 0;
+            gap: clamp(.45rem, .7vw, .7rem);
+        }
+
+        .ppr-operational-value {
+            flex: 0 1 255px;
+            min-width: 0;
+            max-width: 280px;
+        }
+
+        .ppr-operational-value strong {
+            line-height: 1.15;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-result-copy > .ppr-progress { flex: 0 0 auto; }
+        .ppr-status-message { align-self: flex-start; max-width: 100%; line-height: 1.15; }
+        .ppr-result-footer {
+            max-width: 100%;
+            margin-top: clamp(.45rem, .65vw, .7rem);
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-summary-screen,
+        .ppr-general-screen {
+            display: flex;
+            min-height: 0;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ppr-summary-screen .ppr-screen-header,
+        .ppr-general-screen .ppr-screen-header {
+            flex: 0 0 auto;
+            margin-bottom: clamp(.75rem, 1.1vw, 1.15rem);
+        }
+
+        .ppr-summary-hero { flex: 0 0 auto; }
+        .ppr-summary-grid {
+            min-height: 0;
+            grid-auto-rows: minmax(0, 1fr);
+            overflow: hidden;
+        }
+
+        .ppr-summary-indicator {
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .ppr-indicator-head strong {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-indicator-result > span {
+            flex: 0 0 auto;
+            font-size: clamp(1.45rem, 2.35vw, 2.35rem);
+            line-height: 1;
+        }
+
+        .ppr-indicator-result > small {
+            min-width: 0;
+            max-width: 58%;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-indicator-meta > span {
+            display: block;
+            min-width: 0;
+            margin: 0;
+            color: inherit;
+            font-size: inherit;
+            font-weight: 650;
+            line-height: 1.2;
+            overflow-wrap: anywhere;
+        }
+
+        .ppr-indicator-meta > span:last-child {
+            flex: 0 0 auto;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .ppr-summary-screen > .ppr-result-footer,
+        .ppr-general-screen > .ppr-result-footer {
+            flex: 0 0 auto;
+        }
+
+        .ppr-general-grid {
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        @media (max-width: 1500px), (max-height: 820px) {
+            .ppr-screen { padding: clamp(1rem, 1.8vw, 1.7rem) clamp(1.25rem, 2.35vw, 2.4rem); }
+            .ppr-screen-title { font-size: clamp(1.8rem, 3.15vw, 3.15rem); }
+            .ppr-individual-layout { grid-template-columns: minmax(360px, 32%) minmax(0, 1fr); gap: clamp(1rem, 1.7vw, 1.8rem); }
+            .ppr-thermometer-wrap { padding-left: clamp(1.45rem, 3vw, 2.8rem); }
+            .ppr-thermometer { height: min(50vh, 470px); }
+            .ppr-scale { width: clamp(205px, 15vw, 235px); }
+            .ppr-tick { font-size: clamp(.6rem, .92vw, .85rem); }
+            .ppr-result-value { font-size: clamp(3rem, 6vw, 5.8rem); }
+            .ppr-result-name { font-size: clamp(1.2rem, 2.15vw, 2.05rem); }
+            .ppr-result-description { font-size: clamp(.75rem, 1.2vw, 1.05rem); }
+            .ppr-operational-value { padding: .55rem .7rem; }
+            .ppr-summary-indicator { padding: .8rem .9rem .8rem 1rem; }
+        }
+
+        @media (max-width: 980px) {
+            .ppr-individual-screen { display: block; overflow: auto; }
+            .ppr-individual-layout { grid-template-columns: 1fr; height: auto; overflow: visible; }
+            .ppr-thermometer-wrap { min-height: 520px; }
+            .ppr-summary-screen, .ppr-general-screen { overflow: auto; }
+            .ppr-summary-grid, .ppr-general-grid { overflow: visible; }
         }
     </style>
 </head>
