@@ -120,7 +120,16 @@ $form.Controls.Add($logBox)
 
 function Invoke-OnUi([scriptblock]$action) {
     if ($form.IsDisposed) { return }
-    [void]$form.BeginInvoke($action)
+    $callback = [System.Windows.Forms.MethodInvoker]$action.GetNewClosure()
+    if ($form.InvokeRequired) {
+        # PowerShell não resolve de forma consistente a sobrecarga de um
+        # argumento de Control.BeginInvoke. Informe explicitamente o delegado
+        # e o array de argumentos vazio para funcionar no Windows PowerShell 5.
+        [void]$form.BeginInvoke($callback, [object[]]@())
+    }
+    else {
+        $callback.Invoke()
+    }
 }
 
 function Add-LogLine([string]$line, [bool]$isError = $false) {
