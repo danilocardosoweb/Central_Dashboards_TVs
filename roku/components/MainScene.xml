@@ -141,23 +141,22 @@
                 </Group>
             </Group>
 
-            <Group id="bannerGroup" translation="[0,900]" visible="false">
-                <Rectangle id="bannerBackground" width="1920" height="180" color="0xC2410CFA" />
-                <Label
-                    id="bannerTitle"
-                    translation="[72,28]"
-                    width="450"
-                    height="55"
-                    color="0xFFFFFFFF"
-                    font="font:MediumBoldSystemFont" />
-                <Label
-                    id="bannerBody"
-                    translation="[520,25]"
-                    width="1320"
-                    height="120"
-                    wrap="true"
-                    color="0xFFFFFFFF"
+            <Group id="bannerGroup" translation="[0,880]" opacity="0" visible="false">
+                <Rectangle id="bannerBackground" width="1920" height="200" color="0x2563EBFA" />
+                <Rectangle id="bannerIconBackground" translation="[54,38]" width="124" height="124" color="0xFFFFFF26" />
+                <Label id="bannerIcon" translation="[54,50]" width="124" height="100"
+                    text="i" horizAlign="center" vertAlign="center" color="0xFFFFFFFF"
+                    font="font:LargeBoldSystemFont" />
+                <Label id="bannerCategory" translation="[208,22]" width="330" height="42"
+                    color="0xFFFFFFDD" font="font:MediumBoldSystemFont" />
+                <Label id="bannerTitle" translation="[208,65]" width="530" height="76"
+                    color="0xFFFFFFFF" font="font:LargeBoldSystemFont" />
+                <Label id="bannerBody" translation="[770,52]" width="1080" height="96"
+                    wrap="true" vertAlign="center" color="0xFFFFFFFF"
                     font="font:MediumSystemFont" />
+                <ScrollingLabel id="bannerScrollingBody" translation="[770,70]" maxWidth="1080" height="64"
+                    visible="false" scrollSpeed="80" repeatCount="-1" horizAlign="left" vertAlign="center"
+                    color="0xFFFFFFFF" font="font:MediumSystemFont" />
             </Group>
 
             <Group id="statusGroup" visible="false">
@@ -249,6 +248,8 @@
             <Timer id="imageLoadTimer" duration="8" repeat="false" />
             <Timer id="introFallbackTimer" duration="12" repeat="false" />
             <Timer id="fetchWatchdogTimer" duration="20" repeat="false" />
+            <Timer id="temporaryAlertTimer" duration="15" repeat="false" />
+            <Timer id="temporaryAlertGapTimer" duration="1" repeat="false" />
             <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">
                 <FloatFieldInterpolator
                     key="[0.0,1.0]"
@@ -271,6 +272,22 @@
                     key="[0.0,1.0]"
                     keyValue="[[1.0,1.0],[1.0,1.0]]"
                     fieldToInterp="dashboardImageB.scale" />
+            </Animation>
+            <Animation id="temporaryAlertEnter" duration="0.45" easeFunction="outQuad">
+                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[1.0,1.0],[0.8,0.8]]"
+                    fieldToInterp="contentGroup.scale" />
+                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[0.0,0.0],[192.0,0.0]]"
+                    fieldToInterp="contentGroup.translation" />
+                <FloatFieldInterpolator key="[0.0,1.0]" keyValue="[0.0,1.0]"
+                    fieldToInterp="bannerGroup.opacity" />
+            </Animation>
+            <Animation id="temporaryAlertExit" duration="0.35" easeFunction="inQuad">
+                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[0.8,0.8],[1.0,1.0]]"
+                    fieldToInterp="contentGroup.scale" />
+                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[192.0,0.0],[0.0,0.0]]"
+                    fieldToInterp="contentGroup.translation" />
+                <FloatFieldInterpolator key="[0.0,1.0]" keyValue="[1.0,0.0]"
+                    fieldToInterp="bannerGroup.opacity" />
             </Animation>
         </Group>
     </children>

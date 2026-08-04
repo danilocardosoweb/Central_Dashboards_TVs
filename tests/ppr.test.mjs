@@ -113,3 +113,15 @@ test('player Roku lê e renderiza o PPR sem imagens', () => {
     assert.match(rokuXml, /id="pprValueCaption"/);
     assert.match(rokuXml, /id="pprGoalContext"/);
 });
+
+test('Roku aceita numeros encapsulados pelo ParseJson e nao exibe zero falso', () => {
+    assert.match(roku, /normalizedType = LCase\(valueType\)/);
+    assert.match(roku, /normalizedType = "roint"/);
+    assert.match(roku, /normalizedType = "rofloat"/);
+    assert.match(roku, /normalizedType = "rodouble"/);
+    assert.match(roku, /normalizedType = "rostring"/);
+    assert.match(roku, /return Val\(value\.ToStr\(\)\)/);
+    assert.match(roku, /enabledPprIndicatorCount\(ppr\)/);
+    assert.match(roku, /m\.pprSummaryAverage\.text = "--"/);
+    assert.match(roku, /ppr-invalid-results/);
+});

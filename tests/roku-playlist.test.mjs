@@ -51,15 +51,31 @@ test('combina dashboards, alertas e PPR sem substituicao', () => {
   assert.match(scene, /areaMatches = areaId = "__all__" or targetListMatches\(areaIds, areaId\)/);
 });
 
-test('todos os avisos em faixa participam da rotacao', () => {
-  assert.match(scene, /bannerAlerts\.Push\(alert\)/);
-  assert.match(scene, /sub renderActiveBanner\(\)/);
-  assert.match(scene, /index mod m\.bannerAlerts\.Count\(\)/);
+test('alertas temporarios usam fila independente do carrossel', () => {
+  assert.match(scene, /temporaryAlerts\.Push\(alert\)/);
+  assert.match(scene, /configureTemporaryAlerts\(temporaryAlerts\)/);
+  assert.match(scene, /sub showNextTemporaryAlert\(\)/);
+  assert.match(scene, /sub onTemporaryAlertTimer\(\)/);
+  assert.equal((scene.match(/renderActiveBanner\(\)/g) || []).length, 1);
 });
 
 test('sincroniza quando updated_at muda mesmo sem nova revisao', () => {
   assert.match(scene, /m\.lastUpdatedAt = ""/);
   assert.match(scene, /revision = m\.lastRevision and updatedAt = m\.lastUpdatedAt/);
+});
+
+test('PPR usa imagens publicadas e mantém o desenho nativo como contingência', () => {
+  assert.match(scene, /renderedSlides = arrayOrEmpty\(valueOr\(ppr, "renderedSlides", \[\]\)\)/);
+  assert.match(scene, /kind: "ppr-image"/);
+  assert.match(scene, /if result\.Count\(\) > 0 then return result/);
+  assert.match(scene, /O painel nativo permanece apenas como contingência/);
+});
+
+test('primeira instalação inicia sem abrir automaticamente a seleção de setor', () => {
+  assert.match(scene, /Na primeira instalação, inicia a programação padrão/);
+  assert.match(scene, /else\s+' Na primeira instalação[\s\S]*?activateStationChoice\(0\)/);
+  assert.doesNotMatch(scene, /else\s+showStationSelector\(\)\s+end if\s+end sub/);
+  assert.match(scene, /key = "options" or key = "OK" or key = "down"/);
 });
 
 test('sincronizacao preserva o slide atual quando outro item foi atualizado', () => {
@@ -103,5 +119,5 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V18/);
+  assert.match(scene, /Build: V22/);
 });

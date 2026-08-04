@@ -56,8 +56,11 @@ sub init()
     m.pprScale0 = m.top.FindNode("pprScale0")
     m.bannerGroup = m.top.FindNode("bannerGroup")
     m.bannerBackground = m.top.FindNode("bannerBackground")
+    m.bannerIcon = m.top.FindNode("bannerIcon")
+    m.bannerCategory = m.top.FindNode("bannerCategory")
     m.bannerTitle = m.top.FindNode("bannerTitle")
     m.bannerBody = m.top.FindNode("bannerBody")
+    m.bannerScrollingBody = m.top.FindNode("bannerScrollingBody")
     m.stationLabel = m.top.FindNode("stationLabel")
     m.syncLabel = m.top.FindNode("syncLabel")
     m.stationOverlay = m.top.FindNode("stationOverlay")
@@ -71,6 +74,8 @@ sub init()
     m.introVideo = m.top.FindNode("introVideo")
     m.introFallbackTimer = m.top.FindNode("introFallbackTimer")
     m.fetchWatchdogTimer = m.top.FindNode("fetchWatchdogTimer")
+    m.temporaryAlertTimer = m.top.FindNode("temporaryAlertTimer")
+    m.temporaryAlertGapTimer = m.top.FindNode("temporaryAlertGapTimer")
     m.diagnosticsOverlay = m.top.FindNode("diagnosticsOverlay")
     m.diagnosticsText = m.top.FindNode("diagnosticsText")
     m.fadeIn = m.top.FindNode("fadeIn")
@@ -78,6 +83,8 @@ sub init()
     m.imageEnterOpacity = m.top.FindNode("imageEnterOpacity")
     m.imageEnterTranslation = m.top.FindNode("imageEnterTranslation")
     m.imageEnterScale = m.top.FindNode("imageEnterScale")
+    m.temporaryAlertEnter = m.top.FindNode("temporaryAlertEnter")
+    m.temporaryAlertExit = m.top.FindNode("temporaryAlertExit")
 
     m.slideTimer.ObserveField("fire", "onSlideTimer")
     m.syncTimer.ObserveField("fire", "onSyncTimer")
@@ -87,6 +94,8 @@ sub init()
     m.introVideo.ObserveField("position", "onIntroVideoPosition")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
     m.fetchWatchdogTimer.ObserveField("fire", "onFetchWatchdogTimer")
+    m.temporaryAlertTimer.ObserveField("fire", "onTemporaryAlertTimer")
+    m.temporaryAlertGapTimer.ObserveField("fire", "onTemporaryAlertGapTimer")
     m.dashboardImageA.ObserveField("loadStatus", "onImageALoadStatus")
     m.dashboardImageB.ObserveField("loadStatus", "onImageBLoadStatus")
     m.stationList.ObserveField("itemSelected", "onStationSelected")
@@ -94,11 +103,14 @@ sub init()
     m.state = invalid
     m.stations = []
     m.stationChoices = []
-    m.bannerAlerts = []
+    m.temporaryAlerts = []
+    m.temporaryAlertQueue = []
+    m.activeTemporaryAlert = invalid
     m.slides = []
     m.slideIndex = -1
     m.lastRevision = -1
     m.lastUpdatedAt = ""
+    m.lastPlaybackSignature = ""
     m.fetching = false
     m.paused = false
     m.defaultDuration = 30
@@ -119,7 +131,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 18, endpoint: m.endpoint })
+    logEvent("app-start", { build: 22, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -176,6 +188,9 @@ sub finishIntroVideo()
         m.top.SetFocus(true)
     end if
     logEvent("intro-finish", {})
+    if m.activeTemporaryAlert = invalid and m.temporaryAlertQueue <> invalid and m.temporaryAlertQueue.Count() > 0
+        showNextTemporaryAlert()
+    end if
 end sub
 
 sub applyResolutionScale()
@@ -241,10 +256,17 @@ sub onFetchResult()
         return
     end if
 
+    playbackSignature = statePlaybackSignature(payload)
+    playbackChanged = playbackSignature <> m.lastPlaybackSignature
     m.preservePlaybackOnBuild = m.state <> invalid
     m.lastRevision = revision
     m.lastUpdatedAt = updatedAt
     m.state = payload
+    m.lastPlaybackSignature = playbackSignature
+    if not playbackChanged and m.currentStation <> invalid
+        updateSlideStatus()
+        return
+    end if
     m.stations = arrayOrEmpty(valueOr(payload, "stations", []))
     configureDefaultDuration(payload)
     chooseOrRestoreStation()
@@ -297,10 +319,10 @@ sub chooseOrRestoreStation()
 
     if index >= 0
         activateStationChoice(index)
-    else if m.stationChoices.Count() = 1
-        activateStationChoice(0)
     else
-        showStationSelector()
+        ' Na primeira instalação, inicia a programação padrão sem interromper
+        ' a abertura. A seleção continua disponível pelo botão Opções/OK.
+        activateStationChoice(0)
     end if
 end sub
 
@@ -391,7 +413,7 @@ sub buildPlaylist()
     alerts = arrayOrEmpty(valueOr(m.state, "alerts", []))
     dashboardSlides = []
     alertSlides = []
-    bannerAlerts = []
+    temporaryAlerts = []
     pprSlides = []
 
     for each dashboard in urls
@@ -408,10 +430,10 @@ sub buildPlaylist()
     end for
 
     for each alert in alerts
-        if isAlertActive(alert) and belongsToArea(alert, areaId)
+        if isAlertActive(alert) and alertTargetsStation(alert, m.currentStation, areaId)
             mode = LCase(valueOr(alert, "displayMode", "fullscreen"))
             if mode = "banner"
-                bannerAlerts.Push(alert)
+                temporaryAlerts.Push(alert)
             else
                 alertSlides.Push({
                     id: valueOr(alert, "id", "")
@@ -432,7 +454,7 @@ sub buildPlaylist()
     end if
 
     m.slides = []
-    m.bannerAlerts = bannerAlerts
+    configureTemporaryAlerts(temporaryAlerts)
     pprPosition = LCase(valueOr(ppr, "sequencePosition", "after-dashboards"))
     if pprPosition = "start"
         appendSlides(m.slides, pprSlides)
@@ -456,7 +478,7 @@ sub buildPlaylist()
         dashboards: dashboardSlides.Count()
         ppr: pprSlides.Count()
         alerts: alertSlides.Count()
-        banners: bannerAlerts.Count()
+        temporaryAlerts: temporaryAlerts.Count()
         total: m.slides.Count()
     })
     updateDiagnostics()
@@ -465,7 +487,6 @@ sub buildPlaylist()
     preservedIndex = findSlideIndex(m.slides, previousSlide)
     if preservedIndex >= 0
         m.slideIndex = preservedIndex
-        renderActiveBanner()
         currentSlideSignature = FormatJson(m.slides[preservedIndex])
         if currentSlideSignature = previousSlideSignature
             ' A sincronização alterou outro item (por exemplo, uma captura
@@ -488,7 +509,6 @@ end sub
 sub showNextSlide()
     if m.slides.Count() = 0 then return
     m.slideIndex = (m.slideIndex + 1) mod m.slides.Count()
-    renderActiveBanner()
     renderSlide(m.slides[m.slideIndex])
 end sub
 
@@ -496,7 +516,6 @@ sub showPreviousSlide()
     if m.slides.Count() = 0 then return
     m.slideIndex = m.slideIndex - 1
     if m.slideIndex < 0 then m.slideIndex = m.slides.Count() - 1
-    renderActiveBanner()
     renderSlide(m.slides[m.slideIndex])
 end sub
 
@@ -582,6 +601,18 @@ sub handlePendingImageStatus(status as string)
         showImageLoadFailure(m.pendingSlide)
     end if
 end sub
+
+function statePlaybackSignature(payload as dynamic) as string
+    if payload = invalid then return ""
+    return FormatJson({
+        urls: valueOr(payload, "urls", [])
+        areas: valueOr(payload, "areas", [])
+        stations: valueOr(payload, "stations", [])
+        alerts: valueOr(payload, "alerts", [])
+        ppr: valueOr(payload, "ppr", {})
+        settings: valueOr(payload, "settings", {})
+    })
+end function
 
 sub onFetchWatchdogTimer()
     if not m.fetching then return
@@ -776,6 +807,15 @@ function pprTargetsStation(ppr as dynamic, station as dynamic, areaId as string)
     return targetListMatches(stationIds, stationId) and areaMatches
 end function
 
+function alertTargetsStation(alert as dynamic, station as dynamic, areaId as string) as boolean
+    if alert = invalid or station = invalid then return false
+    stationIds = arrayOrEmpty(valueOr(alert, "stationIds", ["*"]))
+    areaIds = arrayOrEmpty(valueOr(alert, "areaIds", ["*"]))
+    stationId = valueOr(station, "id", "")
+    areaMatches = areaId = "__all__" or targetListMatches(areaIds, areaId)
+    return targetListMatches(stationIds, stationId) and areaMatches
+end function
+
 function targetListMatches(values as object, currentValue as string) as boolean
     if values.Count() = 0 then return true
     for each candidate in values
@@ -786,20 +826,55 @@ end function
 
 function activePprIndicators(ppr as dynamic) as object
     result = []
+    invalidResults = 0
     indicators = arrayOrEmpty(valueOr(ppr, "indicators", []))
     for each indicator in indicators
-        value = pprNumericValue(valueOr(indicator, "result", invalid))
+        rawValue = valueOr(indicator, "result", invalid)
+        value = pprNumericValue(rawValue)
         if valueOr(indicator, "enabled", true) and value >= 0 and value <= 150
             result.Push(indicator)
+        else if valueOr(indicator, "enabled", true)
+            invalidResults = invalidResults + 1
         end if
     end for
+    if invalidResults > 0
+        logEvent("ppr-invalid-results", {
+            total: indicators.Count()
+            invalid: invalidResults
+        })
+    end if
     return result
+end function
+
+function enabledPprIndicatorCount(ppr as dynamic) as integer
+    total = 0
+    indicators = arrayOrEmpty(valueOr(ppr, "indicators", []))
+    for each indicator in indicators
+        if valueOr(indicator, "enabled", true) then total = total + 1
+    end for
+    return total
 end function
 
 function buildPprSlides(ppr as dynamic) as object
     result = []
+    renderedSlides = arrayOrEmpty(valueOr(ppr, "renderedSlides", []))
     indicators = activePprIndicators(ppr)
     duration = valueOr(ppr, "duration", 30)
+    for each rendered in renderedSlides
+        imageUrl = valueOr(rendered, "imageUrl", "")
+        if Left(LCase(imageUrl), 8) = "https://"
+            result.Push({
+                id: valueOr(rendered, "id", "ppr-image")
+                kind: "ppr-image"
+                title: valueOr(rendered, "title", "Indicador do PPR")
+                imageUrl: imageUrl
+                duration: valueOr(rendered, "duration", duration)
+            })
+        end if
+    end for
+    ' O painel nativo permanece apenas como contingência quando ainda não
+    ' existe um conjunto de imagens publicado pela Central.
+    if result.Count() > 0 then return result
     if valueOr(ppr, "showSummary", true)
         result.Push({ id: "ppr-summary", kind: "ppr-summary", source: ppr, duration: duration })
     end if
@@ -820,11 +895,21 @@ function buildPprSlides(ppr as dynamic) as object
 end function
 
 function pprNumericValue(value as dynamic) as float
+    if value = invalid then return -1
     valueType = Type(value)
     if valueType = "Integer" or valueType = "LongInteger" or valueType = "Float" or valueType = "Double"
         return value
     end if
-    if valueType = "String" and value <> "" then return Val(value)
+
+    normalizedType = LCase(valueType)
+    if normalizedType = "roint" or normalizedType = "rofloat" or normalizedType = "rodouble" or normalizedType = "rolonginteger" or normalizedType = "roint64"
+        return Val(value.ToStr())
+    end if
+
+    if normalizedType = "string" or normalizedType = "rostring"
+        textValue = value.ToStr().Trim().Replace(",", ".")
+        if textValue <> "" then return Val(textValue)
+    end if
     return -1
 end function
 
@@ -1043,6 +1128,7 @@ end function
 sub renderPprSummary(ppr as dynamic)
     indicators = activePprIndicators(ppr)
     total = indicators.Count()
+    enabledTotal = enabledPprIndicatorCount(ppr)
     reached = 0
     sum = 0.0
     lines = ""
@@ -1072,11 +1158,19 @@ sub renderPprSummary(ppr as dynamic)
     m.pprStatus.visible = false
     m.pprDetails.visible = false
     m.pprSummaryGroup.visible = true
-    m.pprSummaryAverage.text = pprPercent(average)
+    if total > 0
+        m.pprSummaryAverage.text = pprPercent(average)
+    else
+        m.pprSummaryAverage.text = "--"
+    end if
     m.pprSummaryTotal.text = total.ToStr()
     m.pprSummaryReached.text = reached.ToStr()
     m.pprSummaryAttention.text = (total - reached).ToStr()
-    if lines = "" then lines = "Nenhum indicador possui resultado atualizado."
+    if lines = "" and enabledTotal > 0
+        lines = "Os indicadores foram recebidos, mas os resultados nao puderam ser lidos. A apresentacao continuara e tentara novamente na proxima sincronizacao."
+    else if lines = ""
+        lines = "Nenhum indicador ativo possui resultado atualizado."
+    end if
     m.pprSummaryList.text = lines
 end sub
 
@@ -1192,6 +1286,181 @@ sub renderAlertSlide(slide as object)
     m.meta.text = metaText
 end sub
 
+sub configureTemporaryAlerts(alerts as object)
+    sorted = sortTemporaryAlerts(alerts)
+    m.temporaryAlerts = sorted
+
+    if m.activeTemporaryAlert <> invalid
+        activeId = valueOr(m.activeTemporaryAlert, "id", "")
+        stillActive = false
+        for each candidate in sorted
+            if valueOr(candidate, "id", "") = activeId then stillActive = true
+        end for
+        if not stillActive then hideTemporaryAlert("deactivated")
+    end if
+
+    m.temporaryAlertQueue = []
+    for each alert in sorted
+        isCurrentAlert = m.activeTemporaryAlert <> invalid and valueOr(alert, "id", "") = valueOr(m.activeTemporaryAlert, "id", "")
+        if not isCurrentAlert
+            repetitions = Int(valueOr(alert, "repetitions", 1))
+            if repetitions < 1 then repetitions = 1
+            if repetitions > 10 then repetitions = 10
+            for repeatIndex = 1 to repetitions
+                m.temporaryAlertQueue.Push(alert)
+            end for
+        end if
+    end for
+    logEvent("temporary-alert-queue", { count: m.temporaryAlertQueue.Count() })
+    if not m.introPlaying and m.activeTemporaryAlert = invalid and m.temporaryAlertQueue.Count() > 0
+        showNextTemporaryAlert()
+    end if
+end sub
+
+function sortTemporaryAlerts(alerts as object) as object
+    sorted = []
+    for each alert in alerts
+        inserted = false
+        score = temporaryAlertPriority(alert)
+        if sorted.Count() > 0
+            for index = 0 to sorted.Count() - 1
+                if score > temporaryAlertPriority(sorted[index])
+                    sorted.Insert(index, alert)
+                    inserted = true
+                    exit for
+                end if
+            end for
+        end if
+        if not inserted then sorted.Push(alert)
+    end for
+    return sorted
+end function
+
+function temporaryAlertPriority(alert as dynamic) as integer
+    priority = LCase(valueOr(alert, "priority", "normal"))
+    category = LCase(valueOr(alert, "category", "info"))
+    if priority = "critical" or category = "critical" then return 300
+    if priority = "high" or category = "attention" or category = "safety" then return 200
+    return 100
+end function
+
+sub showNextTemporaryAlert()
+    if m.introPlaying then return
+    if m.activeTemporaryAlert <> invalid then return
+    if m.temporaryAlertQueue = invalid or m.temporaryAlertQueue.Count() = 0 then return
+    alert = m.temporaryAlertQueue.Shift()
+    if not isAlertActive(alert)
+        showNextTemporaryAlert()
+        return
+    end if
+
+    m.activeTemporaryAlert = alert
+    category = valueOr(alert, "category", "info")
+    priority = temporaryAlertPriority(alert)
+    if priority >= 300
+        color = "0xDC2626FA"
+        icon = "!!"
+        level = "CRITICO"
+    else if priority >= 200
+        color = "0xD97706FA"
+        icon = "!"
+        level = "ATENCAO"
+    else
+        color = "0x2563EBFA"
+        icon = "i"
+        level = "INFORMATIVO"
+    end if
+
+    m.bannerBackground.color = color
+    m.bannerIcon.text = icon
+    m.bannerCategory.text = level + "  |  " + UCase(categoryLabel(category))
+    m.bannerTitle.text = valueOr(alert, "title", "Comunicado")
+    bodyText = valueOr(alert, "body", "")
+    textMode = LCase(valueOr(alert, "textMode", "auto"))
+    useScrolling = textMode = "scrolling" or (textMode = "auto" and Len(bodyText) > 95)
+    m.bannerBody.visible = not useScrolling
+    m.bannerScrollingBody.visible = useScrolling
+    if useScrolling
+        m.bannerScrollingBody.text = bodyText
+    else
+        m.bannerBody.text = bodyText
+    end if
+
+    m.bannerGroup.visible = true
+    m.temporaryAlertExit.control = "stop"
+    m.temporaryAlertEnter.control = "start"
+    duration = Int(valueOr(alert, "duration", 15))
+    if duration < 5 then duration = 5
+    if duration > 300 then duration = 300
+    m.temporaryAlertTimer.duration = duration
+    m.temporaryAlertTimer.control = "start"
+    logEvent("temporary-alert-show", {
+        alertId: valueOr(alert, "id", "")
+        priority: valueOr(alert, "priority", "normal")
+        duration: duration
+        remaining: m.temporaryAlertQueue.Count()
+    })
+    sendAlertHistoryEvent(alert, "displayed")
+    updateDiagnostics()
+end sub
+
+sub onTemporaryAlertTimer()
+    hideTemporaryAlert("completed")
+end sub
+
+sub hideTemporaryAlert(reason as string)
+    if m.activeTemporaryAlert = invalid then return
+    completedAlert = m.activeTemporaryAlert
+    alertId = valueOr(completedAlert, "id", "")
+    m.temporaryAlertTimer.control = "stop"
+    m.temporaryAlertEnter.control = "stop"
+    m.temporaryAlertExit.control = "start"
+    m.activeTemporaryAlert = invalid
+    logEvent("temporary-alert-hide", { alertId: alertId, reason: reason })
+    if reason = "completed" then sendAlertHistoryEvent(completedAlert, "completed")
+    m.temporaryAlertGapTimer.control = "start"
+    updateDiagnostics()
+end sub
+
+sub onTemporaryAlertGapTimer()
+    m.bannerGroup.visible = false
+    m.bannerGroup.opacity = 0.0
+    m.contentGroup.scale = [1.0, 1.0]
+    m.contentGroup.translation = [0.0, 0.0]
+    showNextTemporaryAlert()
+end sub
+
+sub sendAlertHistoryEvent(alert as dynamic, eventType as string)
+    if alert = invalid or m.currentStation = invalid then return
+    task = CreateObject("roSGNode", "AlertEventTask")
+    task.endpoint = m.endpoint
+    task.eventPayload = {
+        eventId: m.sessionId + "-" + valueOr(m.currentStation, "id", "station") + "-" + valueOr(alert, "id", "") + "-" + currentClock().Replace(":", "")
+        alertId: valueOr(alert, "id", "")
+        title: valueOr(alert, "title", "Comunicado")
+        priority: valueOr(alert, "priority", "normal")
+        type: eventType
+        stationId: valueOr(m.currentStation, "id", "")
+        stationName: valueOr(m.currentStation, "name", "TV")
+        areaId: valueOr(m.currentStation, "areaId", "geral")
+    }
+    task.ObserveField("state", "onAlertEventTaskState")
+    m.alertEventTask = task
+    task.control = "run"
+end sub
+
+sub onAlertEventTaskState()
+    if m.alertEventTask = invalid or m.alertEventTask.state <> "stop" then return
+    if m.alertEventTask.error <> ""
+        logEvent("temporary-alert-history-error", {
+            error: m.alertEventTask.error
+            statusCode: m.alertEventTask.statusCode
+        })
+    else
+        logEvent("temporary-alert-history-saved", { statusCode: m.alertEventTask.statusCode })
+    end if
+end sub
+
 sub renderBanner(alert as dynamic)
     if alert = invalid
         m.bannerGroup.visible = false
@@ -1278,9 +1547,12 @@ sub updateDiagnostics()
         currentId = valueOr(m.slides[m.slideIndex], "id", "-")
         currentKind = valueOr(m.slides[m.slideIndex], "kind", "-")
     end if
-    textValue = "Build: V18 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    activeAlertId = "-"
+    if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
+    textValue = "Build: V22 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
+    textValue = textValue + Chr(10) + "Alertas temporarios: " + m.temporaryAlerts.Count().ToStr() + " | Ativo: " + activeAlertId
     textValue = textValue + Chr(10) + "Ultimo erro: " + m.lastError
     m.diagnosticsText.text = textValue
 end sub
@@ -1289,7 +1561,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 18
+        build: 22
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId

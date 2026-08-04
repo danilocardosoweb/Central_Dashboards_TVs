@@ -23,6 +23,9 @@ function pprSlideCount(ppr, station, areaId) {
   const stationMatch = !stationIds.length || stationIds.includes('*') || stationIds.includes(station?.id);
   const areaMatch = areaId === '__all__' || !areaIds.length || areaIds.includes('*') || areaIds.includes(areaId);
   if (!stationMatch || !areaMatch) return 0;
+  const rendered = (Array.isArray(ppr.renderedSlides) ? ppr.renderedSlides : [])
+    .filter(item => String(item?.imageUrl || '').startsWith('https://'));
+  if (rendered.length) return rendered.length;
   const active = (Array.isArray(ppr.indicators) ? ppr.indicators : [])
     .filter(item => item?.enabled !== false)
     .filter(item => Number(item?.result) >= 0 && Number(item?.result) <= 150);
@@ -54,11 +57,26 @@ export function buildDiagnostics(row, source = 'storage') {
     }
   });
 
+  if (payload.ppr?.enabled) {
+    const rendered = Array.isArray(payload.ppr.renderedSlides)
+      ? payload.ppr.renderedSlides
+      : [];
+    if (!rendered.length) warnings.push('PPR ativo sem imagens publicadas; o Roku usará a contingência nativa.');
+    if (payload.ppr.renderStatus === 'stale') warnings.push('As imagens do PPR estão desatualizadas.');
+    rendered.forEach((slide, index) => {
+      if (!String(slide?.imageUrl || '').startsWith('https://')) {
+        warnings.push(`Imagem ${index + 1} do PPR fora de HTTPS.`);
+      }
+    });
+  }
+
   const playlists = stations.map(station => {
     const areaId = station?.areaId || 'geral';
     const dashboardCount = dashboards.filter(item => item?.enabled !== false && belongsToArea(item, areaId)).length;
     const alertCount = alerts.filter(item => item?.enabled !== false && belongsToArea(item, areaId))
       .filter(item => String(item?.displayMode || 'fullscreen').toLowerCase() !== 'banner').length;
+    const temporaryAlertCount = alerts.filter(item => item?.enabled !== false && belongsToArea(item, areaId))
+      .filter(item => String(item?.displayMode || 'fullscreen').toLowerCase() === 'banner').length;
     const pprCount = pprSlideCount(payload.ppr, station, areaId);
     return {
       stationId: station?.id || 'station-default',
@@ -67,6 +85,7 @@ export function buildDiagnostics(row, source = 'storage') {
       dashboards: dashboardCount,
       ppr: pprCount,
       alerts: alertCount,
+      temporaryAlerts: temporaryAlertCount,
       totalSlides: dashboardCount + pprCount + alertCount
     };
   });
@@ -74,7 +93,7 @@ export function buildDiagnostics(row, source = 'storage') {
   return {
     ok: warnings.length === 0 && playlists.every(item => item.totalSlides > 0),
     service: 'central-dashboards-diagnostics',
-    version: 'diagnostics-v1',
+    version: 'diagnostics-v3-temporary-alerts',
     source,
     state: summarizeStateRow(row),
     playlists,

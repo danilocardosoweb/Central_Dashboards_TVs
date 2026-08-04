@@ -146,7 +146,7 @@ async function saveState(request, response, supabase, config, traceId) {
   }, traceId);
 }
 
-async function processNextCapture(request, response, traceId) {
+async function processCapture(request, response, traceId, type = 'dashboard') {
   if (!process.env.CAPTURE_API_SECRET) {
     return json(response, 503, {
       ok: false,
@@ -161,7 +161,7 @@ async function processNextCapture(request, response, traceId) {
       'Content-Type': 'application/json',
       'X-Central-Trace-Id': traceId
     },
-    body: '{}'
+    body: JSON.stringify(type === 'ppr' ? { type: 'ppr' } : {})
   });
   const payload = await captureResponse.json().catch(() => ({
     ok: false,
@@ -172,9 +172,58 @@ async function processNextCapture(request, response, traceId) {
     status: captureResponse.status,
     ok: payload?.ok === true,
     skipped: payload?.skipped === true,
-    dashboardCount: Array.isArray(payload?.dashboards) ? payload.dashboards.length : 0
+    dashboardCount: Array.isArray(payload?.dashboards) ? payload.dashboards.length : 0,
+    pprSlides: Number(payload?.slides) || 0,
+    type
   }, captureResponse.ok ? 'info' : 'error');
   return json(response, captureResponse.status, payload, traceId);
+}
+
+function cleanText(value, maxLength = 120) {
+  return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, maxLength);
+}
+
+export function normalizeAlertEvent(input = {}, now = new Date()) {
+  if (!input || typeof input !== 'object') return null;
+  const allowedTypes = new Set(['displayed', 'completed', 'error']);
+  const event = {
+    eventId: cleanText(input.eventId, 180),
+    alertId: cleanText(input.alertId, 180),
+    title: cleanText(input.title, 120),
+    priority: cleanText(input.priority, 20) || 'normal',
+    type: allowedTypes.has(input.type) ? input.type : 'displayed',
+    stationId: cleanText(input.stationId, 120),
+    stationName: cleanText(input.stationName, 120),
+    areaId: cleanText(input.areaId, 120),
+    occurredAt: now.toISOString()
+  };
+  if (!event.eventId || !event.alertId || !event.stationId) return null;
+  return event;
+}
+
+async function appendAlertEvent(request, response, supabase, config, traceId) {
+  const event = normalizeAlertEvent(requestBody(request).event);
+  if (!event) {
+    return json(response, 400, { ok: false, error: 'Evento de alerta inválido.' }, traceId);
+  }
+  const result = await updateResilientState(supabase, config, payload => {
+    const state = payload && typeof payload === 'object' ? payload : {};
+    const history = Array.isArray(state.alertHistory) ? [...state.alertHistory] : [];
+    if (!history.some(item => item?.eventId === event.eventId)) history.unshift(event);
+    return { ...state, alertHistory: history.slice(0, 300) };
+  }, { databaseFallback: false });
+  logEvent('state-api', 'alert-event.saved', {
+    traceId,
+    eventId: event.eventId,
+    alertId: event.alertId,
+    stationId: event.stationId,
+    revision: result.row?.revision
+  });
+  return json(response, 200, {
+    ok: true,
+    revision: result.row?.revision,
+    eventId: event.eventId
+  }, traceId);
 }
 
 export default async function handler(request, response) {
@@ -199,7 +248,13 @@ export default async function handler(request, response) {
     if (request.method === 'POST') {
       const body = requestBody(request);
       if (body.action === 'capture-next') {
-        return await processNextCapture(request, response, traceId);
+        return await processCapture(request, response, traceId, 'dashboard');
+      }
+      if (body.action === 'capture-ppr') {
+        return await processCapture(request, response, traceId, 'ppr');
+      }
+      if (body.action === 'alert-event') {
+        return await appendAlertEvent(request, response, supabase, config, traceId);
       }
       return json(response, 400, { ok: false, error: 'Ação desconhecida.' }, traceId);
     }

@@ -39,6 +39,9 @@ export function summarizeStateRow(row) {
     ? payload.ppr.indicators
     : [];
   const queue = Array.isArray(payload.capture?.queue) ? payload.capture.queue : [];
+  const pprImages = Array.isArray(payload.ppr?.renderedSlides)
+    ? payload.ppr.renderedSlides
+    : [];
   return {
     revision: Number(row?.revision) || 0,
     updatedAt: row?.updated_at || null,
@@ -52,6 +55,8 @@ export function summarizeStateRow(row) {
     pprEnabled: payload.ppr?.enabled === true,
     pprIndicators: indicators.length,
     pprIndicatorsEnabled: indicators.filter(item => item?.enabled !== false).length,
+    pprImages: pprImages.length,
+    pprRenderStatus: payload.ppr?.renderStatus || 'missing',
     capture: {
       requestId: payload.capture?.requestId || null,
       status: payload.capture?.status || 'idle',
