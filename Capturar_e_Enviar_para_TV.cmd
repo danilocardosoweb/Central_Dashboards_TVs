@@ -1,5 +1,4 @@
 @echo off
 cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\capture-local-upload.ps1" -Visible
-echo.
-pause
+start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "scripts\capture-local-gui.ps1"
+exit /b

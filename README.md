@@ -109,9 +109,12 @@ Os dados são salvos no campo `ppr` do mesmo `payload` central já existente.
 Portanto, esta evolução não exige uma nova tabela nem altera os registros de
 dashboards, avisos, setores ou estações.
 
-O player Roku lê a mesma configuração. Depois de publicar a Central Web e
-instalar o ZIP atualizado, as mudanças do PPR chegam automaticamente à TV na
-próxima sincronização.
+O player Roku usa prioritariamente imagens 1920x1080 geradas a partir da mesma
+configuração. A publicação cria uma pasta de geração exclusiva em
+`roku-snapshots/ppr`, confirma todos os arquivos e somente então troca os links
+no estado central. A geração anterior permanece como contingência e não é
+apagada antes da troca. URLs novas a cada geração evitam que a TV reutilize uma
+imagem antiga do cache.
 
 ### Publicação e validação
 
@@ -119,7 +122,11 @@ próxima sincronização.
 2. Aguarde o deploy de produção e abra a Central Web.
 3. Entre em **PPR**, preencha os resultados e use **Visualizar em 16:9**.
 4. Ative o módulo apenas depois de revisar os setores e TVs selecionados.
-5. Para Roku, gere e reinstale o ZIP numerado da versão atual, por exemplo
+5. Clique em **Gerar imagens do PPR** ou abra
+   `Capturar_e_Enviar_para_TV.cmd`; confirme que o diagnóstico informa PPR
+   `ready` e que a origem renderizada coincide com a última atualização.
+6. Para Roku, gere e reinstale o ZIP numerado apenas quando houver mudança no
+   aplicativo da TV, por exemplo
    `dist/Central_Dashboard_Tvs_Roku_V_17.zip`.
 
 Antes de publicar, execute:
@@ -259,7 +266,14 @@ Para gerar as imagens pelo PC e enviá-las diretamente ao Storage:
 1. execute `npm.cmd install` e `npm.cmd run capture:install-browser` uma vez;
 2. abra `Capturar_e_Enviar_para_TV.cmd`;
 3. preencha `SUPABASE_RENDERER_KEY` no `.env` criado na primeira abertura;
-4. abra o atalho novamente e acompanhe o Chromium.
+4. abra o atalho novamente e use a janela **Central de Captura para TVs**.
+
+A janela permite iniciar e cancelar a captura, acompanhar o painel atual,
+abrir as imagens geradas e editar a configuração de acesso. Por padrão, o
+Chromium trabalha oculto. Marque **Mostrar o Chromium durante a captura** apenas
+quando precisar acompanhar ou diagnosticar o carregamento do Power BI. O
+computador precisa permanecer ligado somente enquanto a captura estiver em
+andamento; cada imagem concluída é enviada imediatamente ao Supabase.
 
 Não existe quantidade fixa: novos dashboards entram na próxima captura. As
 cópias locais ficam em `renderer/output` e os links publicados são gravados no
@@ -275,18 +289,12 @@ contrário, ele recebe mais uma tentativa. Após duas interrupções, o painel �
 registrado como falha e a fila segue para o próximo, evitando que toda a
 apresentação permaneça presa em um único item.
 
-### Botão de captura pelo PC
+### Interface de captura pelo PC
 
-O navegador não pode iniciar diretamente um programa local, abrir o Chromium
-automatizado ou ler a chave secreta do Supabase. Por isso, um futuro botão
-**Capturar neste PC** deve conversar com um assistente local previamente
-instalado. O assistente pode reutilizar `renderer/capture.mjs` e manter a chave
-somente no arquivo `.env` do computador.
-
-Enquanto esse assistente não fizer parte do instalador, o fluxo seguro e já
-funcional é abrir `Capturar_e_Enviar_para_TV.cmd`. Ele gera as imagens no PC,
-envia os arquivos para `roku-snapshots` e atualiza o estado central consumido
-pelas TVs.
+O navegador da Central não recebe a chave secreta. A interface local mantém a
+chave somente no `.env` deste computador, executa `renderer/capture.mjs`, envia
+os arquivos para `roku-snapshots` e atualiza o estado central consumido pelas
+TVs. Assim, a captura pode rodar em segundo plano sem expor credenciais no site.
 
 ## Segurança
 

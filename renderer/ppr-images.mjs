@@ -193,8 +193,10 @@ export function buildPprSlideHtml(ppr, slide) {
 export function pprRenderFingerprint(ppr) {
   const relevant = { ...ppr };
   delete relevant.renderedSlides;
+  delete relevant.previousRenderedSlides;
   delete relevant.renderedAt;
   delete relevant.renderVersion;
+  delete relevant.renderGeneration;
   delete relevant.renderStatus;
   delete relevant.renderError;
   delete relevant.renderSourceUpdatedAt;
@@ -236,6 +238,16 @@ export async function renderAndUploadPprImages({ supabase, config, ppr, sourceRe
       if (error) throw new Error(`Falha ao publicar ${slide.title}: ${error.message}`);
       const { data } = supabase.storage.from(config.bucket).getPublicUrl(objectName);
       if (!data?.publicUrl) throw new Error(`O Storage não retornou a URL de ${slide.title}.`);
+      const { data: storedImage, error: verifyError } = await supabase.storage
+        .from(config.bucket)
+        .download(objectName);
+      if (verifyError || !storedImage) {
+        throw new Error(`A imagem ${slide.title} foi enviada, mas não pôde ser confirmada no Storage.`);
+      }
+      const storedMetadata = await sharp(Buffer.from(await storedImage.arrayBuffer())).metadata();
+      if (storedMetadata.width !== 1920 || storedMetadata.height !== 1080) {
+        throw new Error(`A imagem publicada de ${slide.title} não possui 1920x1080.`);
+      }
       uploaded.push({
         id: slide.id,
         kind: slide.kind,
@@ -253,4 +265,14 @@ export async function renderAndUploadPprImages({ supabase, config, ppr, sourceRe
     await browser.close().catch(() => {});
   }
   return { slides: uploaded, fingerprint, generation, generatedAt: new Date().toISOString() };
+}
+
+export async function removePprSlideObjects(supabase, config, slides) {
+  const objectNames = (Array.isArray(slides) ? slides : [])
+    .map(item => String(item?.objectName || ''))
+    .filter(name => name.startsWith('ppr/') && name.endsWith('.png'));
+  if (!objectNames.length) return { removed: 0 };
+  const { error } = await supabase.storage.from(config.bucket).remove(objectNames);
+  if (error) throw new Error(`Falha ao remover imagens PPR antigas: ${error.message}`);
+  return { removed: objectNames.length };
 }

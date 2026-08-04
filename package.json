@@ -9,6 +9,7 @@
     "test": "node --test",
     "audit:e2e": "node scripts/audit-e2e.mjs",
     "capture:once": "node renderer/capture.mjs",
+    "capture:ppr": "node renderer/ppr-capture.mjs",
     "capture:watch": "node renderer/capture.mjs --watch",
     "capture:test": "node --test renderer/capture.test.mjs renderer/capture-start.test.mjs renderer/capture-queue.test.mjs renderer/state-store.test.mjs api/capture.test.mjs tests/capture-request-ui.test.mjs",
     "ppr:test": "node --test tests/ppr.test.mjs",
