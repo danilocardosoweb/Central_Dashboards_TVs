@@ -58,11 +58,19 @@ export function buildDiagnostics(row, source = 'storage') {
   });
 
   if (payload.ppr?.enabled) {
+    const sourceUpdatedAt = String(payload.ppr.updatedAt || '');
+    const renderedSourceUpdatedAt = String(payload.ppr.renderSourceUpdatedAt || '');
     const rendered = Array.isArray(payload.ppr.renderedSlides)
       ? payload.ppr.renderedSlides
       : [];
     if (!rendered.length) warnings.push('PPR ativo sem imagens publicadas; o Roku usará a contingência nativa.');
-    if (payload.ppr.renderStatus === 'stale') warnings.push('As imagens do PPR estão desatualizadas.');
+    if (rendered.length && payload.ppr.renderStatus !== 'ready') {
+      warnings.push('As imagens do PPR ainda não estão marcadas como prontas.');
+    }
+    if (payload.ppr.renderStatus === 'stale'
+      || (rendered.length && sourceUpdatedAt && renderedSourceUpdatedAt !== sourceUpdatedAt)) {
+      warnings.push('As imagens do PPR estão desatualizadas em relação aos dados da Central.');
+    }
     rendered.forEach((slide, index) => {
       if (!String(slide?.imageUrl || '').startsWith('https://')) {
         warnings.push(`Imagem ${index + 1} do PPR fora de HTTPS.`);

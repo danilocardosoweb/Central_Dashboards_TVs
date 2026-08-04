@@ -14,7 +14,10 @@ import {
   completeCapture
 } from '../renderer/capture-queue.mjs';
 import { updateResilientState } from '../renderer/state-store.mjs';
-import { renderAndUploadPprImages } from '../renderer/ppr-images.mjs';
+import {
+  removePprSlideObjects,
+  renderAndUploadPprImages
+} from '../renderer/ppr-images.mjs';
 import {
   errorDetails,
   logEvent,
@@ -220,6 +223,13 @@ export default async function handler(request, response) {
         sourceRevision: sourceRow.revision
       });
 
+      const previousCurrent = (Array.isArray(sourcePpr.renderedSlides)
+        ? sourcePpr.renderedSlides
+        : []).filter(item => String(item?.imageUrl || '').startsWith('https://'));
+      const obsolete = (Array.isArray(sourcePpr.previousRenderedSlides)
+        ? sourcePpr.previousRenderedSlides
+        : []).filter(item => String(item?.objectName || '').startsWith('ppr/'));
+
       const saved = await updateCentralPayload(supabase, baseConfig, payload => {
         const currentPpr = payload?.ppr;
         if (String(currentPpr?.updatedAt || '') !== String(sourcePpr.updatedAt || '')) {
@@ -229,6 +239,7 @@ export default async function handler(request, response) {
           ...payload,
           ppr: {
             ...currentPpr,
+            previousRenderedSlides: previousCurrent,
             renderedSlides: rendered.slides,
             renderedAt: rendered.generatedAt,
             renderSourceUpdatedAt: currentPpr.updatedAt || '',
@@ -239,11 +250,25 @@ export default async function handler(request, response) {
           }
         };
       });
+      let removedObsoleteSlides = 0;
+      try {
+        removedObsoleteSlides = (await removePprSlideObjects(
+          supabase,
+          baseConfig,
+          obsolete
+        )).removed;
+      } catch (cleanupError) {
+        logEvent('capture-api', 'ppr-cleanup-pending', {
+          traceId,
+          error: errorDetails(cleanupError)
+        }, 'warn');
+      }
       logEvent('capture-api', 'ppr-complete', {
         traceId,
         sourceRevision: sourceRow.revision,
         publishedRevision: saved.row?.revision,
         slides: rendered.slides.length,
+        removedObsoleteSlides,
         renderVersion: rendered.fingerprint,
         elapsedMs: Date.now() - startedAt
       });

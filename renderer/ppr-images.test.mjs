@@ -4,7 +4,8 @@ import test from 'node:test';
 import {
   buildPprImageSlides,
   buildPprSlideHtml,
-  pprRenderFingerprint
+  pprRenderFingerprint,
+  removePprSlideObjects
 } from './ppr-images.mjs';
 
 const ppr = {
@@ -52,8 +53,33 @@ test('fingerprint ignora metadados da renderização anterior', () => {
   const second = pprRenderFingerprint({
     ...ppr,
     renderedSlides: [{ imageUrl: 'https://old.example/ppr.png' }],
+    previousRenderedSlides: [{ imageUrl: 'https://older.example/ppr.png' }],
     renderedAt: '2026-08-04T10:00:00Z',
+    renderGeneration: 'rev-10-old',
     renderStatus: 'ready'
   });
   assert.equal(first, second);
+});
+
+test('remove somente objetos PPR depois da troca de geração', async () => {
+  let removed = [];
+  const supabase = {
+    storage: {
+      from() {
+        return {
+          async remove(names) {
+            removed = names;
+            return { error: null };
+          }
+        };
+      }
+    }
+  };
+  const result = await removePprSlideObjects(supabase, { bucket: 'roku-snapshots' }, [
+    { objectName: 'ppr/rev-antiga/ppr-summary.png' },
+    { objectName: 'dashboards/invalido/slot-1.png' },
+    { objectName: 'ppr/rev-antiga/sem-extensao' }
+  ]);
+  assert.equal(result.removed, 1);
+  assert.deepEqual(removed, ['ppr/rev-antiga/ppr-summary.png']);
 });
