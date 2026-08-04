@@ -166,6 +166,7 @@
 
         .url-item {
             background: var(--background-color);
+            border: 1px solid transparent;
             padding: 1rem;
             border-radius: var(--radius-md);
             display: flex;
@@ -177,6 +178,93 @@
 
         .url-item:hover {
             background: #f1f5f9;
+        }
+
+        .url-item.dashboard-dragging {
+            opacity: 0.48;
+            transform: scale(0.985);
+        }
+
+        .url-item.dashboard-drag-target {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+        }
+
+        .dashboard-order-control {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            flex: 0 0 auto;
+            margin-right: 0.7rem;
+        }
+
+        .dashboard-drag-handle,
+        .dashboard-order-button {
+            width: 2rem;
+            height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dbe4f0;
+            border-radius: 0.62rem;
+            background: #fff;
+            color: #64748b;
+        }
+
+        .dashboard-drag-handle {
+            cursor: grab;
+            touch-action: none;
+        }
+
+        .dashboard-drag-handle:active { cursor: grabbing; }
+
+        .dashboard-order-number {
+            min-width: 1.65rem;
+            height: 1.65rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #e8f1ff;
+            color: #2563eb;
+            font-size: 0.68rem;
+            font-weight: 800;
+        }
+
+        .dashboard-order-button {
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .dashboard-order-button:hover:not(:disabled) {
+            border-color: #93c5fd;
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .dashboard-order-button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .dashboard-order-hint {
+            margin: -0.55rem 0 1rem;
+            color: #64748b;
+            font-size: 0.7rem;
+            line-height: 1.45;
+        }
+
+        @media (max-width: 640px) {
+            .url-item {
+                align-items: flex-start;
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+
+            .dashboard-order-control { order: 1; }
+            .url-item-content { order: 2; flex-basis: calc(100% - 6rem); }
+            .url-actions { order: 3; width: 100%; justify-content: flex-end; }
         }
 
         .url-name {
@@ -3064,11 +3152,16 @@
         /* PPR Executive Experience */
         body.ppr-presenting .station-status-chip,
         body.ppr-presenting .control-buttons {
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-12px);
+            opacity: 1;
+            pointer-events: auto;
+            transform: none;
         }
-        .station-status-chip, .control-buttons { transition: opacity 260ms ease, transform 260ms ease; }
+        .station-status-chip,
+        .control-buttons {
+            z-index: 2200;
+            transition: opacity 260ms ease, transform 260ms ease;
+        }
+        body.ppr-presenting.fullscreen .control-buttons { opacity: 1; }
         .ppr-screen {
             --ppr-surface: rgba(15,23,42,0.72);
             --ppr-border: rgba(148,163,184,0.2);
@@ -4500,7 +4593,8 @@
                     service: serviceUrl,
                     combined: combinedUrl,
                     rokuImageUrl,
-                    areaIds: [document.getElementById('dashboardAreaId').value || 'geral']
+                    areaIds: [document.getElementById('dashboardAreaId').value || 'geral'],
+                    order: urls.length + 1
                 });
                 
                 localStorage.setItem('dashboardUrls', JSON.stringify(urls));
@@ -6716,7 +6810,8 @@
                             serviceUrl: serviceUrl,
                             publicUrl: publicUrl,
                             combined: combinedUrl,
-                            areaIds: [importedAreaId]
+                            areaIds: [importedAreaId],
+                            order: urls.length + 1
                         });
 
                         importCount++;
@@ -7755,6 +7850,9 @@
         function deleteUrl(index) {
             if (!urls[index]) return;
             urls.splice(index, 1);
+            urls.forEach((item, itemIndex) => {
+                item.order = itemIndex + 1;
+            });
             localStorage.setItem('dashboardUrls', JSON.stringify(urls));
             refreshAreaExperience();
             showToast('Dashboard removido', 'success');
@@ -7771,6 +7869,49 @@
             createSlides();
         }
 
+        let draggedDashboardIndex = -1;
+
+        function persistDashboardOrder(message = '') {
+            urls.forEach((item, index) => {
+                item.order = index + 1;
+            });
+            localStorage.setItem('dashboardUrls', JSON.stringify(urls));
+            updateUrlList();
+            createSlides();
+            updatePresentationEstimate();
+            if (message) showToast(message, 'success');
+        }
+
+        function moveDashboard(index, direction) {
+            const targetIndex = index + direction;
+            if (
+                index < 0 || targetIndex < 0 ||
+                index >= urls.length || targetIndex >= urls.length
+            ) return;
+
+            [urls[index], urls[targetIndex]] = [urls[targetIndex], urls[index]];
+            persistDashboardOrder('Ordem de exibição atualizada');
+        }
+
+        function reorderDashboard(fromIndex, toIndex) {
+            if (
+                fromIndex < 0 || toIndex < 0 ||
+                fromIndex >= urls.length || toIndex >= urls.length ||
+                fromIndex === toIndex
+            ) return;
+
+            const [movedDashboard] = urls.splice(fromIndex, 1);
+            urls.splice(toIndex, 0, movedDashboard);
+            persistDashboardOrder('Nova sequência salva para as TVs');
+        }
+
+        function clearDashboardDragState() {
+            document.querySelectorAll('.url-item').forEach(row => {
+                row.classList.remove('dashboard-dragging', 'dashboard-drag-target');
+            });
+            draggedDashboardIndex = -1;
+        }
+
         function updateUrlList() {
             ensureAreaSystem();
             const urlList = document.querySelector('.url-list');
@@ -7781,6 +7922,11 @@
             const heading = document.createElement('h3');
             heading.textContent = 'Dashboards Configurados';
             urlList.appendChild(heading);
+
+            const orderHint = document.createElement('p');
+            orderHint.className = 'dashboard-order-hint';
+            orderHint.textContent = 'Arraste pelo marcador ou use as setas para definir a sequência exibida nas TVs.';
+            urlList.appendChild(orderHint);
 
             if (!urls.length) {
                 const empty = document.createElement('div');
@@ -7793,6 +7939,48 @@
             urls.forEach((item, index) => {
                 const row = document.createElement('div');
                 row.className = 'url-item';
+                row.dataset.dashboardIndex = String(index);
+                row.addEventListener('dragover', event => {
+                    if (draggedDashboardIndex < 0) return;
+                    event.preventDefault();
+                    row.classList.add('dashboard-drag-target');
+                });
+                row.addEventListener('dragleave', () => {
+                    row.classList.remove('dashboard-drag-target');
+                });
+                row.addEventListener('drop', event => {
+                    event.preventDefault();
+                    const fromIndex = draggedDashboardIndex;
+                    clearDashboardDragState();
+                    reorderDashboard(fromIndex, index);
+                });
+
+                const orderControl = document.createElement('div');
+                orderControl.className = 'dashboard-order-control';
+
+                const dragHandle = document.createElement('span');
+                dragHandle.className = 'dashboard-drag-handle';
+                dragHandle.draggable = true;
+                dragHandle.tabIndex = 0;
+                dragHandle.title = 'Arraste para mudar a posição';
+                dragHandle.setAttribute(
+                    'aria-label',
+                    `Reordenar ${item.name || `Dashboard ${index + 1}`}`
+                );
+                dragHandle.innerHTML = '<i class="fas fa-grip-vertical"></i>';
+                dragHandle.addEventListener('dragstart', event => {
+                    draggedDashboardIndex = index;
+                    row.classList.add('dashboard-dragging');
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', String(index));
+                });
+                dragHandle.addEventListener('dragend', clearDashboardDragState);
+
+                const orderNumber = document.createElement('span');
+                orderNumber.className = 'dashboard-order-number';
+                orderNumber.textContent = String(index + 1);
+                orderNumber.title = `Posição ${index + 1}`;
+                orderControl.append(dragHandle, orderNumber);
 
                 const content = document.createElement('div');
                 content.className = 'url-item-content';
@@ -7827,15 +8015,34 @@
 
                 const actions = document.createElement('div');
                 actions.className = 'url-actions';
+
+                const moveUp = document.createElement('button');
+                moveUp.type = 'button';
+                moveUp.className = 'dashboard-order-button';
+                moveUp.title = 'Mover para cima';
+                moveUp.setAttribute('aria-label', 'Mover dashboard para cima');
+                moveUp.disabled = index === 0;
+                moveUp.innerHTML = '<i class="fas fa-arrow-up"></i>';
+                moveUp.addEventListener('click', () => moveDashboard(index, -1));
+
+                const moveDown = document.createElement('button');
+                moveDown.type = 'button';
+                moveDown.className = 'dashboard-order-button';
+                moveDown.title = 'Mover para baixo';
+                moveDown.setAttribute('aria-label', 'Mover dashboard para baixo');
+                moveDown.disabled = index === urls.length - 1;
+                moveDown.innerHTML = '<i class="fas fa-arrow-down"></i>';
+                moveDown.addEventListener('click', () => moveDashboard(index, 1));
+
                 const remove = document.createElement('button');
                 remove.type = 'button';
                 remove.className = 'delete-url';
                 remove.title = 'Remover dashboard';
                 remove.innerHTML = '<i class="fas fa-trash"></i>';
                 remove.addEventListener('click', () => deleteUrl(index));
-                actions.appendChild(remove);
+                actions.append(moveUp, moveDown, remove);
 
-                row.append(content, actions);
+                row.append(orderControl, content, actions);
                 urlList.appendChild(row);
             });
         }
