@@ -62,6 +62,7 @@ export function claimNextCapture(payload, options = {}) {
   const now = options.now || new Date().toISOString();
   const nowMs = asDate(now) || Date.now();
   const leaseMs = Math.max(60000, Number(options.leaseMs) || 4 * 60 * 1000);
+  const maxAttempts = Math.max(1, Number(options.maxAttempts) || 2);
 
   if (!captureRequestIsActive(capture) || !Array.isArray(capture.queue)) {
     return { claimed: false, reason: 'idle', payload: source };
@@ -78,7 +79,28 @@ export function claimNextCapture(payload, options = {}) {
 
   if (activeId) {
     const stale = queue.find(item => String(item.id) === activeId && item.status === 'running');
-    if (stale) stale.status = 'pending';
+    if (stale) {
+      const dashboard = (Array.isArray(source.urls) ? source.urls : [])
+        .find(item => String(item?.id) === activeId);
+      const capturedAt = asDate(dashboard?.rokuCapturedAt);
+      const startedAt = asDate(stale.startedAt);
+      const imageWasPublished = dashboard?.rokuCaptureStatus === 'ok'
+        && Boolean(dashboard?.rokuImageUrl)
+        && capturedAt > 0
+        && capturedAt >= startedAt;
+
+      if (imageWasPublished) {
+        stale.status = 'complete';
+        stale.completedAt = dashboard.rokuCapturedAt;
+        stale.error = null;
+      } else if ((Number(stale.attempts) || 0) >= maxAttempts) {
+        stale.status = 'error';
+        stale.completedAt = now;
+        stale.error = `Captura interrompida após ${maxAttempts} tentativas.`;
+      } else {
+        stale.status = 'pending';
+      }
+    }
   }
 
   const next = queue.find(item => item.status === 'pending');

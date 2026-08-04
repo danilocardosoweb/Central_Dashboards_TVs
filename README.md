@@ -265,6 +265,29 @@ Não existe quantidade fixa: novos dashboards entram na próxima captura. As
 cópias locais ficam em `renderer/output` e os links publicados são gravados no
 mesmo estado consumido pelo Roku.
 
+### Recuperação de captura interrompida
+
+Uma atualização continua sendo iniciada somente pelo botão **Atualizar agora**.
+Depois de iniciada, a Central acompanha a fila e recupera automaticamente uma
+execução cuja concessão tenha vencido. Se a imagem já tiver sido publicada no
+Storage, o painel é reconciliado como concluído sem uma segunda captura. Caso
+contrário, ele recebe mais uma tentativa. Após duas interrupções, o painel é
+registrado como falha e a fila segue para o próximo, evitando que toda a
+apresentação permaneça presa em um único item.
+
+### Botão de captura pelo PC
+
+O navegador não pode iniciar diretamente um programa local, abrir o Chromium
+automatizado ou ler a chave secreta do Supabase. Por isso, um futuro botão
+**Capturar neste PC** deve conversar com um assistente local previamente
+instalado. O assistente pode reutilizar `renderer/capture.mjs` e manter a chave
+somente no arquivo `.env` do computador.
+
+Enquanto esse assistente não fizer parte do instalador, o fluxo seguro e já
+funcional é abrir `Capturar_e_Enviar_para_TV.cmd`. Ele gera as imagens no PC,
+envia os arquivos para `roku-snapshots` e atualiza o estado central consumido
+pelas TVs.
+
 ## Segurança
 
 Evite usar a opção **Publicar na Web** do Power BI para dados confidenciais.

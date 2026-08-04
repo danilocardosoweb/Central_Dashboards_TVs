@@ -48,6 +48,65 @@ test('bloqueia concorrencia e recupera uma concessao vencida', () => {
   assert.equal(recovered.payload.capture.queue[0].attempts, 2);
 });
 
+test('abandona painel após duas interrupções e continua no próximo', () => {
+  const initial = createCaptureRequest({}, {
+    requestId: 'req-stale',
+    dashboards: [{ id: 'a' }, { id: 'b' }]
+  });
+  const first = claimNextCapture(initial, {
+    now: '2026-08-03T12:00:00.000Z',
+    leaseMs: 60000
+  });
+  const retry = claimNextCapture(first.payload, {
+    now: '2026-08-03T12:02:00.000Z',
+    leaseMs: 60000
+  });
+  const continued = claimNextCapture(retry.payload, {
+    now: '2026-08-03T12:04:00.000Z',
+    leaseMs: 60000
+  });
+
+  assert.equal(continued.claimed, true);
+  assert.equal(continued.dashboardId, 'b');
+  assert.equal(continued.payload.capture.queue[0].status, 'error');
+  assert.match(continued.payload.capture.queue[0].error, /2 tentativas/);
+  assert.equal(continued.payload.capture.queue[1].status, 'running');
+});
+
+test('reconcilia imagem publicada antes de repetir uma captura interrompida', () => {
+  const initial = createCaptureRequest({
+    urls: [{ id: 'a' }, { id: 'b' }]
+  }, {
+    requestId: 'req-uploaded',
+    dashboards: [{ id: 'a' }, { id: 'b' }]
+  });
+  const first = claimNextCapture(initial, {
+    now: '2026-08-03T12:00:00.000Z',
+    leaseMs: 60000
+  });
+  const afterUpload = {
+    ...first.payload,
+    urls: [
+      {
+        id: 'a',
+        rokuCaptureStatus: 'ok',
+        rokuImageUrl: 'https://cdn.example/a.png',
+        rokuCapturedAt: '2026-08-03T12:00:30.000Z'
+      },
+      { id: 'b' }
+    ]
+  };
+  const reconciled = claimNextCapture(afterUpload, {
+    now: '2026-08-03T12:02:00.000Z',
+    leaseMs: 60000
+  });
+
+  assert.equal(reconciled.claimed, true);
+  assert.equal(reconciled.dashboardId, 'b');
+  assert.equal(reconciled.payload.capture.queue[0].status, 'complete');
+  assert.equal(reconciled.payload.capture.queue[0].attempts, 1);
+});
+
 test('continua a fila e conclui mesmo quando um painel falha', () => {
   const initial = createCaptureRequest({}, {
     dashboards: [{ id: 'a' }, { id: 'b' }]

@@ -8846,6 +8846,21 @@
                 };
             }
 
+            function captureNeedsRecovery(capture, now = Date.now()) {
+                const progress = captureQueueProgress(capture);
+                if (!progress.active) return false;
+                if (!capture?.activeDashboardId) return true;
+
+                const leaseUntil = Date.parse(String(capture.leaseUntil || ''));
+                if (Number.isFinite(leaseUntil)) return leaseUntil <= now;
+
+                const lastWorkerUpdate = Date.parse(String(
+                    capture.workerUpdatedAt || capture.requestedAt || ''
+                ));
+                return Number.isFinite(lastWorkerUpdate)
+                    && now - lastWorkerUpdate >= 5 * 60 * 1000;
+            }
+
             function renderCaptureRequestStatus(capture) {
                 const button = document.getElementById('captureRequestButton');
                 const message = document.getElementById('captureRequestMessage');
@@ -8865,7 +8880,9 @@
 
                 if (capture?.status === 'running') {
                     message.textContent = 'O capturador está preparando as imagens atualizadas.';
-                    status.textContent = `Capturando ${capture.activeDashboardId ? 'o próximo painel' : 'painéis'}…`;
+                    status.textContent = captureNeedsRecovery(capture)
+                        ? 'Recuperando uma captura interrompida…'
+                        : `Capturando ${capture.activeDashboardId ? 'o próximo painel' : 'painéis'}…`;
                     return;
                 }
                 if (capture?.status === 'pending') {
@@ -9326,6 +9343,15 @@
                             'Atualização recebida',
                             `Dados atualizados às ${formatCloudTime(row.updated_at)}.`
                         );
+                    }
+                    renderCaptureRequestStatus(row.payload?.capture);
+                    if (captureNeedsRecovery(row.payload?.capture)) {
+                        console.warn('[captura] Fila interrompida detectada; retomando automaticamente.', {
+                            requestId: row.payload?.capture?.requestId || null,
+                            activeDashboardId: row.payload?.capture?.activeDashboardId || null,
+                            leaseUntil: row.payload?.capture?.leaseUntil || null
+                        });
+                        processCaptureQueue();
                     }
                 } catch (error) {
                     setCloudStatus(
