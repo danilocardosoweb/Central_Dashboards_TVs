@@ -433,7 +433,7 @@ async function persistCaptureStarts(supabase, config, dashboards) {
     if (saved.updated) return saved.row;
     if (attempt < maxAttempts) await delay(250 * attempt);
   }
-  throw new Error('A base mudou durante o inÃ­cio da captura. Tente novamente.');
+    throw new Error('A base mudou durante o início da captura. Tente novamente.');
 }
 
 export async function runCaptureCycle(config) {

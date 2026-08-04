@@ -3411,7 +3411,7 @@
                 <div class="capture-request-heading">
                     <div>
                         <strong><i class="fas fa-camera"></i> Imagens dos dashboards nas TVs</strong>
-                        <span id="captureRequestMessage">Atualize depois de concluir a publicaÃ§Ã£o no Power BI.</span>
+                        <span id="captureRequestMessage">Atualize depois de concluir a publicação no Power BI.</span>
                     </div>
                     <button id="captureRequestButton" type="button" class="capture-request-button" onclick="requestDashboardCapture()">
                         <i class="fas fa-rotate"></i> Atualizar agora
@@ -8864,26 +8864,26 @@
                 progressBar.style.width = `${percent}%`;
 
                 if (capture?.status === 'running') {
-                    message.textContent = 'O capturador estÃ¡ preparando as imagens atualizadas.';
-                    status.textContent = `Capturando ${capture.activeDashboardId ? 'o prÃ³ximo painel' : 'painÃ©is'}â€¦`;
+                    message.textContent = 'O capturador está preparando as imagens atualizadas.';
+                    status.textContent = `Capturando ${capture.activeDashboardId ? 'o próximo painel' : 'painéis'}…`;
                     return;
                 }
                 if (capture?.status === 'pending') {
-                    message.textContent = 'SolicitaÃ§Ã£o recebida. A captura iniciarÃ¡ em instantes.';
-                    status.textContent = 'Na fila de atualizaÃ§Ã£o';
+                    message.textContent = 'Solicitação recebida. A captura iniciará em instantes.';
+                    status.textContent = 'Na fila de atualização';
                     return;
                 }
                 if (capture?.status === 'partial') {
                     message.textContent = `${progress.completed} atualizados e ${progress.failed} com falha.`;
-                    status.textContent = 'ConcluÃ­do com pendÃªncias';
+                    status.textContent = 'Concluído com pendências';
                     return;
                 }
                 if (capture?.status === 'complete' && progress.total) {
-                    message.textContent = 'As TVs jÃ¡ podem carregar as novas imagens.';
-                    status.textContent = 'AtualizaÃ§Ã£o concluÃ­da';
+                    message.textContent = 'As TVs já podem carregar as novas imagens.';
+                    status.textContent = 'Atualização concluída';
                     return;
                 }
-                message.textContent = 'Atualize depois de concluir a publicaÃ§Ã£o no Power BI.';
+                    message.textContent = 'Atualize depois de concluir a publicação no Power BI.';
                 status.textContent = 'Pronto para atualizar';
             }
 
@@ -8934,11 +8934,11 @@
 
                     for (let attempt = 0; attempt < 4; attempt += 1) {
                         const row = await readCloudRow();
-                        if (!row) throw new Error('A configuraÃ§Ã£o central nÃ£o foi encontrada.');
+                if (!row) throw new Error('A configuração central não foi encontrada.');
                         const currentCapture = row.payload?.capture || {};
                         if (captureQueueProgress(currentCapture).active) {
                             renderCaptureRequestStatus(currentCapture);
-                            showToast('Retomando a atualizaÃ§Ã£o solicitada.');
+                    showToast('Retomando a atualização solicitada.');
                             processCaptureQueue();
                             return;
                         }
@@ -8949,7 +8949,7 @@
                                 item.combined || item.public || item.url || ''
                             )));
                         if (!dashboards.length) {
-                            throw new Error('Nenhum dashboard do Power BI estÃ¡ configurado.');
+                    throw new Error('Nenhum dashboard do Power BI está configurado.');
                         }
 
                         const requestedAt = new Date().toISOString();
@@ -9002,7 +9002,7 @@
                         cloudRevision = Number(saved.revision) || Number(row.revision) + 1;
                         cloudPayloadSignature = payloadSignature(saved.payload || payload);
                         applyCloudPayload(saved.payload || payload);
-                        showToast(`${dashboards.length} dashboard(s) enviado(s) para atualizaÃ§Ã£o.`);
+                showToast(`${dashboards.length} dashboard(s) enviado(s) para atualização.`);
                         processCaptureQueue();
                         return;
                     }

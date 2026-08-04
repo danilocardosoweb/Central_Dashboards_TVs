@@ -115,7 +115,7 @@ async function updateCentralPayload(supabase, config, buildPayload, maxAttempts 
     );
     if (saved.updated) return saved;
   }
-  throw new Error('A fila mudou durante a atualizaÃ§Ã£o. Tente novamente.');
+    throw new Error('A fila mudou durante a atualização. Tente novamente.');
 }
 
 async function claimQueuedDashboard(supabase, config) {
@@ -319,7 +319,7 @@ export default async function handler(request, response) {
 
     const result = summary.results.find(item => String(item.id) === queuedDashboardId)
       || summary.results[0]
-      || { ok: false, error: 'O dashboard solicitado nÃ£o foi localizado.' };
+      || { ok: false, error: 'O dashboard solicitado não foi localizado.' };
     const captureRequest = queuedDashboardId
       ? await finishQueuedDashboard(
           supabase,
