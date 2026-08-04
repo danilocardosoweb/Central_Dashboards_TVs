@@ -6,9 +6,11 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $captureScript = Join-Path $PSScriptRoot 'capture-local-upload.ps1'
 $environmentPath = Join-Path $repositoryRoot '.env'
 $outputDirectory = Join-Path $repositoryRoot 'renderer\output'
+$captureLogPath = Join-Path $outputDirectory 'capture-local-ui.log'
 $script:process = $null
 $script:completed = 0
 $script:total = 0
+$script:logLineCount = 0
 $script:closing = $false
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -194,6 +196,44 @@ function Set-IdleState([bool]$success, [string]$message) {
     }
 }
 
+function Read-CaptureLog {
+    if (-not (Test-Path -LiteralPath $captureLogPath)) { return }
+    $lines = @(Get-Content -LiteralPath $captureLogPath -Encoding UTF8 -ErrorAction SilentlyContinue)
+    if ($lines.Count -le $script:logLineCount) { return }
+    for ($index = $script:logLineCount; $index -lt $lines.Count; $index++) {
+        $line = [string]$lines[$index]
+        $isError = $line -match '(?i)\berro\b|\bfalha\b|exception|não foi possível'
+        Add-LogLine $line $isError
+    }
+    $script:logLineCount = $lines.Count
+}
+
+$pollTimer = New-Object System.Windows.Forms.Timer
+$pollTimer.Interval = 500
+$pollTimer.Add_Tick({
+    Read-CaptureLog
+    if (-not $script:process -or -not $script:process.HasExited) { return }
+
+    $pollTimer.Stop()
+    Read-CaptureLog
+    $exitCode = $script:process.ExitCode
+    if ($script:closing) { return }
+    if ($exitCode -eq 0) {
+        Set-IdleState $true 'As imagens foram enviadas e já estão disponíveis para as TVs.'
+        [System.Windows.Forms.MessageBox]::Show(
+            'Captura concluída. Os dashboards e as imagens do PPR foram enviados ao Supabase.',
+            'Captura concluída', 'OK', 'Information'
+        ) | Out-Null
+    }
+    else {
+        Set-IdleState $false 'Consulte o acompanhamento abaixo para identificar o painel com erro.'
+        [System.Windows.Forms.MessageBox]::Show(
+            "A captura terminou com erro (código $exitCode). Consulte o acompanhamento na janela.",
+            'Falha na captura', 'OK', 'Error'
+        ) | Out-Null
+    }
+})
+
 $startButton.Add_Click({
     if ($script:process -and -not $script:process.HasExited) { return }
     if (-not (Test-Path -LiteralPath $environmentPath)) {
@@ -206,6 +246,7 @@ $startButton.Add_Click({
 
     $script:completed = 0
     $script:total = 0
+    $script:logLineCount = 0
     $logBox.Clear()
     $progress.Style = 'Marquee'
     $progress.MarqueeAnimationSpeed = 25
@@ -216,50 +257,35 @@ $startButton.Add_Click({
     $cancelButton.Enabled = $true
     $visibleCheck.Enabled = $false
 
-    $arguments = @(
-        '-NoProfile',
-        '-ExecutionPolicy', 'Bypass',
-        '-File', ('"' + $captureScript + '"')
-    )
-    if ($visibleCheck.Checked) { $arguments += '-Visible' }
+    if (-not (Test-Path -LiteralPath $outputDirectory)) {
+        New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+    }
+    Set-Content -LiteralPath $captureLogPath -Value '' -Encoding UTF8
+
+    $escapedCaptureScript = $captureScript.Replace("'", "''")
+    $escapedLogPath = $captureLogPath.Replace("'", "''")
+    $visibleArgument = if ($visibleCheck.Checked) { ' -Visible' } else { '' }
+    $command = "try { & '$escapedCaptureScript'$visibleArgument *>&1 | Out-File -LiteralPath '$escapedLogPath' -Encoding utf8; " +
+        '$captureSucceeded = $?; $captureExitCode = $LASTEXITCODE; ' +
+        'if ($captureSucceeded -and ($null -eq $captureExitCode -or $captureExitCode -eq 0)) { exit 0 }; ' +
+        'if ($captureExitCode) { exit $captureExitCode }; exit 1 ' +
+        "} catch { `$_ | Out-String | Out-File -LiteralPath '$escapedLogPath' -Encoding utf8 -Append; exit 1 }"
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName = 'powershell.exe'
-    $startInfo.Arguments = $arguments -join ' '
+    $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($command))
+    $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand"
     $startInfo.WorkingDirectory = $repositoryRoot
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
-    $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
 
     $script:process = New-Object System.Diagnostics.Process
     $script:process.StartInfo = $startInfo
-    $script:process.EnableRaisingEvents = $true
-    $script:process.add_OutputDataReceived({
-        param($sender, $eventArgs)
-        if ($null -ne $eventArgs.Data) { Add-LogLine $eventArgs.Data $false }
-    })
-    $script:process.add_ErrorDataReceived({
-        param($sender, $eventArgs)
-        if ($null -ne $eventArgs.Data) { Add-LogLine $eventArgs.Data $true }
-    })
-    $script:process.add_Exited({
-        $exitCode = $sender.ExitCode
-        if ($script:closing) { return }
-        if ($exitCode -eq 0) {
-            Set-IdleState $true 'As imagens foram enviadas e já estão disponíveis para as TVs.'
-        } else {
-            Set-IdleState $false 'Consulte o acompanhamento abaixo para identificar o painel com erro.'
-        }
-    })
 
     try {
         [void]$script:process.Start()
-        $script:process.BeginOutputReadLine()
-        $script:process.BeginErrorReadLine()
         Add-LogLine 'Captura iniciada. O Chromium está trabalhando em segundo plano.' $false
+        $pollTimer.Start()
     } catch {
         Set-IdleState $false $_.Exception.Message
     }
@@ -274,6 +300,8 @@ $cancelButton.Add_Click({
     if ($answer -ne 'Yes') { return }
     $pidToStop = $script:process.Id
     Start-Process -FilePath 'taskkill.exe' -ArgumentList "/PID $pidToStop /T /F" -WindowStyle Hidden -Wait
+    $pollTimer.Stop()
+    Read-CaptureLog
     Add-LogLine 'Captura cancelada pelo usuário.' $true
     Set-IdleState $false 'A captura foi cancelada. As imagens concluídas anteriormente foram preservadas.'
 })
@@ -304,6 +332,7 @@ $form.Add_FormClosing({
             return
         }
         $script:closing = $true
+        $pollTimer.Stop()
         $pidToStop = $script:process.Id
         Start-Process -FilePath 'taskkill.exe' -ArgumentList "/PID $pidToStop /T /F" -WindowStyle Hidden -Wait
     }

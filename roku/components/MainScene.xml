@@ -141,22 +141,29 @@
                 </Group>
             </Group>
 
-            <Group id="bannerGroup" translation="[0,880]" opacity="0" visible="false">
-                <Rectangle id="bannerBackground" width="1920" height="200" color="0x2563EBFA" />
-                <Rectangle id="bannerIconBackground" translation="[54,38]" width="124" height="124" color="0xFFFFFF26" />
-                <Label id="bannerIcon" translation="[54,50]" width="124" height="100"
+            <Group id="bannerGroup" translation="[48,832]" opacity="0" visible="false">
+                <Rectangle id="bannerShadow" translation="[10,12]" width="1824" height="200" color="0x02061788" />
+                <Rectangle id="bannerBackground" width="1824" height="200" color="0x0F172AFA" />
+                <Rectangle id="bannerAccent" width="16" height="200" color="0x2563EBFF" />
+                <Rectangle id="bannerIconBackground" translation="[48,38]" width="124" height="124" color="0x2563EBFF" />
+                <Label id="bannerIcon" translation="[48,50]" width="124" height="100"
                     text="i" horizAlign="center" vertAlign="center" color="0xFFFFFFFF"
                     font="font:LargeBoldSystemFont" />
-                <Label id="bannerCategory" translation="[208,22]" width="330" height="42"
-                    color="0xFFFFFFDD" font="font:MediumBoldSystemFont" />
-                <Label id="bannerTitle" translation="[208,65]" width="530" height="76"
+                <Label id="bannerCategory" translation="[208,24]" width="510" height="38"
+                    color="0x60A5FAFF" font="font:SmallSystemFont" />
+                <Label id="bannerTitle" translation="[208,62]" width="610" height="70"
                     color="0xFFFFFFFF" font="font:LargeBoldSystemFont" />
-                <Label id="bannerBody" translation="[770,52]" width="1080" height="96"
+                <Label id="bannerBody" translation="[850,42]" width="900" height="84"
                     wrap="true" vertAlign="center" color="0xFFFFFFFF"
                     font="font:MediumSystemFont" />
-                <ScrollingLabel id="bannerScrollingBody" translation="[770,70]" maxWidth="1080" height="64"
+                <ScrollingLabel id="bannerScrollingBody" translation="[850,55]" maxWidth="900" height="64"
                     visible="false" scrollSpeed="80" repeatCount="-1" horizAlign="left" vertAlign="center"
                     color="0xFFFFFFFF" font="font:MediumSystemFont" />
+                <Rectangle id="bannerDivider" translation="[824,32]" width="2" height="136" color="0x334155FF" />
+                <Label id="bannerAction" translation="[850,132]" width="900" height="42"
+                    color="0xFDE68AFF" font="font:SmallSystemFont" />
+                <Label id="bannerMeta" translation="[208,140]" width="610" height="34"
+                    color="0x94A3B8FF" font="font:SmallSystemFont" />
             </Group>
 
             <Group id="statusGroup" visible="false">
@@ -274,20 +281,36 @@
                     fieldToInterp="dashboardImageB.scale" />
             </Animation>
             <Animation id="temporaryAlertEnter" duration="0.45" easeFunction="outQuad">
-                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[1.0,1.0],[0.8,0.8]]"
+                <Vector2DFieldInterpolator id="temporaryAlertEnterScale" key="[0.0,1.0]" keyValue="[[1.0,1.0],[0.8,0.8]]"
                     fieldToInterp="contentGroup.scale" />
-                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[0.0,0.0],[192.0,0.0]]"
+                <Vector2DFieldInterpolator id="temporaryAlertEnterTranslation" key="[0.0,1.0]" keyValue="[[0.0,0.0],[192.0,0.0]]"
                     fieldToInterp="contentGroup.translation" />
                 <FloatFieldInterpolator key="[0.0,1.0]" keyValue="[0.0,1.0]"
                     fieldToInterp="bannerGroup.opacity" />
+                <Vector2DFieldInterpolator id="temporaryAlertBannerEnterTranslation" key="[0.0,1.0]" keyValue="[[48.0,1080.0],[48.0,832.0]]"
+                    fieldToInterp="bannerGroup.translation" />
+                <FloatFieldInterpolator id="temporaryAlertEnterContentOpacity" key="[0.0,1.0]" keyValue="[1.0,1.0]"
+                    fieldToInterp="contentGroup.opacity" />
             </Animation>
             <Animation id="temporaryAlertExit" duration="0.35" easeFunction="inQuad">
-                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[0.8,0.8],[1.0,1.0]]"
+                <Vector2DFieldInterpolator id="temporaryAlertExitScale" key="[0.0,1.0]" keyValue="[[0.8,0.8],[1.0,1.0]]"
                     fieldToInterp="contentGroup.scale" />
-                <Vector2DFieldInterpolator key="[0.0,1.0]" keyValue="[[192.0,0.0],[0.0,0.0]]"
+                <Vector2DFieldInterpolator id="temporaryAlertExitTranslation" key="[0.0,1.0]" keyValue="[[192.0,0.0],[0.0,0.0]]"
                     fieldToInterp="contentGroup.translation" />
                 <FloatFieldInterpolator key="[0.0,1.0]" keyValue="[1.0,0.0]"
                     fieldToInterp="bannerGroup.opacity" />
+                <Vector2DFieldInterpolator id="temporaryAlertBannerExitTranslation" key="[0.0,1.0]" keyValue="[[48.0,832.0],[48.0,1080.0]]"
+                    fieldToInterp="bannerGroup.translation" />
+                <FloatFieldInterpolator id="temporaryAlertExitContentOpacity" key="[0.0,1.0]" keyValue="[1.0,1.0]"
+                    fieldToInterp="contentGroup.opacity" />
+            </Animation>
+            <Animation id="temporaryAlertPulse" duration="1.2" repeat="true" easeFunction="inOutQuad">
+                <FloatFieldInterpolator key="[0.0,0.5,1.0]" keyValue="[1.0,0.42,1.0]" fieldToInterp="bannerAccent.opacity" />
+                <FloatFieldInterpolator key="[0.0,0.5,1.0]" keyValue="[1.0,0.68,1.0]" fieldToInterp="bannerIconBackground.opacity" />
+            </Animation>
+            <Animation id="temporaryAlertBlink" duration="0.72" repeat="true">
+                <FloatFieldInterpolator key="[0.0,0.48,0.52,1.0]" keyValue="[1.0,1.0,0.18,0.18]" fieldToInterp="bannerAccent.opacity" />
+                <FloatFieldInterpolator key="[0.0,0.48,0.52,1.0]" keyValue="[1.0,1.0,0.32,0.32]" fieldToInterp="bannerIconBackground.opacity" />
             </Animation>
         </Group>
     </children>
