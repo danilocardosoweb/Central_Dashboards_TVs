@@ -1371,6 +1371,13 @@
             font-size: 0.85rem;
         }
 
+        .alert-history { margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem; }
+        .alert-history summary { cursor: pointer; font-weight: 800; color: var(--text-primary); }
+        .alert-history-list { display: grid; gap: 0.55rem; margin-top: 0.8rem; max-height: 18rem; overflow: auto; }
+        .alert-history-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.7rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: #f8fafc; }
+        .alert-history-item strong { display: block; color: var(--text-primary); }
+        .alert-history-item span { color: var(--text-secondary); font-size: 0.82rem; }
+
         .alert-list-item {
             border: 1px solid var(--border-color);
             border-left: 5px solid var(--alert-color, var(--primary-color));
@@ -3672,6 +3679,25 @@
                     </button>
                 </div>
 
+                <div class="capture-request-card" id="pprImageGenerationCard">
+                    <div class="capture-request-heading">
+                        <div>
+                            <strong><i class="fas fa-image"></i> Imagens do PPR nas TVs</strong>
+                            <span id="pprImageGenerationMessage">Gere as telas em alta qualidade depois de atualizar os indicadores.</span>
+                        </div>
+                        <button id="pprImageGenerationButton" type="button" class="capture-request-button" onclick="requestPprImageGeneration()">
+                            <i class="fas fa-wand-magic-sparkles"></i> Gerar imagens do PPR
+                        </button>
+                    </div>
+                    <div class="capture-request-progress" aria-hidden="true">
+                        <span id="pprImageGenerationProgress"></span>
+                    </div>
+                    <div class="capture-request-progress-row">
+                        <span id="pprImageGenerationStatus">Aguardando geração</span>
+                        <strong id="pprImageGenerationCount">0 telas</strong>
+                    </div>
+                </div>
+
                 <div class="ppr-section-heading">
                     <div>
                         <h4>Indicadores cadastrados</h4>
@@ -3798,6 +3824,11 @@
 
             <div id="alertList" class="alert-list"></div>
 
+            <details class="alert-history">
+                <summary>Histórico de exibição nas TVs</summary>
+                <div id="alertHistoryList" class="alert-history-list"></div>
+            </details>
+
             <div id="alertEditor" class="alert-editor" style="display: none;">
                 <input type="hidden" id="alertId">
 
@@ -3823,15 +3854,27 @@
                     <div>
                         <label for="alertPriority">Prioridade</label>
                         <select id="alertPriority" class="select-field" onchange="updateAlertPreview()">
-                            <option value="normal">Normal</option>
-                            <option value="high">Alta</option>
-                            <option value="critical">Crítica</option>
+                            <option value="normal">Informativo</option>
+                            <option value="high">Atenção</option>
+                            <option value="critical">Crítico</option>
                         </select>
                     </div>
                 </div>
 
-                <label for="alertAreaTarget">Destino do aviso</label>
-                <select id="alertAreaTarget" class="select-field" onchange="updateAlertPreview()"></select>
+                <div class="alert-form-grid">
+                    <div>
+                        <label for="alertTargetType">Enviar para</label>
+                        <select id="alertTargetType" class="select-field" onchange="handleAlertTargetTypeChange()">
+                            <option value="all">Todas as TVs</option>
+                            <option value="area">Um setor</option>
+                            <option value="station">Uma TV</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="alertAreaTarget">Destino</label>
+                        <select id="alertAreaTarget" class="select-field" onchange="updateAlertPreview()"></select>
+                    </div>
+                </div>
 
                 <label class="alert-message-only" for="alertTitle">Título</label>
                 <input id="alertTitle" class="input-field" maxlength="80"
@@ -3889,6 +3932,21 @@
                             <option value="30">30 segundos</option>
                             <option value="60">1 minuto</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="alert-form-grid alert-message-only">
+                    <div>
+                        <label for="alertTextMode">Comportamento do texto</label>
+                        <select id="alertTextMode" class="select-field">
+                            <option value="auto">Automático</option>
+                            <option value="fixed">Texto fixo</option>
+                            <option value="scrolling">Texto rolante</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="alertRepetitions">Repetições</label>
+                        <input id="alertRepetitions" type="number" class="input-field" min="1" max="10" value="1">
                     </div>
                 </div>
 
@@ -4047,6 +4105,7 @@
         let refreshInterval = 5 * 60 * 1000; // 5 minutos em milissegundos
         let lastRefreshTime = new Date();
         let alerts = [];
+        let alertHistory = [];
         let pprConfig = null;
         let alertEditorImageData = null;
         let alertEditorImageUrl = '';
@@ -5289,6 +5348,9 @@
         }
 
         function getAlertStatus(alert, now = new Date()) {
+            if (alert.endedAt) {
+                return { key: 'expired', label: 'Encerrado' };
+            }
             if (!alert.enabled) {
                 return { key: 'disabled', label: 'Desativado' };
             }
@@ -5329,17 +5391,69 @@
             }
         }
 
+        function saveAlertHistoryToStorage() {
+            alertHistory = (Array.isArray(alertHistory) ? alertHistory : []).slice(0, 300);
+            localStorage.setItem('dashboardAlertHistoryV1', JSON.stringify(alertHistory));
+        }
+
+        function recordAlertHistory(alert, type, extra = {}) {
+            const now = new Date().toISOString();
+            alertHistory.unshift({
+                eventId: `web-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                alertId: alert?.id || '',
+                title: alert?.title || alert?.imageName || 'Comunicado',
+                priority: alert?.priority || 'normal',
+                type,
+                stationId: extra.stationId || '',
+                stationName: extra.stationName || 'Central Web',
+                areaId: extra.areaId || '',
+                occurredAt: now
+            });
+            saveAlertHistoryToStorage();
+            renderAlertHistory();
+        }
+
+        function renderAlertHistory() {
+            const list = document.getElementById('alertHistoryList');
+            if (!list) return;
+            list.replaceChildren();
+            if (!Array.isArray(alertHistory) || !alertHistory.length) {
+                list.appendChild(createTextElement('div', 'alert-list-empty', 'Nenhuma exibição registrada pelas TVs.'));
+                return;
+            }
+            const labels = {
+                displayed: 'Exibido', completed: 'Concluído', error: 'Erro',
+                created: 'Criado', updated: 'Editado', activated: 'Ativado', ended: 'Encerrado'
+            };
+            alertHistory.slice(0, 100).forEach(event => {
+                const item = document.createElement('div');
+                item.className = 'alert-history-item';
+                const copy = document.createElement('div');
+                copy.appendChild(createTextElement('strong', '', event.title || 'Alerta'));
+                copy.appendChild(createTextElement('span', '',
+                    `${labels[event.type] || event.type} · ${event.stationName || 'Central'}${event.areaId ? ` · ${getAreaLabel(event.areaId)}` : ''}`));
+                item.appendChild(copy);
+                item.appendChild(createTextElement('span', '',
+                    event.occurredAt ? new Date(event.occurredAt).toLocaleString('pt-BR') : ''));
+                list.appendChild(item);
+            });
+        }
+
         function loadAlerts() {
             try {
                 const savedAlerts = localStorage.getItem('dashboardAlertsV2');
                 alerts = savedAlerts ? JSON.parse(savedAlerts) : [];
                 if (!Array.isArray(alerts)) alerts = [];
+                const savedHistory = localStorage.getItem('dashboardAlertHistoryV1');
+                alertHistory = savedHistory ? JSON.parse(savedHistory) : [];
+                if (!Array.isArray(alertHistory)) alertHistory = [];
             } catch (error) {
                 console.error('Erro ao carregar avisos:', error);
                 alerts = [];
             }
 
             renderAlertList();
+            renderAlertHistory();
             refreshAlertPresentation(true);
 
             if (!alertScheduleTimer) {
@@ -5423,6 +5537,14 @@
             banner.style.display = 'block';
         }
 
+        function getAlertTargetLabel(alert) {
+            const stationId = Array.isArray(alert.stationIds) ? alert.stationIds.find(id => id !== '*') : '';
+            if (stationId) return dashboardStations.find(item => item.id === stationId)?.name || 'TV específica';
+            const areaId = Array.isArray(alert.areaIds) ? alert.areaIds.find(id => id !== '*') : '';
+            if (areaId) return getAreaLabel(areaId);
+            return 'Todas as TVs';
+        }
+
         function renderAlertList() {
             const list = document.getElementById('alertList');
             if (!list) return;
@@ -5478,15 +5600,7 @@
                     'alert-badge',
                     alert.displayMode === 'banner' ? 'Faixa inferior' : 'Tela completa'
                 ));
-                meta.appendChild(createTextElement(
-                    'span',
-                    'alert-badge',
-                    getAreaLabel(
-                        Array.isArray(alert.areaIds) && alert.areaIds.length
-                            ? alert.areaIds[0]
-                            : '*'
-                    )
-                ));
+                meta.appendChild(createTextElement('span', 'alert-badge', getAlertTargetLabel(alert)));
                 if (alert.displayMode === 'fullscreen' && alert.layoutMode === 'custom') {
                     meta.appendChild(createTextElement(
                         'span',
@@ -5505,6 +5619,13 @@
                     alert.enabled ? 'Desativar' : 'Ativar',
                     () => toggleAlert(alert.id)
                 ));
+                if (alert.enabled) {
+                    actions.appendChild(createAlertActionButton(
+                        'fa-circle-stop',
+                        'Encerrar agora',
+                        () => endAlert(alert.id)
+                    ));
+                }
                 actions.appendChild(createAlertActionButton(
                     'fa-pen',
                     'Editar',
@@ -5556,7 +5677,8 @@
             document.getElementById('alertContentType').value = 'message';
             document.getElementById('alertCategory').value = 'quality';
             document.getElementById('alertPriority').value = 'normal';
-            document.getElementById('alertAreaTarget').value = '*';
+            document.getElementById('alertTargetType').value = 'all';
+            populateAlertTarget('*');
             document.getElementById('alertTitle').value = '';
             document.getElementById('alertBody').value = '';
             document.getElementById('alertAction').value = '';
@@ -5564,8 +5686,10 @@
             document.getElementById('alertOwner').value = '';
             document.getElementById('alertStart').value = toLocalDateTimeValue(new Date());
             document.getElementById('alertEnd').value = '';
-            document.getElementById('alertDisplayMode').value = 'fullscreen';
+            document.getElementById('alertDisplayMode').value = 'banner';
             document.getElementById('alertDuration').value = '20';
+            document.getElementById('alertTextMode').value = 'auto';
+            document.getElementById('alertRepetitions').value = '1';
             document.getElementById('alertLayoutMode').value = 'automatic';
             document.getElementById('alertImageFit').value = 'contain';
             document.getElementById('alertImageBackground').value = '#000000';
@@ -5593,11 +5717,15 @@
 
         function getAlertDraft() {
             const contentType = document.getElementById('alertContentType').value || 'message';
+            const targetType = document.getElementById('alertTargetType').value || 'all';
+            const targetId = document.getElementById('alertAreaTarget').value || '*';
             return {
                 contentType,
                 category: document.getElementById('alertCategory').value,
                 priority: document.getElementById('alertPriority').value,
-                areaIds: [document.getElementById('alertAreaTarget').value || '*'],
+                targetType,
+                areaIds: targetType === 'area' ? [targetId] : ['*'],
+                stationIds: targetType === 'station' ? [targetId] : ['*'],
                 title: document.getElementById('alertTitle').value.trim(),
                 body: document.getElementById('alertBody').value.trim(),
                 action: document.getElementById('alertAction').value.trim(),
@@ -5607,6 +5735,8 @@
                 end: document.getElementById('alertEnd').value || null,
                 displayMode: document.getElementById('alertDisplayMode').value,
                 duration: parseInt(document.getElementById('alertDuration').value, 10) || 20,
+                repetitions: Math.max(1, Math.min(10, parseInt(document.getElementById('alertRepetitions').value, 10) || 1)),
+                textMode: document.getElementById('alertTextMode').value || 'auto',
                 imageData: alertEditorImageData,
                 imageUrl: alertEditorImageUrl,
                 imageName: alertEditorImageName,
@@ -5917,6 +6047,7 @@
 
             const id = document.getElementById('alertId').value;
             const now = new Date().toISOString();
+            let savedAlert = null;
 
             if (id) {
                 const index = alerts.findIndex(alert => alert.id === id);
@@ -5926,18 +6057,21 @@
                         ...draft,
                         updatedAt: now
                     };
+                    savedAlert = alerts[index];
                 }
             } else {
-                alerts.push({
+                savedAlert = {
                     ...draft,
                     id: `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`,
                     enabled: true,
                     createdAt: now,
                     updatedAt: now
-                });
+                };
+                alerts.push(savedAlert);
             }
 
             if (!saveAlertsToStorage()) return;
+            if (savedAlert) recordAlertHistory(savedAlert, id ? 'updated' : 'created');
             cancelAlertEdit();
             renderAlertList();
             refreshAlertPresentation(true);
@@ -5952,10 +6086,12 @@
             document.getElementById('alertContentType').value = alert.contentType || 'message';
             document.getElementById('alertCategory').value = alert.category || 'info';
             document.getElementById('alertPriority').value = alert.priority || 'normal';
-            document.getElementById('alertAreaTarget').value =
-                Array.isArray(alert.areaIds) && alert.areaIds.length
-                    ? alert.areaIds[0]
-                    : '*';
+            const stationTarget = Array.isArray(alert.stationIds) && alert.stationIds.find(id => id !== '*');
+            const areaTarget = Array.isArray(alert.areaIds) && alert.areaIds.find(id => id !== '*');
+            const targetType = alert.targetType || (stationTarget ? 'station' : (areaTarget ? 'area' : 'all'));
+            const targetId = targetType === 'station' ? stationTarget : (targetType === 'area' ? areaTarget : '*');
+            document.getElementById('alertTargetType').value = targetType;
+            populateAlertTarget(targetId || '*');
             document.getElementById('alertTitle').value = alert.title || '';
             document.getElementById('alertBody').value = alert.body || '';
             document.getElementById('alertAction').value = alert.action || '';
@@ -5965,6 +6101,8 @@
             document.getElementById('alertEnd').value = alert.end || '';
             document.getElementById('alertDisplayMode').value = alert.displayMode || 'fullscreen';
             document.getElementById('alertDuration').value = String(alert.duration || 20);
+            document.getElementById('alertTextMode').value = alert.textMode || 'auto';
+            document.getElementById('alertRepetitions').value = String(alert.repetitions || 1);
             document.getElementById('alertLayoutMode').value = alert.layoutMode || 'automatic';
             document.getElementById('alertImageFit').value = alert.imageFit || 'contain';
             document.getElementById('alertImageBackground').value = alert.imageBackground || '#000000';
@@ -6000,6 +6138,7 @@
             alert.enabled = !alert.enabled;
             alert.updatedAt = new Date().toISOString();
             if (!saveAlertsToStorage()) return;
+            recordAlertHistory(alert, alert.enabled ? 'activated' : 'ended');
             renderAlertList();
             refreshAlertPresentation(true);
             showToast(alert.enabled ? 'Aviso ativado' : 'Aviso desativado', 'success');
@@ -6862,7 +7001,28 @@
             const areaIds = Array.isArray(alert.areaIds) && alert.areaIds.length
                 ? alert.areaIds
                 : ['*'];
-            return areaId === '__all__' || areaIds.includes('*') || areaIds.includes(areaId);
+            const stationIds = Array.isArray(alert.stationIds) && alert.stationIds.length
+                ? alert.stationIds
+                : ['*'];
+            const stationId = getCurrentStation()?.id || '';
+            const areaMatches = areaId === '__all__' || areaIds.includes('*') || areaIds.includes(areaId);
+            const stationMatches = stationIds.includes('*') || stationIds.includes(stationId);
+            return areaMatches && stationMatches;
+        }
+
+        function endAlert(id) {
+            const alert = alerts.find(item => item.id === id);
+            if (!alert) return;
+            const now = new Date().toISOString();
+            alert.enabled = false;
+            alert.end = now.slice(0, 16);
+            alert.endedAt = now;
+            alert.updatedAt = now;
+            if (!saveAlertsToStorage()) return;
+            recordAlertHistory(alert, 'ended');
+            renderAlertList();
+            refreshAlertPresentation(true);
+            showToast('Alerta encerrado em todas as TVs', 'success');
         }
 
         function appendOption(select, value, label, selectedValue) {
@@ -6890,6 +7050,30 @@
             dashboardAreas.forEach(area => {
                 appendOption(select, area.id, area.name, selectedValue);
             });
+        }
+
+        function populateAlertTarget(selectedValue = '') {
+            const typeSelect = document.getElementById('alertTargetType');
+            const targetSelect = document.getElementById('alertAreaTarget');
+            if (!typeSelect || !targetSelect) return;
+            const type = typeSelect.value || 'all';
+            targetSelect.replaceChildren();
+            if (type === 'all') {
+                appendOption(targetSelect, '*', 'Todas as TVs', '*');
+                targetSelect.disabled = true;
+            } else if (type === 'station') {
+                dashboardStations.forEach(station => appendOption(targetSelect, station.id, station.name, selectedValue));
+                targetSelect.disabled = false;
+            } else {
+                dashboardAreas.forEach(area => appendOption(targetSelect, area.id, area.name, selectedValue));
+                targetSelect.disabled = false;
+            }
+            if (!targetSelect.value && targetSelect.options.length) targetSelect.selectedIndex = 0;
+        }
+
+        function handleAlertTargetTypeChange() {
+            populateAlertTarget();
+            updateAlertPreview();
         }
 
         function renderStationSelectors() {
@@ -6921,7 +7105,7 @@
 
             const alertTarget = document.getElementById('alertAreaTarget');
             const currentTarget = alertTarget ? alertTarget.value || '*' : '*';
-            populateAreaSelect(alertTarget, currentTarget, 'alert');
+            populateAlertTarget(currentTarget);
         }
 
         function renderStationChip() {
@@ -7406,6 +7590,11 @@
                 stationIds: ['*'],
                 updatedAt: '',
                 updatedBy: '',
+                renderedSlides: [],
+                renderedAt: '',
+                renderSourceUpdatedAt: '',
+                renderVersion: '',
+                renderStatus: 'missing',
                 indicators: defaultPprIndicators(),
                 rules: defaultPprRules(),
                 audit: []
@@ -7491,6 +7680,9 @@
 
         function persistPprConfig(action = '', details = {}) {
             pprConfig.updatedAt = new Date().toISOString();
+            if (Array.isArray(pprConfig.renderedSlides) && pprConfig.renderedSlides.length) {
+                pprConfig.renderStatus = 'stale';
+            }
             if (action) addPprAudit(action, details);
             localStorage.setItem('dashboardPprV1', JSON.stringify(pprConfig));
             if (typeof window.scheduleCloudSectionSave === 'function') {
@@ -7500,6 +7692,72 @@
             updateSettingsNavigationCounts();
             createSlides();
         }
+
+        function renderPprImageGenerationStatus() {
+            const button = document.getElementById('pprImageGenerationButton');
+            const message = document.getElementById('pprImageGenerationMessage');
+            const status = document.getElementById('pprImageGenerationStatus');
+            const count = document.getElementById('pprImageGenerationCount');
+            const progress = document.getElementById('pprImageGenerationProgress');
+            if (!button || !message || !status || !count || !progress || !pprConfig) return;
+            const slides = Array.isArray(pprConfig.renderedSlides) ? pprConfig.renderedSlides : [];
+            const ready = pprConfig.renderStatus === 'ready' &&
+                String(pprConfig.renderSourceUpdatedAt || '') === String(pprConfig.updatedAt || '');
+            count.textContent = `${slides.length} ${slides.length === 1 ? 'tela' : 'telas'}`;
+            progress.style.width = ready ? '100%' : (slides.length ? '45%' : '0%');
+            button.disabled = !pprConfig.enabled;
+            if (!pprConfig.enabled) {
+                message.textContent = 'Ative o PPR antes de gerar as imagens.';
+                status.textContent = 'PPR desativado';
+            } else if (ready) {
+                message.textContent = `Versão publicada em ${formatPprDate(pprConfig.renderedAt, true)}.`;
+                status.textContent = 'Imagens prontas para as TVs';
+            } else if (slides.length) {
+                message.textContent = 'Os dados mudaram. As TVs mantêm a última versão válida até a nova geração.';
+                status.textContent = 'Imagens desatualizadas';
+            } else {
+                message.textContent = 'Gere as telas em alta qualidade depois de atualizar os indicadores.';
+                status.textContent = 'Aguardando geração';
+            }
+        }
+
+        window.__requestPprImageGenerationNeedsCloudScope = async function() {
+            const button = document.getElementById('pprImageGenerationButton');
+            const message = document.getElementById('pprImageGenerationMessage');
+            const status = document.getElementById('pprImageGenerationStatus');
+            const progress = document.getElementById('pprImageGenerationProgress');
+            if (button) button.disabled = true;
+            if (message) message.textContent = 'Montando e validando todas as telas em 1920×1080.';
+            if (status) status.textContent = 'Gerando imagens…';
+            if (progress) progress.style.width = '65%';
+            try {
+                if (!cloudReady) await bootstrapCloudSync();
+                if (cloudDirtySections.size > 0) await saveCloudState({ force: true });
+                const response = await fetch(CLOUD_STATE_ENDPOINT, {
+                    method: 'POST',
+                    headers: cloudHeaders(),
+                    body: JSON.stringify({ action: 'capture-ppr' })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || `Falha ao gerar (${response.status}).`);
+                const row = await readCloudRow();
+                if (row) {
+                    cloudRevision = Number(row.revision) || cloudRevision;
+                    cloudPayloadSignature = payloadSignature(row.payload);
+                    applyCloudPayload(row.payload);
+                }
+                showToast(`${Number(result.slides) || 0} imagem(ns) do PPR publicada(s) para as TVs.`, 'success');
+            } catch (error) {
+                console.error('Erro ao gerar imagens do PPR:', error);
+                if (message) message.textContent = error instanceof Error ? error.message : String(error);
+                if (status) status.textContent = 'Falha na geração';
+                if (progress) progress.style.width = '0%';
+                showToast(error instanceof Error ? error.message : String(error), 'error');
+            } finally {
+                if (button) button.disabled = !pprConfig?.enabled;
+                renderPprImageGenerationStatus();
+            }
+        };
 
         function selectedMultipleValues(select) {
             const values = Array.from(select?.selectedOptions || []).map(option => option.value);
@@ -7704,6 +7962,7 @@
             populatePprTargets();
             renderPprIndicatorList();
             renderPprRules();
+            renderPprImageGenerationStatus();
         }
 
         function renderPprIndicatorList() {
@@ -8355,6 +8614,7 @@
                 'dashboardTvAreas',
                 'dashboardTvStations',
                 'dashboardAlertsV2',
+                'dashboardAlertHistoryV1',
                 'dashboardPprV1',
                 'transitionTime',
                 'transitionEffect',
@@ -8382,6 +8642,7 @@
                     dashboardTvAreas: 'areas',
                     dashboardTvStations: 'stations',
                     dashboardAlertsV2: 'alerts',
+                    dashboardAlertHistoryV1: 'alertHistory',
                     dashboardPprV1: 'ppr',
                     transitionTime: 'settings',
                     transitionEffect: 'settings',
@@ -8440,6 +8701,7 @@
                     areas: parseStoredJson('dashboardTvAreas', []),
                     stations: parseStoredJson('dashboardTvStations', []),
                     alerts: parseStoredJson('dashboardAlertsV2', []),
+                    alertHistory: parseStoredJson('dashboardAlertHistoryV1', []),
                     ppr: parseStoredJson('dashboardPprV1', defaultPprConfig()),
                     settings: {
                         transitionTime:
@@ -8625,6 +8887,44 @@
                 status.textContent = 'Pronto para atualizar';
             }
 
+            window.requestPprImageGeneration = async function() {
+                const button = document.getElementById('pprImageGenerationButton');
+                const message = document.getElementById('pprImageGenerationMessage');
+                const status = document.getElementById('pprImageGenerationStatus');
+                const progress = document.getElementById('pprImageGenerationProgress');
+                if (button) button.disabled = true;
+                if (message) message.textContent = 'Montando e validando todas as telas em 1920×1080.';
+                if (status) status.textContent = 'Gerando imagens…';
+                if (progress) progress.style.width = '65%';
+                try {
+                    if (!cloudReady) await bootstrapCloudSync();
+                    if (cloudDirtySections.size > 0) await saveCloudState({ force: true });
+                    const response = await fetch(CLOUD_STATE_ENDPOINT, {
+                        method: 'POST',
+                        headers: cloudHeaders(),
+                        body: JSON.stringify({ action: 'capture-ppr' })
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.error || `Falha ao gerar (${response.status}).`);
+                    const row = await readCloudRow();
+                    if (row) {
+                        cloudRevision = Number(row.revision) || cloudRevision;
+                        cloudPayloadSignature = payloadSignature(row.payload);
+                        applyCloudPayload(row.payload);
+                    }
+                    showToast(`${Number(result.slides) || 0} imagem(ns) do PPR publicada(s) para as TVs.`, 'success');
+                } catch (error) {
+                    console.error('Erro ao gerar imagens do PPR:', error);
+                    if (message) message.textContent = error instanceof Error ? error.message : String(error);
+                    if (status) status.textContent = 'Falha na geração';
+                    if (progress) progress.style.width = '0%';
+                    showToast(error instanceof Error ? error.message : String(error), 'error');
+                } finally {
+                    if (button) button.disabled = !pprConfig?.enabled;
+                    renderPprImageGenerationStatus();
+                }
+            };
+
             window.requestDashboardCapture = async function() {
                 const button = document.getElementById('captureRequestButton');
                 if (button) button.disabled = true;
@@ -8787,6 +9087,10 @@
                         JSON.stringify(Array.isArray(state.alerts) ? state.alerts : [])
                     );
                     localStorage.setItem(
+                        'dashboardAlertHistoryV1',
+                        JSON.stringify(Array.isArray(state.alertHistory) ? state.alertHistory : [])
+                    );
+                    localStorage.setItem(
                         'dashboardPprV1',
                         JSON.stringify(normalizePprConfig(state.ppr))
                     );
@@ -8809,6 +9113,7 @@
 
                     urls = Array.isArray(state.urls) ? state.urls : [];
                     alerts = Array.isArray(state.alerts) ? state.alerts : [];
+                    alertHistory = Array.isArray(state.alertHistory) ? state.alertHistory : [];
                     pprConfig = normalizePprConfig(state.ppr);
                     transitionTime = Number(settings.transitionTime) || 30000;
                     currentTransitionEffect = settings.transitionEffect || 'fade';
@@ -8818,6 +9123,7 @@
                     areaSystemReady = false;
 
                     ensureAreaSystem();
+                    renderAlertHistory();
                     const timeSelect = document.getElementById('transitionTime');
                     const effectSelect =
                         document.getElementById('transitionEffect');
@@ -9046,7 +9352,7 @@
                     if (!row) {
                         cloudReady = true;
                         cloudRevision = 0;
-                        ['urls', 'areas', 'stations', 'alerts', 'ppr', 'settings']
+                        ['urls', 'areas', 'stations', 'alerts', 'alertHistory', 'ppr', 'settings']
                             .forEach(section => cloudDirtySections.add(section));
                         await saveCloudState({ force: true });
                     } else {
@@ -9065,7 +9371,7 @@
                         } else {
                             cloudReady = true;
                             cloudPayloadSignature = payloadSignature(localPayload);
-                            ['urls', 'areas', 'stations', 'alerts', 'ppr', 'settings']
+                            ['urls', 'areas', 'stations', 'alerts', 'alertHistory', 'ppr', 'settings']
                                 .forEach(section => cloudDirtySections.add(section));
                             await saveCloudState({ force: true });
                         }

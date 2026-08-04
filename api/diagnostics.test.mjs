@@ -13,7 +13,10 @@ test('diagnostics counts dynamic dashboards, PPR and alerts per station', () => 
         areaIds: ['*'],
         rokuImageUrl: `https://cdn.test/d${index}.png`
       })),
-      alerts: [{ id: 'a1', enabled: true, areaIds: ['*'], displayMode: 'fullscreen' }],
+      alerts: [
+        { id: 'a1', enabled: true, areaIds: ['*'], displayMode: 'fullscreen' },
+        { id: 'a2', enabled: true, areaIds: ['*'], displayMode: 'banner' }
+      ],
       stations: [{ id: 'tv1', name: 'TV 1', areaId: 'geral' }],
       ppr: {
         enabled: true,
@@ -21,6 +24,11 @@ test('diagnostics counts dynamic dashboards, PPR and alerts per station', () => 
         areaIds: ['*'],
         showSummary: true,
         showIndicators: true,
+        renderStatus: 'ready',
+        renderedSlides: [
+          { id: 'ppr-summary', imageUrl: 'https://cdn.test/ppr-summary.png' },
+          { id: 'ppr-p1', imageUrl: 'https://cdn.test/ppr-p1.png' }
+        ],
         indicators: [{ id: 'p1', enabled: true, result: 100 }]
       }
     }
@@ -28,7 +36,7 @@ test('diagnostics counts dynamic dashboards, PPR and alerts per station', () => 
   const result = buildDiagnostics(row);
   assert.equal(result.ok, true);
   assert.deepEqual(result.playlists[0], {
-    stationId: 'tv1', stationName: 'TV 1', areaId: 'geral', dashboards: 8, ppr: 2, alerts: 1, totalSlides: 11
+    stationId: 'tv1', stationName: 'TV 1', areaId: 'geral', dashboards: 8, ppr: 2, alerts: 1, temporaryAlerts: 1, totalSlides: 11
   });
 });
 

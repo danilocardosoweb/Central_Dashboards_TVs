@@ -12,6 +12,9 @@ test('visao geral oferece captura manual com progresso', () => {
   assert.match(html, /id="captureRequestButton"/);
   assert.match(html, /onclick="requestDashboardCapture\(\)"/);
   assert.match(html, /id="captureRequestProgress"/);
+  assert.match(html, /id="pprImageGenerationButton"/);
+  assert.match(html, /requestPprImageGeneration\(\)/);
+  assert.match(html, /action: 'capture-ppr'/);
   assert.match(html, /function renderCaptureRequestStatus\(capture\)/);
 });
 

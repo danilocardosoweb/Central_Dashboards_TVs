@@ -14,6 +14,7 @@ import {
   completeCapture
 } from '../renderer/capture-queue.mjs';
 import { updateResilientState } from '../renderer/state-store.mjs';
+import { renderAndUploadPprImages } from '../renderer/ppr-images.mjs';
 import {
   errorDetails,
   logEvent,
@@ -56,6 +57,18 @@ function json(response, status, payload, traceId = '') {
   response.setHeader('Access-Control-Expose-Headers', 'X-Central-Trace-Id');
   if (traceId) response.setHeader('X-Central-Trace-Id', traceId);
   response.end(JSON.stringify(traceId ? { ...payload, traceId } : payload));
+}
+
+function requestPayload(request) {
+  if (!request.body) return {};
+  if (typeof request.body === 'string') {
+    try {
+      return JSON.parse(request.body);
+    } catch {
+      return {};
+    }
+  }
+  return request.body;
 }
 
 async function captureHealth() {
@@ -169,15 +182,81 @@ export default async function handler(request, response) {
     const supabase = createClient(baseConfig.supabaseUrl, baseConfig.supabaseKey, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
     });
-    const explicitDashboardIds = Array.isArray(request.body?.dashboardIds)
-      ? request.body.dashboardIds.map(String).filter(Boolean)
+    const body = requestPayload(request);
+    const explicitDashboardIds = Array.isArray(body.dashboardIds)
+      ? body.dashboardIds.map(String).filter(Boolean)
       : [];
     let queuedDashboardId = '';
     logEvent('capture-api', 'request-start', {
       traceId,
-      mode: explicitDashboardIds.length ? 'explicit' : 'queue',
+      mode: body.type === 'ppr' ? 'ppr' : (explicitDashboardIds.length ? 'explicit' : 'queue'),
       requestedCount: explicitDashboardIds.length
     });
+
+    if (body.type === 'ppr') {
+      const sourceRow = await readCentralState(supabase, baseConfig);
+      const sourcePpr = sourceRow.payload?.ppr;
+      if (!sourcePpr?.enabled) {
+        return json(response, 400, { ok: false, error: 'O PPR está desativado na Central.' }, traceId);
+      }
+
+      chromiumBinary.setGraphicsMode = false;
+      const executablePath = await chromiumBinary.executablePath();
+      const renderConfig = {
+        ...baseConfig,
+        browserLaunchOptions: {
+          executablePath,
+          args: [
+            ...chromiumBinary.args,
+            '--disable-dev-shm-usage',
+            '--hide-scrollbars'
+          ]
+        }
+      };
+      const rendered = await renderAndUploadPprImages({
+        supabase,
+        config: renderConfig,
+        ppr: sourcePpr,
+        sourceRevision: sourceRow.revision
+      });
+
+      const saved = await updateCentralPayload(supabase, baseConfig, payload => {
+        const currentPpr = payload?.ppr;
+        if (String(currentPpr?.updatedAt || '') !== String(sourcePpr.updatedAt || '')) {
+          throw new Error('O PPR foi alterado durante a geração. Gere as imagens novamente.');
+        }
+        return {
+          ...payload,
+          ppr: {
+            ...currentPpr,
+            renderedSlides: rendered.slides,
+            renderedAt: rendered.generatedAt,
+            renderSourceUpdatedAt: currentPpr.updatedAt || '',
+            renderVersion: rendered.fingerprint,
+            renderGeneration: rendered.generation,
+            renderStatus: 'ready',
+            renderError: null
+          }
+        };
+      });
+      logEvent('capture-api', 'ppr-complete', {
+        traceId,
+        sourceRevision: sourceRow.revision,
+        publishedRevision: saved.row?.revision,
+        slides: rendered.slides.length,
+        renderVersion: rendered.fingerprint,
+        elapsedMs: Date.now() - startedAt
+      });
+      return json(response, 200, {
+        ok: true,
+        type: 'ppr',
+        slides: rendered.slides.length,
+        generatedAt: rendered.generatedAt,
+        renderVersion: rendered.fingerprint,
+        revision: saved.row?.revision,
+        elapsedMs: Date.now() - startedAt
+      }, traceId);
+    }
 
     if (!explicitDashboardIds.length) {
       const claim = await claimQueuedDashboard(supabase, baseConfig);

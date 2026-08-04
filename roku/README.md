@@ -1,8 +1,26 @@
-# Player Roku V18
+# Player Roku V22
 
 Aplicativo nativo Roku que consulta a API central da Vercel e monta uma unica
 lista com dashboards, avisos em tela cheia e telas do PPR. Itens desativados e
 itens destinados a outra TV ou setor sao ignorados.
+
+As telas do PPR sao geradas pela Central em 1920x1080 e publicadas como um
+conjunto versionado no Supabase Storage. O Roku prioriza essas imagens e usa o
+desenho nativo somente quando ainda nao existe uma geracao valida.
+
+## Alertas temporarios nativos
+
+- A Central permite criar, editar, ativar e encerrar alertas destinados a todas
+  as TVs, a um setor ou a uma TV especifica.
+- Alertas em faixa usam `Rectangle`, `Label`, `ScrollingLabel`, `Animation` e
+  `Timer` nativos do SceneGraph.
+- A fila exibe um alerta por vez, na ordem: critico, atencao e informativo.
+- Enquanto a faixa aparece, o conteudo atual e reduzido para 80%, mas o
+  temporizador e a rotacao do carrossel continuam funcionando normalmente.
+- Textos curtos ficam fixos; textos longos podem rolar automaticamente.
+- Duracao e repeticoes sao configuradas na Central.
+- O historico de exibicao e enviado de forma assincrona. Falhas nesse envio nao
+  param nem reiniciam dashboards, imagens, videos ou PPR.
 
 ## Recuperacao e diagnostico
 
@@ -24,6 +42,10 @@ itens destinados a outra TV ou setor sao ignorados.
 - Seta para cima: mostrar/ocultar o painel de diagnostico.
 - Durante a abertura, `OK` ou `Back`: pular o video.
 
+Na primeira instalacao, o aplicativo inicia a programacao padrao diretamente.
+O seletor nao abre sozinho; ele aparece apenas quando o usuario pressiona
+`OK`, `*` ou a seta para baixo.
+
 O painel de diagnostico mostra build, sessao, origem dos dados (rede ou cache),
 revisao, trace ID, TV selecionada, total de telas, tela atual e ultimo erro.
 
@@ -36,10 +58,10 @@ npm.cmd run roku:check
 npm.cmd run roku:package
 ```
 
-O V18 e gerado como:
+O V22 e gerado como:
 
 ```text
-dist/Central_Dashboard_TVs_Roku_V_18.zip
+dist/Central_Dashboard_TVs_Roku_V_22.zip
 ```
 
 O gerador recusa substituir um ZIP existente. Para uma nova entrega, incremente
