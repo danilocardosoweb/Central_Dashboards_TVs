@@ -119,5 +119,5 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V22/);
+  assert.match(scene, /Build: V24/);
 });

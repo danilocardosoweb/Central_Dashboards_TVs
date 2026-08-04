@@ -55,12 +55,18 @@ sub init()
     m.pprScale50 = m.top.FindNode("pprScale50")
     m.pprScale0 = m.top.FindNode("pprScale0")
     m.bannerGroup = m.top.FindNode("bannerGroup")
+    m.bannerShadow = m.top.FindNode("bannerShadow")
     m.bannerBackground = m.top.FindNode("bannerBackground")
+    m.bannerAccent = m.top.FindNode("bannerAccent")
+    m.bannerIconBackground = m.top.FindNode("bannerIconBackground")
     m.bannerIcon = m.top.FindNode("bannerIcon")
     m.bannerCategory = m.top.FindNode("bannerCategory")
     m.bannerTitle = m.top.FindNode("bannerTitle")
     m.bannerBody = m.top.FindNode("bannerBody")
     m.bannerScrollingBody = m.top.FindNode("bannerScrollingBody")
+    m.bannerDivider = m.top.FindNode("bannerDivider")
+    m.bannerAction = m.top.FindNode("bannerAction")
+    m.bannerMeta = m.top.FindNode("bannerMeta")
     m.stationLabel = m.top.FindNode("stationLabel")
     m.syncLabel = m.top.FindNode("syncLabel")
     m.stationOverlay = m.top.FindNode("stationOverlay")
@@ -85,6 +91,16 @@ sub init()
     m.imageEnterScale = m.top.FindNode("imageEnterScale")
     m.temporaryAlertEnter = m.top.FindNode("temporaryAlertEnter")
     m.temporaryAlertExit = m.top.FindNode("temporaryAlertExit")
+    m.temporaryAlertEnterScale = m.top.FindNode("temporaryAlertEnterScale")
+    m.temporaryAlertEnterTranslation = m.top.FindNode("temporaryAlertEnterTranslation")
+    m.temporaryAlertExitScale = m.top.FindNode("temporaryAlertExitScale")
+    m.temporaryAlertExitTranslation = m.top.FindNode("temporaryAlertExitTranslation")
+    m.temporaryAlertBannerEnterTranslation = m.top.FindNode("temporaryAlertBannerEnterTranslation")
+    m.temporaryAlertBannerExitTranslation = m.top.FindNode("temporaryAlertBannerExitTranslation")
+    m.temporaryAlertEnterContentOpacity = m.top.FindNode("temporaryAlertEnterContentOpacity")
+    m.temporaryAlertExitContentOpacity = m.top.FindNode("temporaryAlertExitContentOpacity")
+    m.temporaryAlertPulse = m.top.FindNode("temporaryAlertPulse")
+    m.temporaryAlertBlink = m.top.FindNode("temporaryAlertBlink")
 
     m.slideTimer.ObserveField("fire", "onSlideTimer")
     m.syncTimer.ObserveField("fire", "onSyncTimer")
@@ -106,6 +122,7 @@ sub init()
     m.temporaryAlerts = []
     m.temporaryAlertQueue = []
     m.activeTemporaryAlert = invalid
+    m.completedTemporaryAlertVersions = {}
     m.slides = []
     m.slideIndex = -1
     m.lastRevision = -1
@@ -1302,7 +1319,9 @@ sub configureTemporaryAlerts(alerts as object)
     m.temporaryAlertQueue = []
     for each alert in sorted
         isCurrentAlert = m.activeTemporaryAlert <> invalid and valueOr(alert, "id", "") = valueOr(m.activeTemporaryAlert, "id", "")
-        if not isCurrentAlert
+        alertVersion = temporaryAlertVersion(alert)
+        alreadyCompleted = m.completedTemporaryAlertVersions.DoesExist(alertVersion)
+        if not isCurrentAlert and not alreadyCompleted
             repetitions = Int(valueOr(alert, "repetitions", 1))
             if repetitions < 1 then repetitions = 1
             if repetitions > 10 then repetitions = 10
@@ -1371,7 +1390,11 @@ sub showNextTemporaryAlert()
         level = "INFORMATIVO"
     end if
 
-    m.bannerBackground.color = color
+    m.bannerBackground.color = "0x0F172AFA"
+    m.bannerAccent.color = color
+    m.bannerIconBackground.color = color
+    m.bannerCategory.color = color
+    applyTemporaryAlertLayout(alert)
     m.bannerIcon.text = icon
     m.bannerCategory.text = level + "  |  " + UCase(categoryLabel(category))
     m.bannerTitle.text = valueOr(alert, "title", "Comunicado")
@@ -1386,9 +1409,34 @@ sub showNextTemporaryAlert()
         m.bannerBody.text = bodyText
     end if
 
+    scrollSpeed = LCase(valueOr(alert, "scrollSpeed", "normal"))
+    if scrollSpeed = "slow"
+        m.bannerScrollingBody.scrollSpeed = 45
+    else if scrollSpeed = "fast"
+        m.bannerScrollingBody.scrollSpeed = 120
+    else
+        m.bannerScrollingBody.scrollSpeed = 78
+    end if
+
+    actionText = valueOr(alert, "action", "")
+    m.bannerAction.visible = actionText <> ""
+    if actionText <> "" then m.bannerAction.text = "ACAO  |  " + actionText
+
+    metaText = ""
+    audience = valueOr(alert, "audience", "")
+    owner = valueOr(alert, "owner", "")
+    if audience <> "" then metaText = audience
+    if owner <> ""
+        if metaText <> "" then metaText = metaText + "  |  "
+        metaText = metaText + "Responsavel: " + owner
+    end if
+    m.bannerMeta.visible = metaText <> ""
+    m.bannerMeta.text = metaText
+
     m.bannerGroup.visible = true
     m.temporaryAlertExit.control = "stop"
     m.temporaryAlertEnter.control = "start"
+    startTemporaryAlertEmphasis(alert)
     duration = Int(valueOr(alert, "duration", 15))
     if duration < 5 then duration = 5
     if duration > 300 then duration = 300
@@ -1414,12 +1462,173 @@ sub hideTemporaryAlert(reason as string)
     alertId = valueOr(completedAlert, "id", "")
     m.temporaryAlertTimer.control = "stop"
     m.temporaryAlertEnter.control = "stop"
+    m.temporaryAlertPulse.control = "stop"
+    m.temporaryAlertBlink.control = "stop"
+    m.bannerAccent.opacity = 1.0
+    m.bannerIconBackground.opacity = 1.0
     m.temporaryAlertExit.control = "start"
     m.activeTemporaryAlert = invalid
+    if reason = "completed"
+        completedVersion = temporaryAlertVersion(completedAlert)
+        hasPendingRepeat = false
+        for each pendingAlert in m.temporaryAlertQueue
+            if temporaryAlertVersion(pendingAlert) = completedVersion then hasPendingRepeat = true
+        end for
+        if not hasPendingRepeat then m.completedTemporaryAlertVersions[completedVersion] = true
+    end if
     logEvent("temporary-alert-hide", { alertId: alertId, reason: reason })
     if reason = "completed" then sendAlertHistoryEvent(completedAlert, "completed")
     m.temporaryAlertGapTimer.control = "start"
     updateDiagnostics()
+end sub
+
+function temporaryAlertVersion(alert as dynamic) as string
+    return valueOr(alert, "id", "") + ":" + valueOr(alert, "updatedAt", "")
+end function
+
+sub applyTemporaryAlertLayout(alert as dynamic)
+    size = LCase(valueOr(alert, "bannerSize", "standard"))
+    bannerHeight = 200
+    bannerY = 832
+    scaleValue = 0.8
+    translationX = 192.0
+
+    if size = "compact"
+        bannerHeight = 150
+        bannerY = 882
+        scaleValue = 0.86
+        translationX = 134.0
+        m.bannerIconBackground.translation = [36,30]
+        m.bannerIconBackground.width = 90
+        m.bannerIconBackground.height = 90
+        m.bannerIcon.translation = [36,26]
+        m.bannerIcon.width = 90
+        m.bannerIcon.height = 98
+        m.bannerCategory.translation = [154,16]
+        m.bannerCategory.width = 470
+        m.bannerTitle.translation = [154,48]
+        m.bannerTitle.width = 540
+        m.bannerTitle.height = 72
+        m.bannerBody.translation = [742,24]
+        m.bannerBody.width = 1015
+        m.bannerBody.height = 72
+        m.bannerScrollingBody.translation = [742,35]
+        m.bannerScrollingBody.maxWidth = 1015
+        m.bannerDivider.translation = [716,24]
+        m.bannerDivider.height = 102
+        m.bannerAction.translation = [742,102]
+        m.bannerAction.width = 1015
+        m.bannerMeta.translation = [154,112]
+        m.bannerMeta.width = 540
+    else if size = "large"
+        bannerHeight = 300
+        bannerY = 732
+        scaleValue = 0.7
+        translationX = 288.0
+        m.bannerIconBackground.translation = [48,65]
+        m.bannerIconBackground.width = 170
+        m.bannerIconBackground.height = 170
+        m.bannerIcon.translation = [48,92]
+        m.bannerIcon.width = 170
+        m.bannerIcon.height = 120
+        m.bannerCategory.translation = [250,40]
+        m.bannerCategory.width = 590
+        m.bannerTitle.translation = [250,92]
+        m.bannerTitle.width = 650
+        m.bannerTitle.height = 130
+        m.bannerBody.translation = [980,58]
+        m.bannerBody.width = 760
+        m.bannerBody.height = 160
+        m.bannerScrollingBody.translation = [980,100]
+        m.bannerScrollingBody.maxWidth = 760
+        m.bannerDivider.translation = [942,45]
+        m.bannerDivider.height = 210
+        m.bannerAction.translation = [980,230]
+        m.bannerAction.width = 760
+        m.bannerMeta.translation = [250,242]
+        m.bannerMeta.width = 650
+    else
+        m.bannerIconBackground.translation = [48,38]
+        m.bannerIconBackground.width = 124
+        m.bannerIconBackground.height = 124
+        m.bannerIcon.translation = [48,50]
+        m.bannerIcon.width = 124
+        m.bannerIcon.height = 100
+        m.bannerCategory.translation = [208,22]
+        m.bannerCategory.width = 510
+        m.bannerTitle.translation = [208,65]
+        m.bannerTitle.width = 590
+        m.bannerTitle.height = 76
+        m.bannerBody.translation = [850,42]
+        m.bannerBody.width = 900
+        m.bannerBody.height = 84
+        m.bannerScrollingBody.translation = [850,55]
+        m.bannerScrollingBody.maxWidth = 900
+        m.bannerDivider.translation = [824,32]
+        m.bannerDivider.height = 136
+        m.bannerAction.translation = [850,132]
+        m.bannerAction.width = 900
+        m.bannerMeta.translation = [208,140]
+        m.bannerMeta.width = 590
+    end if
+
+    m.bannerBackground.height = bannerHeight
+    m.bannerShadow.height = bannerHeight
+    m.bannerAccent.height = bannerHeight
+
+    bannerPosition = LCase(valueOr(alert, "bannerPosition", "bottom"))
+    if bannerPosition = "top" then bannerY = 48
+
+    dashboardTreatment = LCase(valueOr(alert, "dashboardTreatment", "shrink"))
+    contentScale = scaleValue
+    contentTranslationX = translationX
+    contentTranslationY = 0.0
+    contentOpacity = 1.0
+    if dashboardTreatment = "dim"
+        contentScale = 1.0
+        contentTranslationX = 0.0
+        contentOpacity = 0.62
+    else if dashboardTreatment = "unchanged"
+        contentScale = 1.0
+        contentTranslationX = 0.0
+    else if bannerPosition = "top"
+        contentTranslationY = bannerHeight + 24.0
+    end if
+
+    entranceEffect = LCase(valueOr(alert, "entranceEffect", "slide-up"))
+    bannerFinal = [48.0, bannerY]
+    bannerInitial = [48.0, 1080.0]
+    if entranceEffect = "slide-left"
+        bannerInitial = [1920.0, bannerY]
+    else if entranceEffect = "fade"
+        bannerInitial = bannerFinal
+    end if
+    bannerExit = [48.0, 1080.0]
+    if entranceEffect = "slide-left" then bannerExit = [-1872.0, bannerY]
+    if entranceEffect = "fade" then bannerExit = bannerFinal
+
+    m.bannerGroup.translation = bannerInitial
+    m.temporaryAlertBannerEnterTranslation.keyValue = [bannerInitial,bannerFinal]
+    m.temporaryAlertBannerExitTranslation.keyValue = [bannerFinal,bannerExit]
+    m.temporaryAlertEnterScale.keyValue = [[1.0,1.0],[contentScale,contentScale]]
+    m.temporaryAlertEnterTranslation.keyValue = [[0.0,0.0],[contentTranslationX,contentTranslationY]]
+    m.temporaryAlertExitScale.keyValue = [[contentScale,contentScale],[1.0,1.0]]
+    m.temporaryAlertExitTranslation.keyValue = [[contentTranslationX,contentTranslationY],[0.0,0.0]]
+    m.temporaryAlertEnterContentOpacity.keyValue = [1.0,contentOpacity]
+    m.temporaryAlertExitContentOpacity.keyValue = [contentOpacity,1.0]
+end sub
+
+sub startTemporaryAlertEmphasis(alert as dynamic)
+    m.temporaryAlertPulse.control = "stop"
+    m.temporaryAlertBlink.control = "stop"
+    m.bannerAccent.opacity = 1.0
+    m.bannerIconBackground.opacity = 1.0
+    emphasis = LCase(valueOr(alert, "emphasisEffect", "none"))
+    if emphasis = "pulse"
+        m.temporaryAlertPulse.control = "start"
+    else if emphasis = "blink"
+        m.temporaryAlertBlink.control = "start"
+    end if
 end sub
 
 sub onTemporaryAlertGapTimer()
@@ -1427,6 +1636,9 @@ sub onTemporaryAlertGapTimer()
     m.bannerGroup.opacity = 0.0
     m.contentGroup.scale = [1.0, 1.0]
     m.contentGroup.translation = [0.0, 0.0]
+    m.contentGroup.opacity = 1.0
+    m.temporaryAlertPulse.control = "stop"
+    m.temporaryAlertBlink.control = "stop"
     showNextTemporaryAlert()
 end sub
 
@@ -1549,7 +1761,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V22 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V24 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Alertas temporarios: " + m.temporaryAlerts.Count().ToStr() + " | Ativo: " + activeAlertId
@@ -1700,9 +1912,26 @@ end function
 
 function dateSeconds(value as string) as integer
     if value = "" then return 0
+    normalizedValue = value.Trim()
+    ' Inputs datetime-local produzidos pela Central antiga omitem os segundos.
+    ' O Roku aceita apenas YYYY-MM-DDTHH:MM:SS (ou a variante com espaco).
+    if Len(normalizedValue) = 16 and Mid(normalizedValue, 11, 1) = "T"
+        normalizedValue = normalizedValue + ":00"
+    else if Len(normalizedValue) = 16 and Mid(normalizedValue, 11, 1) = " "
+        normalizedValue = normalizedValue + ":00"
+    end if
+    ' Legacy Central versions stored local wall-clock values without a timezone.
+    ' FromISO8601String treats that value as UTC, so add the TV timezone offset.
+    hasTimeZone = Right(UCase(normalizedValue), 1) = "Z"
+    if not hasTimeZone and Len(normalizedValue) > 10
+        timePart = Mid(normalizedValue, 11)
+        hasTimeZone = Instr(1, timePart, "+") > 0 or Instr(1, timePart, "-") > 0
+    end if
     date = CreateObject("roDateTime")
-    date.FromISO8601String(value)
-    return date.AsSeconds()
+    date.FromISO8601String(normalizedValue)
+    result = date.AsSeconds()
+    if not hasTimeZone then result = result + (date.GetTimeZoneOffset() * 60)
+    return result
 end function
 
 function getAreaName(areaId as string) as string
