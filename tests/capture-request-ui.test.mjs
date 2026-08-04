@@ -32,6 +32,8 @@ test('captura começa pelo clique e recupera automaticamente somente a fila inic
   assert.match(html, /Retomando a atualiza/);
   assert.match(html, /window\.requestDashboardCapture = async function/);
   assert.match(html, /function captureNeedsRecovery\(capture, now = Date\.now\(\)\)/);
+  assert.match(html, /Retomar captura/);
+  assert.match(html, /button\.disabled = progress\.active && !needsRecovery/);
   assert.match(html, /if \(captureNeedsRecovery\(row\.payload\?\.capture\)\)/);
   assert.match(html, /Fila interrompida detectada; retomando automaticamente/);
   assert.match(manualCaptureSql, /cron\.unschedule/);

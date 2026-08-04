@@ -8874,13 +8874,17 @@
                 const percent = progress.total
                     ? Math.min(100, Math.round((finished / progress.total) * 100))
                     : 0;
-                button.disabled = progress.active;
+                const needsRecovery = captureNeedsRecovery(capture);
+                button.disabled = progress.active && !needsRecovery;
+                button.innerHTML = needsRecovery
+                    ? '<i class="fas fa-rotate"></i> Retomar captura'
+                    : '<i class="fas fa-rotate"></i> Atualizar agora';
                 count.textContent = `${finished}/${progress.total}`;
                 progressBar.style.width = `${percent}%`;
 
                 if (capture?.status === 'running') {
                     message.textContent = 'O capturador está preparando as imagens atualizadas.';
-                    status.textContent = captureNeedsRecovery(capture)
+                    status.textContent = needsRecovery
                         ? 'Recuperando uma captura interrompida…'
                         : `Capturando ${capture.activeDashboardId ? 'o próximo painel' : 'painéis'}…`;
                     return;
