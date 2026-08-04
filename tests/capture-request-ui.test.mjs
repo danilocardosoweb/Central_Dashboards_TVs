@@ -28,13 +28,14 @@ test('sincronizacao exibe a mensagem detalhada devolvida pela API', () => {
   assert.match(html, /error\.error \|\| error\.message \|\| `Falha ao salvar/);
 });
 
-test('captura somente avanca depois do clique do usuario', () => {
-  assert.doesNotMatch(
-    html,
-    /captureQueueProgress\(row\.payload\?\.capture\)\.active\) \{\s*processCaptureQueue\(\)/
-  );
+test('captura começa pelo clique e recupera automaticamente somente a fila iniciada', () => {
   assert.match(html, /Retomando a atualiza/);
   assert.match(html, /window\.requestDashboardCapture = async function/);
+  assert.match(html, /function captureNeedsRecovery\(capture, now = Date\.now\(\)\)/);
+  assert.match(html, /Retomar captura/);
+  assert.match(html, /button\.disabled = progress\.active && !needsRecovery/);
+  assert.match(html, /if \(captureNeedsRecovery\(row\.payload\?\.capture\)\)/);
+  assert.match(html, /Fila interrompida detectada; retomando automaticamente/);
   assert.match(manualCaptureSql, /cron\.unschedule/);
   assert.match(manualCaptureSql, /drop trigger if exists tv_app_state_capture_request/);
   assert.doesNotMatch(manualCaptureSql, /cron\.schedule\(/);
