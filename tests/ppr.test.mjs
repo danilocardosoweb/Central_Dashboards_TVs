@@ -45,6 +45,8 @@ test('PPR possui administração, telas e persistência central', () => {
     assert.match(web, /ppr-progress-fill/);
     assert.match(web, /ppr-performance-label/);
     assert.match(web, /function updatePresentationChrome\(/);
+    assert.match(web, /Ligas 6005, 6061, 6082 e 6351/);
+    assert.doesNotMatch(web, /Ligas 6005, 6061, 6082 e 6301/);
 });
 
 test('escala mantém os seis marcos e o resultado decimal', () => {
