@@ -32,11 +32,37 @@ test('imagens são publicadas em bucket próprio do Supabase', () => {
     assert.match(web, /\/storage\/v1\/object\/public\//);
     assert.match(sql, /'alert-assets'/);
     assert.match(sql, /for insert/i);
+    assert.match(sql, /for select/i);
     assert.match(sql, /bucket_id = 'alert-assets'/);
     assert.match(sql, /name like 'alerts\/%'/);
 });
 
 test('Roku continua consumindo a URL remota do aviso', () => {
-    assert.match(roku, /imageUrl: remoteAlertImage\(alert\)/);
-    assert.match(roku, /candidate = valueOr\(alert, "imageUrl", ""\)/);
+    assert.match(roku, /alertImageUrl = remoteAlertImage\(alert\)/);
+    assert.match(roku, /imageUrl: alertImageUrl/);
+    assert.match(roku, /"imageUrl"/);
+    assert.match(roku, /"mediaUrl"/);
+    assert.match(roku, /"attachmentUrl"/);
+});
+
+test('a Central exige uma URL HTTPS para imagens que serão exibidas na TV', () => {
+    assert.match(web, /Envie uma imagem para a TV antes de salvar/);
+    assert.match(web, /uploadAlertAsset\(asset\.blob, asset\.mimeType, asset\.extension\)/);
+    assert.doesNotMatch(web, /uploadAlertImage\(/);
+});
+
+test('alterações dos avisos são encaminhadas imediatamente para a base central', () => {
+    assert.match(web, /function persistAlerts\(\)/);
+    assert.match(web, /window\.saveCloudSectionNow\('alerts'\)/);
+    assert.match(web, /window\.scheduleCloudSectionSave\('alerts', 0\)/);
+    assert.match(web, /Não foi possível salvar/);
+});
+
+test('avisos possuem ordem manual persistente usada na Central e no Roku', () => {
+    assert.match(web, /displayOrder/);
+    assert.match(web, /function moveAlert\(id, direction\)/);
+    assert.match(web, /Mover para cima/);
+    assert.match(web, /Mover para baixo/);
+    assert.match(roku, /function temporaryAlertOrder\(/);
+    assert.match(roku, /order < existingOrder/);
 });
