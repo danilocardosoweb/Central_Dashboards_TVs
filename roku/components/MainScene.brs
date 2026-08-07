@@ -1,5 +1,6 @@
 sub init()
     m.endpoint = "https://central-dashboards-t-vs.vercel.app/api/state"
+    m.heartbeatEndpoint = "https://central-dashboards-t-vs.vercel.app/api/tv-status"
 
     m.canvas = m.top.FindNode("canvas")
     m.contentGroup = m.top.FindNode("contentGroup")
@@ -74,12 +75,14 @@ sub init()
     m.loading = m.top.FindNode("loading")
     m.slideTimer = m.top.FindNode("slideTimer")
     m.syncTimer = m.top.FindNode("syncTimer")
+    m.heartbeatTimer = m.top.FindNode("heartbeatTimer")
     m.transitionTimer = m.top.FindNode("transitionTimer")
     m.imageLoadTimer = m.top.FindNode("imageLoadTimer")
     m.introGroup = m.top.FindNode("introGroup")
     m.introVideo = m.top.FindNode("introVideo")
     m.introFallbackTimer = m.top.FindNode("introFallbackTimer")
     m.fetchWatchdogTimer = m.top.FindNode("fetchWatchdogTimer")
+    m.playbackWatchdogTimer = m.top.FindNode("playbackWatchdogTimer")
     m.temporaryAlertTimer = m.top.FindNode("temporaryAlertTimer")
     m.temporaryAlertGapTimer = m.top.FindNode("temporaryAlertGapTimer")
     m.diagnosticsOverlay = m.top.FindNode("diagnosticsOverlay")
@@ -104,12 +107,14 @@ sub init()
 
     m.slideTimer.ObserveField("fire", "onSlideTimer")
     m.syncTimer.ObserveField("fire", "onSyncTimer")
+    m.heartbeatTimer.ObserveField("fire", "onHeartbeatTimer")
     m.transitionTimer.ObserveField("fire", "onTransitionTimer")
     m.imageLoadTimer.ObserveField("fire", "onImageLoadTimer")
     m.introVideo.ObserveField("state", "onIntroVideoState")
     m.introVideo.ObserveField("position", "onIntroVideoPosition")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
     m.fetchWatchdogTimer.ObserveField("fire", "onFetchWatchdogTimer")
+    m.playbackWatchdogTimer.ObserveField("fire", "onPlaybackWatchdogTimer")
     m.temporaryAlertTimer.ObserveField("fire", "onTemporaryAlertTimer")
     m.temporaryAlertGapTimer.ObserveField("fire", "onTemporaryAlertGapTimer")
     m.dashboardImageA.ObserveField("loadStatus", "onImageALoadStatus")
@@ -145,13 +150,26 @@ sub init()
     m.lastTraceId = ""
     m.lastError = ""
     m.stateSource = "network"
+    m.heartbeatBusy = false
+    m.recoveryCount = 0
+    m.lastSlideStartedAt = 0
+    m.sessionUptime = CreateObject("roTimespan")
+    m.sessionUptime.Mark()
+    m.installationId = readRegistryValue("installationId")
+    if m.installationId = ""
+        deviceInfo = CreateObject("roDeviceInfo")
+        m.installationId = deviceInfo.GetModel() + "-" + currentClock().Replace(":", "")
+        writeRegistryValue("installationId", m.installationId)
+    end if
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 22, endpoint: m.endpoint })
+    logEvent("app-start", { build: 31, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
+    m.heartbeatTimer.control = "start"
+    m.playbackWatchdogTimer.control = "start"
 end sub
 
 sub startIntroVideo()
@@ -393,6 +411,13 @@ end sub
 sub hideStationSelector()
     m.stationOverlay.visible = false
     m.top.SetFocus(true)
+    ' Abrir o seletor pausa o carrossel para a escolha. Se ele for fechado com
+    ' Back, a troca precisa voltar a funcionar sem obrigar o usuário a reabrir
+    ' o aplicativo ou selecionar novamente a estação.
+    if not m.paused and m.currentStation <> invalid and m.slides.Count() > 0 and m.slideIndex >= 0 and m.slideIndex < m.slides.Count()
+        startSlideTimer(m.slides[m.slideIndex])
+        logEvent("station-selector-closed", { restoredTimer: true, slideIndex: m.slideIndex + 1 })
+    end if
 end sub
 
 sub onStationSelected()
@@ -411,6 +436,73 @@ sub activateStationChoice(index as integer)
     end if
     hideStationSelector()
     buildPlaylist()
+    sendHeartbeat()
+end sub
+
+sub onHeartbeatTimer()
+    sendHeartbeat()
+end sub
+
+sub sendHeartbeat()
+    if m.heartbeatBusy or m.currentStation = invalid then return
+
+    currentType = ""
+    currentTitle = ""
+    currentIndex = 0
+    if m.slideIndex >= 0 and m.slideIndex < m.slides.Count()
+        currentSlide = m.slides[m.slideIndex]
+        currentType = valueOr(currentSlide, "kind", "")
+        currentTitle = valueOr(currentSlide, "title", "")
+        currentIndex = m.slideIndex + 1
+    end if
+
+    task = CreateObject("roSGNode", "HeartbeatTask")
+    task.endpoint = m.heartbeatEndpoint
+    task.payload = {
+        stationId: valueOr(m.currentStation, "id", "station-default")
+        stationName: valueOr(m.currentStation, "name", "Esta TV")
+        areaId: valueOr(m.currentStation, "areaId", "geral")
+        selectionKind: valueOr(m.currentStation, "kind", "station")
+        installationId: m.installationId
+        sessionId: m.sessionId
+        appVersion: "V_31"
+        currentIndex: currentIndex
+        playlistCount: m.slides.Count()
+        currentType: currentType
+        currentTitle: currentTitle
+        stateRevision: m.lastRevision
+        stateSource: m.stateSource
+        lastError: m.lastError
+        uptimeSeconds: m.sessionUptime.TotalSeconds()
+        playbackAgeSeconds: currentPlaybackAge()
+        recoveryCount: m.recoveryCount
+        playerState: currentPlayerState()
+    }
+    task.ObserveField("result", "onHeartbeatResult")
+    task.ObserveField("error", "onHeartbeatError")
+    m.heartbeatTask = task
+    m.heartbeatBusy = true
+    task.control = "run"
+end sub
+
+sub onHeartbeatResult()
+    m.heartbeatBusy = false
+    m.lastHeartbeatError = ""
+    logEvent("heartbeat-ok", {
+        stationId: valueOr(m.currentStation, "id", "")
+        currentIndex: m.slideIndex + 1
+        total: m.slides.Count()
+    })
+end sub
+
+sub onHeartbeatError()
+    m.heartbeatBusy = false
+    heartbeatError = m.heartbeatTask.error
+    if heartbeatError <> ""
+        m.lastHeartbeatError = heartbeatError
+        m.lastError = heartbeatError
+        logEvent("heartbeat-error", { error: heartbeatError, statusCode: m.heartbeatTask.statusCode })
+    end if
 end sub
 
 sub buildPlaylist()
@@ -452,15 +544,25 @@ sub buildPlaylist()
             if mode = "banner"
                 temporaryAlerts.Push(alert)
             else
-                alertSlides.Push({
-                    id: valueOr(alert, "id", "")
-                    kind: "alert"
-                    source: alert
-                    title: valueOr(alert, "title", "Comunicado")
-                    body: valueOr(alert, "body", "")
-                    imageUrl: remoteAlertImage(alert)
-                    duration: valueOr(alert, "duration", 20)
-                })
+                mediaType = LCase(valueOr(alert, "mediaType", "image"))
+                alertImageUrl = remoteAlertImage(alert)
+                if mediaType = "pdf" then
+                    logEvent("alert-skipped-pdf", { id: valueOr(alert, "id", "") })
+                else if mediaType = "video" then
+                    logEvent("alert-skipped-video", { id: valueOr(alert, "id", "") })
+                else if valueOr(alert, "contentType", "message") = "image" and alertImageUrl = "" then
+                    logEvent("alert-skipped-no-remote-image", { id: valueOr(alert, "id", "") })
+                else
+                    alertSlides.Push({
+                        id: valueOr(alert, "id", "")
+                        kind: "alert"
+                        source: alert
+                        title: valueOr(alert, "title", "Comunicado")
+                        body: valueOr(alert, "body", "")
+                        imageUrl: alertImageUrl
+                        duration: valueOr(alert, "duration", 20)
+                    })
+                end if
             end if
         end if
     end for
@@ -639,6 +741,41 @@ sub onFetchWatchdogTimer()
     if m.state = invalid then showError(m.lastError)
 end sub
 
+' Recuperação de último nível para timers/interpolações que deixaram de disparar.
+' Não depende de internet e não fecha o canal: avança apenas para a próxima tela
+' quando a tela atual já excedeu o próprio tempo de exibição com margem segura.
+sub onPlaybackWatchdogTimer()
+    if m.paused or m.introPlaying or m.stationOverlay.visible then return
+    if m.activeTemporaryAlert <> invalid then return
+    if m.slides.Count() = 0 then return
+
+    if m.slideIndex < 0 or m.slideIndex >= m.slides.Count()
+        m.recoveryCount = m.recoveryCount + 1
+        logEvent("playback-recovery-no-slide", { recoveryCount: m.recoveryCount })
+        showNextSlide()
+        return
+    end if
+
+    currentSlide = m.slides[m.slideIndex]
+    duration = valueOr(currentSlide, "duration", m.defaultDuration)
+    if duration < 5 then duration = 5
+    maxAge = duration + 15
+    age = currentPlaybackAge()
+    if age > maxAge
+        m.recoveryCount = m.recoveryCount + 1
+        logEvent("playback-recovery-stalled", {
+            recoveryCount: m.recoveryCount
+            ageSeconds: age
+            maxAgeSeconds: maxAge
+            slideId: valueOr(currentSlide, "id", "")
+        })
+        cancelPendingImage()
+        m.transitionTimer.control = "stop"
+        m.imageEnter.control = "stop"
+        showNextSlide()
+    end if
+end sub
+
 sub onImageLoadTimer()
     if m.pendingImageName = "" or m.pendingSlide = invalid then return
     target = posterFor(m.pendingImageName)
@@ -805,6 +942,7 @@ sub startSlideTimer(slide as dynamic)
     if slide = invalid then return
     duration = valueOr(slide, "duration", m.defaultDuration)
     if duration < 5 then duration = 5
+    m.lastSlideStartedAt = m.sessionUptime.TotalSeconds()
     m.slideTimer.duration = duration
     if not m.paused then m.slideTimer.control = "start"
 end sub
@@ -1341,9 +1479,12 @@ function sortTemporaryAlerts(alerts as object) as object
     for each alert in alerts
         inserted = false
         score = temporaryAlertPriority(alert)
+        order = temporaryAlertOrder(alert)
         if sorted.Count() > 0
             for index = 0 to sorted.Count() - 1
-                if score > temporaryAlertPriority(sorted[index])
+                existingOrder = temporaryAlertOrder(sorted[index])
+                existingScore = temporaryAlertPriority(sorted[index])
+                if order < existingOrder or (order = existingOrder and score > existingScore)
                     sorted.Insert(index, alert)
                     inserted = true
                     exit for
@@ -1353,6 +1494,12 @@ function sortTemporaryAlerts(alerts as object) as object
         if not inserted then sorted.Push(alert)
     end for
     return sorted
+end function
+
+function temporaryAlertOrder(alert as dynamic) as integer
+    order = Int(valueOr(alert, "displayOrder", 999999))
+    if order < 0 then return 999999
+    return order
 end function
 
 function temporaryAlertPriority(alert as dynamic) as integer
@@ -1742,6 +1889,7 @@ sub updateSlideStatus()
 end sub
 
 sub onSlideTimer()
+    logEvent("slide-timer-fired", { slideIndex: m.slideIndex + 1, total: m.slides.Count() })
     showNextSlide()
 end sub
 
@@ -1761,9 +1909,10 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V24 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V31 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
+    textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
     textValue = textValue + Chr(10) + "Alertas temporarios: " + m.temporaryAlerts.Count().ToStr() + " | Ativo: " + activeAlertId
     textValue = textValue + Chr(10) + "Ultimo erro: " + m.lastError
     m.diagnosticsText.text = textValue
@@ -1773,7 +1922,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 22
+        build: 31
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId
@@ -1892,10 +2041,11 @@ function dashboardImageUrl(dashboard as dynamic) as string
 end function
 
 function remoteAlertImage(alert as dynamic) as string
-    candidate = valueOr(alert, "rokuImageUrl", "")
-    if Left(LCase(candidate), 8) = "https://" then return candidate
-    candidate = valueOr(alert, "imageUrl", "")
-    if Left(LCase(candidate), 8) = "https://" then return candidate
+    keys = ["rokuImageUrl", "imageUrl", "mediaUrl", "attachmentUrl", "fileUrl", "url"]
+    for each key in keys
+        candidate = valueOr(alert, key, "")
+        if Left(LCase(candidate), 8) = "https://" then return candidate
+    end for
     return ""
 end function
 
@@ -1982,6 +2132,22 @@ function currentClock() as string
     date = CreateObject("roDateTime")
     date.ToLocalTime()
     return pad2(date.GetHours()) + ":" + pad2(date.GetMinutes())
+end function
+
+function currentPlaybackAge() as integer
+    if m.sessionUptime = invalid or m.lastSlideStartedAt <= 0 then return 0
+    age = m.sessionUptime.TotalSeconds() - m.lastSlideStartedAt
+    if age < 0 then return 0
+    return Int(age)
+end function
+
+function currentPlayerState() as string
+    if m.introPlaying then return "intro"
+    if m.paused then return "paused"
+    if m.stationOverlay.visible then return "selecting-station"
+    if m.slides.Count() = 0 then return "empty"
+    if m.pendingSlide <> invalid then return "loading-image"
+    return "playing"
 end function
 
 function pad2(value as integer) as string

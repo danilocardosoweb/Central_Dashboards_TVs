@@ -251,10 +251,14 @@
 
             <Timer id="slideTimer" repeat="false" />
             <Timer id="syncTimer" duration="60" repeat="true" />
+            <Timer id="heartbeatTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />
             <Timer id="imageLoadTimer" duration="8" repeat="false" />
             <Timer id="introFallbackTimer" duration="12" repeat="false" />
             <Timer id="fetchWatchdogTimer" duration="20" repeat="false" />
+            <!-- Confere se o temporizador de troca continua ativo. Ele só atua
+                 enquanto o canal ainda está aberto e jamais fecha o player. -->
+            <Timer id="playbackWatchdogTimer" duration="15" repeat="true" />
             <Timer id="temporaryAlertTimer" duration="15" repeat="false" />
             <Timer id="temporaryAlertGapTimer" duration="1" repeat="false" />
             <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">

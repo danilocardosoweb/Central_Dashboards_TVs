@@ -119,5 +119,12 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V24/);
+  assert.match(scene, /Build: V31/);
+});
+
+test('player recupera o carrossel se o temporizador da tela parar', () => {
+  assert.match(xml, /id="playbackWatchdogTimer" duration="15" repeat="true"/);
+  assert.match(scene, /sub onPlaybackWatchdogTimer\(\)/);
+  assert.match(scene, /playback-recovery-stalled/);
+  assert.match(scene, /station-selector-closed/);
 });

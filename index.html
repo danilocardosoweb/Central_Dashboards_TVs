@@ -1533,6 +1533,16 @@
             display: flex;
             gap: 0.35rem;
             margin-top: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .alert-order-help {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.9rem 0 0.4rem;
+            color: #64748b;
+            font-size: 0.88rem;
         }
 
         .alert-icon-button {
@@ -2415,6 +2425,25 @@
             color: #dc2626;
             background: #fee2e2;
         }
+
+        .tv-presence-panel { margin: 1rem 0; padding: 0.9rem; border: 1px solid #dbe4f0; border-radius: 1rem; background: linear-gradient(135deg, #f8fbff, #eef6ff); }
+        .tv-presence-header, .tv-presence-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; }
+        .tv-presence-header h4 { margin: 0; font-size: 0.82rem; }
+        .tv-presence-header p { margin: 0.2rem 0 0; color: var(--text-secondary); font-size: 0.66rem; }
+        .tv-presence-summary { justify-content: flex-start; margin-top: 0.75rem; }
+        .tv-presence-count { padding: 0.28rem 0.55rem; border-radius: 999px; background: #fff; font-size: 0.64rem; font-weight: 800; }
+        .tv-presence-list { display: grid; gap: 0.55rem; margin-top: 0.75rem; }
+        .tv-presence-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.65rem; padding: 0.7rem; border: 1px solid #e2e8f0; border-radius: 0.8rem; background: #fff; }
+        .tv-presence-dot { width: 0.72rem; height: 0.72rem; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 5px #e2e8f0; }
+        .tv-presence-item.online .tv-presence-dot { background: #22c55e; box-shadow: 0 0 0 5px #dcfce7; }
+        .tv-presence-item.unstable .tv-presence-dot { background: #f59e0b; box-shadow: 0 0 0 5px #fef3c7; }
+        .tv-presence-item.offline .tv-presence-dot { background: #ef4444; box-shadow: 0 0 0 5px #fee2e2; }
+        .tv-presence-name { color: var(--text-primary); font-size: 0.75rem; font-weight: 800; }
+        .tv-presence-detail { margin-top: 0.15rem; color: var(--text-secondary); font-size: 0.62rem; line-height: 1.4; }
+        .tv-presence-state { font-size: 0.62rem; font-weight: 850; text-transform: uppercase; }
+        .tv-presence-item.online .tv-presence-state { color: #15803d; }
+        .tv-presence-item.unstable .tv-presence-state { color: #b45309; }
+        .tv-presence-item.offline .tv-presence-state { color: #dc2626; }
 
         .dashboard-area-row {
             display: flex;
@@ -4002,11 +4031,29 @@
                        placeholder="Ex.: TV Usinagem 01"
                        onkeypress="if(event.key === 'Enter') addStation()">
                 <select id="newStationAreaId" class="select-field"></select>
+                <input id="newStationIp" class="input-field" maxlength="45"
+                       placeholder="IP local (opcional), ex.: 192.168.0.148">
             </div>
             <button type="button" class="btn btn-primary" onclick="addStation()">
                 <i class="fas fa-display"></i> Adicionar estação
             </button>
             <div id="stationList" class="station-list"></div>
+
+            <div class="tv-presence-panel">
+                <div class="tv-presence-header">
+                    <div>
+                        <h4><i class="fas fa-satellite-dish"></i> Monitor das TVs</h4>
+                        <p>Confirma se o aplicativo está aberto e qual conteúdo está sendo exibido.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline" onclick="refreshTvPresence(false)">
+                        <i class="fas fa-rotate"></i> Atualizar status
+                    </button>
+                </div>
+                <div id="tvPresenceSummary" class="tv-presence-summary"></div>
+                <div id="tvPresenceList" class="tv-presence-list">
+                    <div class="tv-presence-detail">Aguardando o primeiro sinal das TVs...</div>
+                </div>
+            </div>
         </div>
 
         <div class="input-group alert-center" data-settings-section="alerts">
@@ -4023,6 +4070,11 @@
                         <i class="fas fa-image"></i> Postar imagem
                     </button>
                 </div>
+            </div>
+
+            <div class="alert-order-help">
+                <i class="fas fa-arrows-up-down"></i>
+                Use as setas de cada aviso para definir a ordem de exibição. A mesma ordem será enviada para as TVs.
             </div>
 
             <div id="alertList" class="alert-list"></div>
@@ -4220,9 +4272,9 @@
                     </div>
                 </div>
 
-                <label for="alertImage">Imagem opcional</label>
+                <label for="alertImage">Arquivo opcional</label>
                 <input type="file" id="alertImage" class="input-field"
-                       accept="image/png,image/jpeg,image/webp"
+                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,application/pdf,video/mp4,video/webm,video/quicktime"
                        onchange="handleAlertImage(event)">
                 <button type="button" id="removeAlertImageButton" class="btn btn-outline"
                         style="display: none;" onclick="removeAlertImage()">
@@ -4380,6 +4432,8 @@
         let alertEditorImageData = null;
         let alertEditorImageUrl = '';
         let alertEditorImageName = '';
+        let alertEditorMediaType = 'image';
+        let alertEditorMediaMime = '';
         const ALERT_STORAGE_PROJECT_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
         const ALERT_STORAGE_PUBLISHABLE_KEY =
             'sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv';
@@ -5406,6 +5460,41 @@
             normal: 1
         };
 
+        function normalizeAlertCollection(items) {
+            let changed = false;
+            const list = Array.isArray(items) ? items : [];
+            const normalized = list.map((item, index) => {
+                const alert = normalizeAlertRecord(item);
+                const value = Number(alert?.displayOrder);
+                if (!Number.isFinite(value)) {
+                    changed = true;
+                    return { ...alert, displayOrder: index };
+                }
+                return alert;
+            });
+            return { items: normalized, changed };
+        }
+
+        function compareAlertsForPlayback(a, b) {
+            const orderA = Number.isFinite(Number(a?.displayOrder))
+                ? Number(a.displayOrder) : Number.MAX_SAFE_INTEGER;
+            const orderB = Number.isFinite(Number(b?.displayOrder))
+                ? Number(b.displayOrder) : Number.MAX_SAFE_INTEGER;
+            if (orderA !== orderB) return orderA - orderB;
+            const priorityDifference =
+                (alertPriorityOrder[b?.priority] || 1) -
+                (alertPriorityOrder[a?.priority] || 1);
+            if (priorityDifference !== 0) return priorityDifference;
+            return String(a?.createdAt || '').localeCompare(String(b?.createdAt || ''));
+        }
+
+        function nextAlertDisplayOrder() {
+            return alerts.reduce((maximum, alert, index) => {
+                const value = Number(alert?.displayOrder);
+                return Math.max(maximum, Number.isFinite(value) ? value : index);
+            }, -1) + 1;
+        }
+
         function getAlertCategory(category) {
             return alertCategories[category] || alertCategories.info;
         }
@@ -5422,7 +5511,7 @@
                 const visual = document.createElement('div');
                 visual.className = 'alert-image-only';
                 visual.style.background = alert.imageBackground || '#000000';
-                const imageSource = alert.imageUrl || alert.imageData;
+                const imageSource = alert.imageUrl || alert.mediaUrl || alert.attachmentUrl || alert.imageData;
                 if (imageSource) {
                     const image = document.createElement('img');
                     image.src = imageSource;
@@ -5647,13 +5736,7 @@
             const now = new Date();
             return alerts
                 .filter(alert => getAlertStatus(alert, now).key === 'active')
-                .sort((a, b) => {
-                    const priorityDifference =
-                        (alertPriorityOrder[b.priority] || 1) -
-                        (alertPriorityOrder[a.priority] || 1);
-                    if (priorityDifference !== 0) return priorityDifference;
-                    return (a.createdAt || '').localeCompare(b.createdAt || '');
-                });
+                .sort(compareAlertsForPlayback);
         }
 
         function saveAlertsToStorage() {
@@ -5670,6 +5753,17 @@
         function saveAlertHistoryToStorage() {
             alertHistory = (Array.isArray(alertHistory) ? alertHistory : []).slice(0, 300);
             localStorage.setItem('dashboardAlertHistoryV1', JSON.stringify(alertHistory));
+        }
+
+        async function persistAlerts() {
+            if (!saveAlertsToStorage()) return false;
+            if (typeof window.saveCloudSectionNow === 'function') {
+                return await window.saveCloudSectionNow('alerts');
+            }
+            if (typeof window.scheduleCloudSectionSave === 'function') {
+                window.scheduleCloudSectionSave('alerts', 0);
+            }
+            return true;
         }
 
         function recordAlertHistory(alert, type, extra = {}) {
@@ -5719,8 +5813,7 @@
             try {
                 const savedAlerts = localStorage.getItem('dashboardAlertsV2');
                 alerts = savedAlerts ? JSON.parse(savedAlerts) : [];
-                if (!Array.isArray(alerts)) alerts = [];
-                alerts = alerts.map(normalizeAlertRecord);
+                alerts = normalizeAlertCollection(alerts).items;
                 const savedHistory = localStorage.getItem('dashboardAlertHistoryV1');
                 alertHistory = savedHistory ? JSON.parse(savedHistory) : [];
                 if (!Array.isArray(alertHistory)) alertHistory = [];
@@ -5909,7 +6002,8 @@
                 const statusA = getAlertStatus(a);
                 const statusB = getAlertStatus(b);
                 const statusOrder = { active: 1, scheduled: 2, disabled: 3, expired: 4 };
-                return (statusOrder[statusA.key] || 9) - (statusOrder[statusB.key] || 9);
+                const statusDifference = (statusOrder[statusA.key] || 9) - (statusOrder[statusB.key] || 9);
+                return statusDifference || compareAlertsForPlayback(a, b);
             });
 
             sortedAlerts.forEach(alert => {
@@ -5941,12 +6035,27 @@
                     'alert-badge',
                     alert.contentType === 'image' ? 'Somente imagem' : category.label
                 ));
+                if (alert.mediaType === 'pdf' || alert.mediaType === 'video') {
+                    meta.appendChild(createTextElement(
+                        'span',
+                        'alert-badge',
+                        alert.mediaType === 'pdf' ? 'PDF anexado' : 'Vídeo anexado'
+                    ));
+                }
                 meta.appendChild(createTextElement(
                     'span',
                     'alert-badge',
                     alert.displayMode === 'banner' ? 'Faixa inferior' : 'Tela completa'
                 ));
                 meta.appendChild(createTextElement('span', 'alert-badge', getAlertTargetLabel(alert)));
+                if (alert.contentType === 'image') {
+                    const remoteUrl = alert.imageUrl || alert.mediaUrl || alert.attachmentUrl || '';
+                    meta.appendChild(createTextElement(
+                        'span',
+                        'alert-badge',
+                        /^https:\/\//i.test(remoteUrl) ? 'Pronto para TV' : 'Pendente para TV'
+                    ));
+                }
                 if (alert.displayMode === 'fullscreen' && alert.layoutMode === 'custom') {
                     meta.appendChild(createTextElement(
                         'span',
@@ -5960,6 +6069,16 @@
 
                 const actions = document.createElement('div');
                 actions.className = 'alert-list-actions';
+                actions.appendChild(createAlertActionButton(
+                    'fa-arrow-up',
+                    'Mover para cima',
+                    () => moveAlert(alert.id, -1)
+                ));
+                actions.appendChild(createAlertActionButton(
+                    'fa-arrow-down',
+                    'Mover para baixo',
+                    () => moveAlert(alert.id, 1)
+                ));
                 actions.appendChild(createAlertActionButton(
                     alert.enabled ? 'fa-pause' : 'fa-play',
                     alert.enabled ? 'Desativar' : 'Ativar',
@@ -6039,8 +6158,15 @@
 
         function normalizeAlertRecord(alert) {
             if (!alert || typeof alert !== 'object') return alert;
+            const mediaUrl = alert.mediaUrl || alert.imageUrl || alert.rokuImageUrl || alert.attachmentUrl || alert.fileUrl || '';
+            const mediaType = alert.mediaType || (alert.contentType === 'image' ? 'image' : '');
             return {
                 ...alert,
+                mediaType,
+                mediaMime: alert.mediaMime || '',
+                mediaUrl,
+                attachmentUrl: alert.attachmentUrl || mediaUrl,
+                imageUrl: alert.imageUrl || (mediaType === 'image' ? mediaUrl : ''),
                 start: toUtcDateTimeValue(alert.start),
                 end: toUtcDateTimeValue(alert.end),
                 bannerSize: normalizeBannerSize(alert.bannerSize),
@@ -6083,6 +6209,8 @@
             alertEditorImageData = null;
             alertEditorImageUrl = '';
             alertEditorImageName = '';
+            alertEditorMediaType = 'image';
+            alertEditorMediaMime = '';
             alertEditorLayout = getDefaultAlertLayout();
             selectedAlertElementKey = null;
             document.getElementById('removeAlertImageButton').style.display = 'none';
@@ -6132,6 +6260,11 @@
                 imageData: alertEditorImageData,
                 imageUrl: alertEditorImageUrl,
                 imageName: alertEditorImageName,
+                mediaType: alertEditorMediaType || 'image',
+                mediaMime: alertEditorMediaMime || '',
+                mediaUrl: alertEditorImageUrl,
+                attachmentUrl: alertEditorImageUrl,
+                originalFileName: alertEditorImageName,
                 imageFit: document.getElementById('alertImageFit').value || 'contain',
                 imageBackground: document.getElementById('alertImageBackground').value || '#000000',
                 layoutMode: document.getElementById('alertLayoutMode').value,
@@ -6181,7 +6314,7 @@
             if (isImageOnly) displayMode.value = 'fullscreen';
             displayMode.disabled = isImageOnly;
             document.querySelector('label[for="alertImage"]').textContent =
-                isImageOnly ? 'Imagem do aviso *' : 'Imagem opcional';
+                isImageOnly ? 'Imagem do aviso *' : 'Arquivo opcional';
         }
 
         function handleAlertLayoutModeChange() {
@@ -6410,13 +6543,18 @@
             showToast('Layout padrão restaurado', 'success');
         }
 
-        function saveAlert() {
-            const draft = getAlertDraft();
-            const isImageOnly = draft.contentType === 'image';
-            if (isImageOnly && !draft.imageUrl && !draft.imageData) {
-                showToast('Selecione uma imagem para publicar', 'error');
-                return;
-            }
+        async function saveAlert() {
+        const draft = getAlertDraft();
+        const isImageOnly = draft.contentType === 'image';
+        const mediaUrl = draft.imageUrl || draft.mediaUrl || draft.attachmentUrl || '';
+        if (isImageOnly && draft.mediaType && draft.mediaType !== 'image') {
+            showToast('Avisos em tela cheia da TV aceitam imagens. Use PDF ou vídeo como anexo de um comunicado.', 'error');
+            return;
+        }
+        if (isImageOnly && !/^https:\/\//i.test(mediaUrl)) {
+            showToast('Envie uma imagem para a TV antes de salvar. Ela precisa gerar um link HTTPS.', 'error');
+            return;
+        }
             if (!isImageOnly && !draft.title) {
                 showToast('Informe um título para o aviso', 'error');
                 document.getElementById('alertTitle').focus();
@@ -6444,10 +6582,12 @@
             const id = document.getElementById('alertId').value;
             const now = new Date().toISOString();
             let savedAlert = null;
+            let previousAlert = null;
 
             if (id) {
                 const index = alerts.findIndex(alert => alert.id === id);
                 if (index !== -1) {
+                    previousAlert = { ...alerts[index] };
                     alerts[index] = {
                         ...alerts[index],
                         ...draft,
@@ -6459,6 +6599,7 @@
                 savedAlert = {
                     ...draft,
                     id: `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    displayOrder: nextAlertDisplayOrder(),
                     enabled: true,
                     createdAt: now,
                     updatedAt: now
@@ -6466,7 +6607,17 @@
                 alerts.push(savedAlert);
             }
 
-            if (!saveAlertsToStorage()) return;
+            if (!await persistAlerts()) {
+                if (id) {
+                    const index = alerts.findIndex(alert => alert.id === id);
+                    if (index !== -1 && previousAlert) alerts.splice(index, 1, previousAlert);
+                } else if (savedAlert) {
+                    alerts = alerts.filter(alert => alert.id !== savedAlert.id);
+                }
+                renderAlertList();
+                showToast('Não foi possível salvar o aviso na base central.', 'error');
+                return;
+            }
             if (savedAlert) recordAlertHistory(savedAlert, id ? 'updated' : 'created');
             cancelAlertEdit();
             renderAlertList();
@@ -6510,8 +6661,10 @@
             document.getElementById('alertImageBackground').value = alert.imageBackground || '#000000';
             document.getElementById('alertImage').value = '';
             alertEditorImageData = alert.imageData || null;
-            alertEditorImageUrl = alert.imageUrl || '';
-            alertEditorImageName = alert.imageName || '';
+            alertEditorImageUrl = alert.mediaUrl || alert.imageUrl || alert.attachmentUrl || '';
+            alertEditorImageName = alert.originalFileName || alert.imageName || '';
+            alertEditorMediaType = alert.mediaType || (alert.contentType === 'image' ? 'image' : '');
+            alertEditorMediaMime = alert.mediaMime || '';
             alertEditorLayout = normalizeAlertLayout(alert.layout);
             selectedAlertElementKey = null;
             document.getElementById('removeAlertImageButton').style.display =
@@ -6529,46 +6682,88 @@
             alertEditorImageData = null;
             alertEditorImageUrl = '';
             alertEditorImageName = '';
+            alertEditorMediaType = 'image';
+            alertEditorMediaMime = '';
             alertEditorLayout = null;
             selectedAlertElementKey = null;
             alertDragState = null;
         }
 
-        function toggleAlert(id) {
+        async function toggleAlert(id) {
             const alert = alerts.find(item => item.id === id);
             if (!alert) return;
+            const previous = { ...alert };
             alert.enabled = !alert.enabled;
             alert.updatedAt = new Date().toISOString();
-            if (!saveAlertsToStorage()) return;
+            if (!await persistAlerts()) {
+                Object.assign(alert, previous);
+                renderAlertList();
+                showToast('Não foi possível atualizar o aviso na base central.', 'error');
+                return;
+            }
             recordAlertHistory(alert, alert.enabled ? 'activated' : 'ended');
             renderAlertList();
             refreshAlertPresentation(true);
             showToast(alert.enabled ? 'Aviso ativado' : 'Aviso desativado', 'success');
         }
 
-        function duplicateAlert(id) {
+        async function duplicateAlert(id) {
             const alert = alerts.find(item => item.id === id);
             if (!alert) return;
             const now = new Date().toISOString();
-            alerts.push({
+            const duplicate = {
                 ...alert,
                 id: `alert-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                displayOrder: nextAlertDisplayOrder(),
                 title: `${alert.title || alert.imageName || 'Apresentação visual'} (cópia)`,
                 enabled: false,
                 createdAt: now,
                 updatedAt: now
-            });
-            if (!saveAlertsToStorage()) return;
+            };
+            alerts.push(duplicate);
+            if (!await persistAlerts()) {
+                alerts = alerts.filter(item => item.id !== duplicate.id);
+                renderAlertList();
+                showToast('Não foi possível duplicar o aviso na base central.', 'error');
+                return;
+            }
             renderAlertList();
             showToast('Cópia criada e deixada desativada', 'success');
         }
 
-        function deleteAlert(id) {
+        async function moveAlert(id, direction) {
+              const ordered = [...alerts].sort(compareAlertsForPlayback);
+              const index = ordered.findIndex(alert => alert.id === id);
+              const targetIndex = index + Number(direction || 0);
+              if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return;
+
+              const previousAlerts = alerts;
+              const [current] = ordered.splice(index, 1);
+              ordered.splice(targetIndex, 0, current);
+              alerts = ordered.map((alert, order) => ({ ...alert, displayOrder: order }));
+
+              if (!await persistAlerts()) {
+                  alerts = previousAlerts;
+                  showToast('Não foi possível salvar a nova ordem na base central.', 'error');
+                  return;
+              }
+            renderAlertList();
+            refreshAlertPresentation(true);
+            showToast('Ordem dos avisos atualizada.', 'success');
+        }
+
+        async function deleteAlert(id) {
             const alert = alerts.find(item => item.id === id);
             if (!alert) return;
             if (!window.confirm(`Excluir o aviso “${alert.title || alert.imageName || 'Apresentação visual'}”?`)) return;
+            const index = alerts.findIndex(item => item.id === id);
             alerts = alerts.filter(item => item.id !== id);
-            if (!saveAlertsToStorage()) return;
+            if (!await persistAlerts()) {
+                alerts.splice(index, 0, alert);
+                renderAlertList();
+                showToast('Não foi possível excluir o aviso na base central.', 'error');
+                return;
+            }
             renderAlertList();
             refreshAlertPresentation(true);
             showToast('Aviso excluído', 'success');
@@ -6592,11 +6787,11 @@
             });
         }
 
-        function canvasToBlob(canvas, quality) {
+        function canvasToBlob(canvas, mimeType = 'image/png', quality = 0.92) {
             return new Promise((resolve, reject) => {
                 canvas.toBlob(
                     blob => blob ? resolve(blob) : reject(new Error('Falha ao otimizar a imagem')),
-                    'image/webp',
+                    mimeType,
                     quality
                 );
             });
@@ -6618,19 +6813,17 @@
             context.fillRect(0, 0, canvas.width, canvas.height);
             context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-            let blob = await canvasToBlob(canvas, 0.92);
-            for (const quality of [0.84, 0.76, 0.68]) {
-                if (blob.size <= 1.8 * 1024 * 1024) break;
-                blob = await canvasToBlob(canvas, quality);
-            }
+            const blob = await canvasToBlob(canvas, 'image/png', 0.92);
             return {
                 blob,
-                dataUrl: await blobToDataUrl(blob)
+                dataUrl: await blobToDataUrl(blob),
+                mimeType: 'image/png',
+                extension: 'png'
             };
         }
 
-        async function uploadAlertImage(blob) {
-            const objectPath = `alerts/${Date.now()}-${Math.random().toString(16).slice(2)}.webp`;
+        async function uploadAlertAsset(blob, mimeType = 'image/png', extension = 'png') {
+            const objectPath = `alerts/${Date.now()}-${Math.random().toString(16).slice(2)}.${extension}`;
             const response = await fetch(
                 `${ALERT_STORAGE_PROJECT_URL}/storage/v1/object/${ALERT_STORAGE_BUCKET}/${objectPath}`,
                 {
@@ -6638,7 +6831,7 @@
                     headers: {
                         apikey: ALERT_STORAGE_PUBLISHABLE_KEY,
                         Authorization: `Bearer ${ALERT_STORAGE_PUBLISHABLE_KEY}`,
-                        'Content-Type': 'image/webp',
+                        'Content-Type': mimeType,
                         'cache-control': '3600'
                     },
                     body: blob
@@ -6655,42 +6848,61 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-            if (!allowedTypes.includes(file.type)) {
-                showToast('Use uma imagem PNG, JPG ou WEBP', 'error');
+            const allowedImageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp'];
+            const supportedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+            const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+            const isVideo = supportedVideoTypes.includes(file.type);
+            const isImage = allowedImageTypes.includes(file.type);
+
+            if (!isImage && !isPdf && !isVideo) {
+                showToast('Use imagem, PDF ou vídeo em formato compatível.', 'error');
                 event.target.value = '';
                 return;
             }
-            if (file.size > 10 * 1024 * 1024) {
-                showToast('A imagem original deve ter no máximo 10 MB', 'error');
+            if (file.size > 50 * 1024 * 1024) {
+                showToast('O arquivo deve ter no máximo 50 MB.', 'error');
                 event.target.value = '';
                 return;
             }
 
             alertEditorImageName = file.name;
-            showToast('Preparando e enviando a imagem...', 'success');
+            alertEditorImageData = null;
+            alertEditorImageUrl = '';
+            alertEditorMediaType = isPdf ? 'pdf' : (isVideo ? 'video' : 'image');
+            alertEditorMediaMime = file.type || (isPdf ? 'application/pdf' : '');
+            showToast(isImage ? 'Preparando e enviando a imagem...' : 'Enviando anexo...', 'success');
             try {
-                const optimized = await optimizeAlertImage(file);
-                alertEditorImageUrl = await uploadAlertImage(optimized.blob);
-                alertEditorImageData = null;
+                let asset = {
+                    blob: file,
+                    mimeType: alertEditorMediaMime || 'application/octet-stream',
+                    extension: (file.name.split('.').pop() || 'bin').toLowerCase()
+                };
+                if (isImage) asset = await optimizeAlertImage(file);
+                alertEditorImageUrl = await uploadAlertAsset(asset.blob, asset.mimeType, asset.extension);
+                if (isImage) {
+                    alertEditorMediaType = 'image';
+                    alertEditorMediaMime = asset.mimeType;
+                }
                 document.getElementById('removeAlertImageButton').style.display = 'block';
                 updateAlertPreview();
-                showToast('Imagem pronta para navegador e Roku', 'success');
-            } catch (error) {
-                console.warn('Upload da imagem indisponível; usando cópia local.', error);
-                try {
-                    const optimized = await optimizeAlertImage(file);
-                    alertEditorImageUrl = '';
-                    alertEditorImageData = optimized.dataUrl;
-                    document.getElementById('removeAlertImageButton').style.display = 'block';
-                    updateAlertPreview();
-                    showToast('Imagem guardada localmente. Configure o bucket para exibir no Roku.', 'error');
-                } catch (fallbackError) {
-                    console.error('Erro ao processar imagem:', fallbackError);
-                    event.target.value = '';
-                    alertEditorImageName = '';
-                    showToast('Não foi possível processar esta imagem', 'error');
+                if (isImage) {
+                    showToast('Imagem pronta para navegador e Roku.', 'success');
+                } else if (isPdf) {
+                    showToast('PDF salvo como anexo. Para exibi-lo na TV, publique as páginas como imagens.', 'success');
+                } else {
+                    showToast('Vídeo salvo como anexo. A reprodução no Roku será habilitada apenas para MP4 compatível.', 'success');
                 }
+            } catch (error) {
+                console.error('Erro ao enviar anexo do aviso:', error);
+                event.target.value = '';
+                alertEditorImageData = null;
+                alertEditorImageUrl = '';
+                alertEditorImageName = '';
+                alertEditorMediaType = 'image';
+                alertEditorMediaMime = '';
+                document.getElementById('removeAlertImageButton').style.display = 'none';
+                updateAlertPreview();
+                showToast('Não foi possível enviar o arquivo para a TV. Verifique o bucket alert-assets.', 'error');
             }
         }
 
@@ -6698,6 +6910,8 @@
             alertEditorImageData = null;
             alertEditorImageUrl = '';
             alertEditorImageName = '';
+            alertEditorMediaType = 'image';
+            alertEditorMediaMime = '';
             document.getElementById('alertImage').value = '';
             document.getElementById('removeAlertImageButton').style.display = 'none';
             updateAlertPreview();
@@ -7228,6 +7442,9 @@
         var dashboardStations = [];
         var selectedStationId = '';
         var areaSystemReady = false;
+        var tvPresenceData = null;
+        var tvPresencePollTimer = null;
+        const TV_STATUS_ENDPOINT = `${location.protocol === 'file:' ? 'https://central-dashboards-t-vs.vercel.app' : ''}/api/tv-status`;
 
         var defaultDashboardAreas = [
             { id: 'geral', name: 'Geral', color: '#3b82f6' },
@@ -7303,6 +7520,7 @@
                     .map(station => ({
                         id: String(station.id),
                         name: String(station.name),
+                        localIp: String(station.localIp || ''),
                         areaId: station.areaId === '__all__' ||
                             dashboardAreas.some(area => area.id === station.areaId)
                             ? station.areaId
@@ -7358,6 +7576,9 @@
                     alertsChanged = true;
                     return { ...alert, areaIds: ['*'] };
                 });
+                const ordered = normalizeAlertCollection(alerts);
+                alerts = ordered.items;
+                alertsChanged = alertsChanged || ordered.changed;
                 if (alertsChanged && alerts.length) {
                     saveAlertsToStorage();
                 }
@@ -7413,15 +7634,21 @@
             return areaMatches && stationMatches;
         }
 
-        function endAlert(id) {
+        async function endAlert(id) {
             const alert = alerts.find(item => item.id === id);
             if (!alert) return;
+            const previous = { ...alert };
             const now = new Date().toISOString();
             alert.enabled = false;
             alert.end = now.slice(0, 16);
             alert.endedAt = now;
             alert.updatedAt = now;
-            if (!saveAlertsToStorage()) return;
+            if (!await persistAlerts()) {
+                Object.assign(alert, previous);
+                renderAlertList();
+                showToast('Não foi possível encerrar o aviso na base central.', 'error');
+                return;
+            }
             recordAlertHistory(alert, 'ended');
             renderAlertList();
             refreshAlertPresentation(true);
@@ -7607,7 +7834,7 @@
                 name.textContent = station.name;
                 const meta = document.createElement('div');
                 meta.className = 'station-item-meta';
-                meta.textContent = `${getAreaLabel(station.areaId)}${active ? ' • Em exibição' : ''}`;
+                meta.textContent = `${getAreaLabel(station.areaId)}${station.localIp ? ` • ${station.localIp}` : ''}${active ? ' • Em exibição' : ''}`;
                 copy.append(name, meta);
                 main.append(swatch, copy);
 
@@ -7650,6 +7877,61 @@
             renderStationList();
             if (pprConfig) renderPprAdmin();
             updatePresentationEstimate();
+            renderTvPresenceMonitor();
+        }
+
+        function formatPresenceAge(seconds) {
+            if (seconds === null || seconds === undefined) return 'nunca comunicou';
+            if (seconds < 60) return `há ${seconds}s`;
+            if (seconds < 3600) return `há ${Math.floor(seconds / 60)}min`;
+            return `há ${Math.floor(seconds / 3600)}h`;
+        }
+
+        function renderTvPresenceMonitor() {
+            const list = document.getElementById('tvPresenceList');
+            const summary = document.getElementById('tvPresenceSummary');
+            if (!list || !summary) return;
+            const rows = Array.isArray(tvPresenceData?.stations) ? tvPresenceData.stations : [];
+            const counts = tvPresenceData?.counts || { online: 0, unstable: 0, offline: dashboardStations.length };
+            summary.replaceChildren();
+            [['online', 'Online'], ['unstable', 'Instáveis'], ['offline', 'Offline']].forEach(([key, label]) => {
+                const badge = document.createElement('span');
+                badge.className = 'tv-presence-count';
+                badge.textContent = `${label}: ${Number(counts[key]) || 0}`;
+                summary.appendChild(badge);
+            });
+            list.replaceChildren();
+            const source = rows.length ? rows : dashboardStations.map(station => ({ ...station, status: 'offline', ageSeconds: null, heartbeat: null }));
+            source.forEach(row => {
+                const item = document.createElement('div');
+                item.className = `tv-presence-item ${row.status || 'offline'}`;
+                const dot = document.createElement('span'); dot.className = 'tv-presence-dot';
+                const content = document.createElement('div');
+                const name = document.createElement('div'); name.className = 'tv-presence-name'; name.textContent = row.name || 'TV';
+                const detail = document.createElement('div'); detail.className = 'tv-presence-detail';
+                const heartbeat = row.heartbeat || {};
+                const playing = heartbeat.playlistCount
+                    ? `${heartbeat.currentIndex || 0}/${heartbeat.playlistCount} • ${heartbeat.currentType || 'conteúdo'}${heartbeat.currentTitle ? ` • ${heartbeat.currentTitle}` : ''}`
+                    : 'Aplicativo ainda não confirmou a programação';
+                detail.textContent = `${row.localIp || 'IP não informado'} • ${formatPresenceAge(row.ageSeconds)} • ${playing}`;
+                content.append(name, detail);
+                const state = document.createElement('span'); state.className = 'tv-presence-state';
+                state.textContent = row.status === 'online' ? 'Online' : row.status === 'unstable' ? 'Instável' : 'Offline';
+                item.append(dot, content, state); list.appendChild(item);
+            });
+        }
+
+        async function refreshTvPresence(quiet = true) {
+            try {
+                const response = await fetch(`${TV_STATUS_ENDPOINT}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`Monitor respondeu ${response.status}`);
+                tvPresenceData = await response.json();
+                renderTvPresenceMonitor();
+                if (!quiet) showToast('Status das TVs atualizado', 'success');
+            } catch (error) {
+                console.warn('Não foi possível atualizar o monitor das TVs:', error);
+                if (!quiet) showToast('Não foi possível consultar as TVs agora', 'error');
+            }
         }
 
         function addArea() {
@@ -7725,10 +8007,13 @@
                 return;
             }
             const areaId = document.getElementById('newStationAreaId').value || 'geral';
-            const station = { id: createEntityId('station'), name, areaId };
+            const ipInput = document.getElementById('newStationIp');
+            const localIp = String(ipInput?.value || '').trim();
+            const station = { id: createEntityId('station'), name, areaId, localIp };
             dashboardStations.push(station);
             selectedStationId = station.id;
             input.value = '';
+            if (ipInput) ipInput.value = '';
             persistAreaSystem();
             refreshAreaExperience();
             showToast(`Estação “${name}” adicionada e ativada`, 'success');
@@ -7740,6 +8025,8 @@
             const newName = window.prompt('Novo nome da estação:', station.name);
             if (!newName || !newName.trim()) return;
             station.name = newName.trim();
+            const newIp = window.prompt('IP local da TV (opcional):', station.localIp || '');
+            if (newIp !== null) station.localIp = newIp.trim();
             persistAreaSystem();
             renderAreaSystem();
             showToast('Estação atualizada', 'success');
@@ -9004,13 +9291,7 @@
             return alerts
                 .filter(alert => getAlertStatus(alert, now).key === 'active')
                 .filter(alert => alertBelongsToArea(alert, areaId))
-                .sort((a, b) => {
-                    const priorityDifference =
-                        (alertPriorityOrder[b.priority] || 1) -
-                        (alertPriorityOrder[a.priority] || 1);
-                    if (priorityDifference !== 0) return priorityDifference;
-                    return (a.createdAt || '').localeCompare(b.createdAt || '');
-                });
+                .sort(compareAlertsForPlayback);
         }
 
         function createSlides() {
@@ -9112,6 +9393,10 @@
             renderAlertList();
             showSettingsSection(localStorage.getItem('dashboardSettingsSection') || 'station');
             createSlides();
+            refreshTvPresence(true);
+            if (!tvPresencePollTimer) {
+                tvPresencePollTimer = setInterval(() => refreshTvPresence(true), 30000);
+            }
         });
     </script>
 
@@ -9648,7 +9933,7 @@
                     );
 
                     urls = Array.isArray(state.urls) ? state.urls : [];
-                    alerts = Array.isArray(state.alerts) ? state.alerts.map(normalizeAlertRecord) : [];
+                    alerts = normalizeAlertCollection(state.alerts).items;
                     alertHistory = Array.isArray(state.alertHistory) ? state.alertHistory : [];
                     pprConfig = normalizePprConfig(state.ppr);
                     transitionTime = Number(settings.transitionTime) || 30000;
@@ -9731,17 +10016,18 @@
             async function saveCloudState(options = {}) {
                 if (!cloudReady && !options.force) {
                     cloudPendingBeforeReady = true;
-                    return;
+                    return false;
                 }
                 if (cloudSaveInFlight) {
                     cloudSaveQueued = true;
-                    return;
+                    return false;
                 }
 
                 cloudSaveInFlight = true;
                 cloudSaveQueued = false;
                 const sectionsToSave = new Set(cloudDirtySections);
                 cloudDirtySections.clear();
+                let cloudSaveResult = false;
                 setCloudStatus(
                     'saving',
                     'Salvando na base central',
@@ -9760,11 +10046,11 @@
                                 'Base central sincronizada',
                                 `Dados recebidos às ${formatCloudTime(row.updated_at)}.`
                             );
-                            return;
+                            return true;
                         }
                     }
 
-                    if (sectionsToSave.size === 0) return;
+                    if (sectionsToSave.size === 0) return true;
                     let savedRow = null;
                     let payload = null;
                     for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -9804,6 +10090,7 @@
                     cloudReady = true;
                     cloudPendingBeforeReady = false;
                     applyCloudPayload(payload);
+                    cloudSaveResult = true;
                     setCloudStatus(
                         'online',
                         'Base central sincronizada',
@@ -9827,6 +10114,7 @@
                     } else if (cloudDirtySections.size > 0) {
                         scheduleCloudSave(1200);
                     }
+                    return cloudSaveResult;
                 }
             }
 
@@ -9952,9 +10240,22 @@
             window.forceCloudSync = async function() {
                 if (!cloudReady) {
                     await bootstrapCloudSync();
-                    return;
+                    return cloudReady;
                 }
-                await saveCloudState({ force: true });
+                return await saveCloudState({ force: true });
+            };
+
+            window.saveCloudSectionNow = async function(section) {
+                if (section) cloudDirtySections.add(String(section));
+                if (cloudSaveTimer) {
+                    clearTimeout(cloudSaveTimer);
+                    cloudSaveTimer = null;
+                }
+                if (!cloudReady) {
+                    cloudPendingBeforeReady = true;
+                    await bootstrapCloudSync();
+                }
+                return await saveCloudState({ force: true });
             };
 
             window.scheduleCloudSectionSave = function(section, delay = 250) {

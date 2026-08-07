@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="HeartbeatTask" extends="Task">
+    <interface>
+        <field id="endpoint" type="string" />
+        <field id="payload" type="assocarray" />
+        <field id="result" type="assocarray" />
+        <field id="error" type="string" />
+        <field id="statusCode" type="integer" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/HeartbeatTask.brs" />
+</component>
