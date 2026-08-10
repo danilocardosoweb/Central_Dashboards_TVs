@@ -16,6 +16,22 @@ test('Central permite ordenar dashboards por arraste e por botoes', () => {
   assert.match(central, /Mover dashboard para baixo/);
 });
 
+test('Central usa seletores compactos para autorizar setores e TVs', () => {
+  assert.match(central, /function createDashboardTargetPicker/);
+  assert.match(central, /dashboard-target-picker/);
+  assert.match(central, /globalLabel: 'Todos os setores'/);
+  assert.match(central, /globalLabel: 'Todas as TVs'/);
+  assert.doesNotMatch(central, /areaSelect\.multiple = true/);
+  assert.doesNotMatch(central, /stationSelect\.multiple = true/);
+});
+
+test('cartoes de dashboard respondem a largura real do painel sem duplicar o destino', () => {
+  assert.match(central, /\.url-list\s*\{[\s\S]*?container-type:\s*inline-size/);
+  assert.match(central, /\.dashboard-area-row\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2/);
+  assert.match(central, /@container \(max-width: 24rem\)/);
+  assert.doesNotMatch(central, /areaRow\.append\(badge,/);
+});
+
 test('nova ordem e persistida e atualiza a apresentacao', () => {
   assert.match(central, /function persistDashboardOrder\(message = ''\)/);
   assert.match(central, /item\.order = index \+ 1/);

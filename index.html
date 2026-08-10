@@ -155,6 +155,7 @@
 
         .url-list {
             margin-top: 2rem;
+            container-type: inline-size;
         }
 
         .url-list h3 {
@@ -169,9 +170,10 @@
             border: 1px solid transparent;
             padding: 1rem;
             border-radius: var(--radius-md);
-            display: flex;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
             align-items: center;
-            justify-content: space-between;
+            gap: 0.85rem;
             margin-bottom: 0.5rem;
             transition: var(--transition);
         }
@@ -255,19 +257,23 @@
             line-height: 1.45;
         }
 
-        @media (max-width: 640px) {
+        @container (max-width: 34rem) {
             .url-item {
+                grid-template-columns: auto minmax(0, 1fr);
                 align-items: flex-start;
-                flex-wrap: wrap;
                 gap: 0.75rem;
             }
 
-            .dashboard-order-control { order: 1; }
-            .url-item-content { order: 2; flex-basis: calc(100% - 6rem); }
-            .url-actions { order: 3; width: 100%; justify-content: flex-end; }
+            .url-actions {
+                grid-column: 2;
+                justify-self: end;
+            }
         }
 
         .url-name {
+            display: block;
+            min-width: 0;
+            overflow: hidden;
             font-size: 0.875rem;
             font-weight: 500;
             color: var(--text-primary);
@@ -275,7 +281,8 @@
             padding: 0.25rem 0.5rem;
             border-radius: var(--radius-md);
             transition: var(--transition);
-            flex: 1;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .url-name:hover {
@@ -2446,12 +2453,75 @@
         .tv-presence-item.offline .tv-presence-state { color: #dc2626; }
 
         .dashboard-area-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(8rem, 1fr));
             align-items: center;
             gap: 0.45rem;
-            flex-wrap: wrap;
             margin-top: 0.35rem;
         }
+
+        .dashboard-target-picker { position: relative; min-width: 0; width: 100%; }
+        .dashboard-target-picker > summary {
+            min-height: 2.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 0.7rem;
+            border: 1px solid #dbe4f0;
+            border-radius: 0.7rem;
+            color: #334155;
+            background: #fff;
+            cursor: pointer;
+            list-style: none;
+            font-size: 0.66rem;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+        .dashboard-target-picker > summary span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dashboard-target-picker > summary::-webkit-details-marker { display: none; }
+        .dashboard-target-picker > summary::after {
+            content: '\f078';
+            margin-left: auto;
+            color: #64748b;
+            font-family: 'Font Awesome 6 Free';
+            font-size: 0.58rem;
+            font-weight: 900;
+        }
+        .dashboard-target-picker[open] > summary {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+        }
+        .dashboard-target-menu {
+            position: absolute;
+            z-index: 80;
+            top: calc(100% + 0.35rem);
+            left: 0;
+            width: min(17rem, calc(100vw - 5rem));
+            max-height: 15rem;
+            overflow: auto;
+            padding: 0.45rem;
+            border: 1px solid #dbe4f0;
+            border-radius: 0.8rem;
+            background: #fff;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+        }
+        .dashboard-target-option {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.55rem 0.6rem;
+            border-radius: 0.55rem;
+            color: #334155;
+            cursor: pointer;
+            font-size: 0.68rem;
+        }
+        .dashboard-target-option:hover { background: #eff6ff; }
+        .dashboard-target-option input { accent-color: #2563eb; }
+        .dashboard-target-empty { color: #dc2626; }
 
         .area-badge {
             display: inline-flex;
@@ -2471,7 +2541,11 @@
 
         .url-item-content {
             min-width: 0;
-            flex: 1;
+        }
+
+        @container (max-width: 24rem) {
+            .dashboard-area-row { grid-template-columns: minmax(0, 1fr); }
+            .dashboard-target-picker > summary { min-height: 2.1rem; padding-block: 0.38rem; }
         }
 
         .station-empty-note {
@@ -8314,41 +8388,25 @@
                 areaRow.className = 'dashboard-area-row';
                 const itemAreaIds = Array.isArray(item.areaIds) ? item.areaIds : ['geral'];
                 const itemStationIds = Array.isArray(item.stationIds) ? item.stationIds : ['*'];
-                const areaId = itemAreaIds[0] || 'sem destino';
-                const badge = document.createElement('span');
-                badge.className = 'area-badge';
-                badge.style.setProperty('--badge-color', getAreaColor(areaId));
-                badge.textContent = getAreaLabel(areaId);
-
-                const areaSelect = document.createElement('select');
-                areaSelect.className = 'select-field';
-                areaSelect.multiple = true;
-                areaSelect.title = 'Setores autorizados (Ctrl para selecionar mais de um)';
-                areaSelect.style.margin = '0';
-                areaSelect.style.padding = '0.35rem 2rem 0.35rem 0.55rem';
-                areaSelect.style.width = 'auto';
-                areaSelect.style.fontSize = '0.64rem';
-                appendOption(areaSelect, '*', 'Todos os setores', '');
-                dashboardAreas.forEach(area => appendOption(areaSelect, area.id, area.name, ''));
-                setMultipleSelection(areaSelect, itemAreaIds);
-                areaSelect.addEventListener('change', event => {
-                    setDashboardTargets(index, selectedMultipleValues(event.currentTarget), itemStationIds);
+                const areaPicker = createDashboardTargetPicker({
+                    icon: 'fa-layer-group',
+                    globalLabel: 'Todos os setores',
+                    singularLabel: 'setor',
+                    pluralLabel: 'setores',
+                    selected: itemAreaIds,
+                    options: dashboardAreas.map(area => ({ value: area.id, label: area.name })),
+                    onChange: values => setDashboardTargets(index, values, itemStationIds)
                 });
-                const stationSelect = document.createElement('select');
-                stationSelect.className = 'select-field';
-                stationSelect.multiple = true;
-                stationSelect.title = 'TVs autorizadas (Ctrl para selecionar mais de uma)';
-                stationSelect.style.margin = '0';
-                stationSelect.style.padding = '0.35rem 2rem 0.35rem 0.55rem';
-                stationSelect.style.width = 'auto';
-                stationSelect.style.fontSize = '0.64rem';
-                appendOption(stationSelect, '*', 'Todas as TVs', '');
-                dashboardStations.forEach(station => appendOption(stationSelect, station.id, station.name, ''));
-                setMultipleSelection(stationSelect, itemStationIds);
-                stationSelect.addEventListener('change', event => {
-                    setDashboardTargets(index, itemAreaIds, selectedMultipleValues(event.currentTarget));
+                const stationPicker = createDashboardTargetPicker({
+                    icon: 'fa-tv',
+                    globalLabel: 'Todas as TVs',
+                    singularLabel: 'TV',
+                    pluralLabel: 'TVs',
+                    selected: itemStationIds,
+                    options: dashboardStations.map(station => ({ value: station.id, label: station.name })),
+                    onChange: values => setDashboardTargets(index, itemAreaIds, values)
                 });
-                areaRow.append(badge, areaSelect, stationSelect);
+                areaRow.append(areaPicker, stationPicker);
                 content.append(name, areaRow);
 
                 const actions = document.createElement('div');
@@ -8619,6 +8677,67 @@
         function selectedMultipleValues(select) {
             const values = Array.from(select?.selectedOptions || []).map(option => option.value);
             return values.includes('*') ? ['*'] : values;
+        }
+
+        function createDashboardTargetPicker({
+            icon,
+            globalLabel,
+            singularLabel,
+            pluralLabel,
+            selected,
+            options,
+            onChange
+        }) {
+            const details = document.createElement('details');
+            details.className = 'dashboard-target-picker';
+            let current = Array.isArray(selected) ? [...selected] : ['*'];
+            const summary = document.createElement('summary');
+            const summaryIcon = document.createElement('i');
+            summaryIcon.className = `fas ${icon}`;
+            const summaryText = document.createElement('span');
+            summary.append(summaryIcon, summaryText);
+            const menu = document.createElement('div');
+            menu.className = 'dashboard-target-menu';
+            const allOptions = [{ value: '*', label: globalLabel }, ...options];
+
+            const refreshSummary = () => {
+                summary.classList.toggle('dashboard-target-empty', current.length === 0);
+                if (current.includes('*')) summaryText.textContent = globalLabel;
+                else if (current.length === 0) summaryText.textContent = 'Sem destino';
+                else if (current.length === 1) {
+                    summaryText.textContent = allOptions.find(option => option.value === current[0])?.label || singularLabel;
+                } else summaryText.textContent = `${current.length} ${pluralLabel}`;
+            };
+
+            allOptions.forEach(option => {
+                const label = document.createElement('label');
+                label.className = 'dashboard-target-option';
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.value = option.value;
+                input.checked = current.includes(option.value);
+                const text = document.createElement('span');
+                text.textContent = option.label;
+                input.addEventListener('change', () => {
+                    if (input.checked && input.value === '*') {
+                        menu.querySelectorAll('input').forEach(candidate => {
+                            candidate.checked = candidate === input;
+                        });
+                    } else if (input.checked) {
+                        const globalInput = menu.querySelector('input[value="*"]');
+                        if (globalInput) globalInput.checked = false;
+                    }
+                    current = Array.from(menu.querySelectorAll('input:checked')).map(candidate => candidate.value);
+                    refreshSummary();
+                    onChange(current);
+                });
+                label.append(input, text);
+                menu.appendChild(label);
+            });
+
+            refreshSummary();
+            details.append(summary, menu);
+            return details;
         }
 
         function setMultipleSelection(select, values) {

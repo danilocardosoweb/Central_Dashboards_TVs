@@ -75,7 +75,9 @@ test('PPR usa imagens publicadas e mantém o desenho nativo como contingência',
 
 test('primeira instalação inicia sem abrir automaticamente a seleção de setor', () => {
   assert.match(scene, /if m\.stationChoices\.Count\(\) = 1/);
-  assert.match(scene, /m\.currentStation = invalid/);
+  assert.match(scene, /areaId: "__unbound__"/);
+  assert.match(scene, /kind: "unbound"/);
+  assert.match(scene, /station-binding-required[\s\S]*?buildPlaylist\(\)/);
   assert.match(scene, /station-binding-required/);
   assert.doesNotMatch(scene, /else\s+showStationSelector\(\)\s+end if\s+end sub/);
   assert.match(scene, /key = "options" or key = "OK" or key = "down"/);
@@ -122,7 +124,7 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V32/);
+  assert.match(scene, /Build: V34/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {
