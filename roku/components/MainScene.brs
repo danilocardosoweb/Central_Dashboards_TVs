@@ -164,7 +164,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 32, endpoint: m.endpoint })
+    logEvent("app-start", { build: 34, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -360,10 +360,17 @@ sub chooseOrRestoreStation()
         if m.stationChoices.Count() = 1
             activateStationChoice(0)
         else
-            m.currentStation = invalid
-            m.slides = []
-            m.stationLabel.text = "TV not linked - press OK to select"
+            ' Sem vinculo, manter apenas conteudos explicitamente globais.
+            ' Destinos por setor ou por TV continuam bloqueados.
+            m.currentStation = {
+                id: ""
+                name: "TV sem vinculo"
+                areaId: "__unbound__"
+                kind: "unbound"
+            }
+            m.stationLabel.text = "TV sem vinculo - pressione OK para selecionar"
             logEvent("station-binding-required", { stations: m.stationChoices.Count() })
+            buildPlaylist()
         end if
     end if
 end sub
@@ -436,6 +443,7 @@ end sub
 
 sub sendHeartbeat()
     if m.heartbeatBusy or m.currentStation = invalid then return
+    if valueOr(m.currentStation, "kind", "station") = "unbound" then return
 
     currentType = ""
     currentTitle = ""
@@ -456,7 +464,7 @@ sub sendHeartbeat()
         selectionKind: valueOr(m.currentStation, "kind", "station")
         installationId: m.installationId
         sessionId: m.sessionId
-        appVersion: "V_32"
+        appVersion: "V_34"
         currentIndex: currentIndex
         playlistCount: m.slides.Count()
         currentType: currentType
@@ -1929,7 +1937,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V32 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V34 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -1942,7 +1950,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 32
+        build: 34
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId
