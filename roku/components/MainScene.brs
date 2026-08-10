@@ -164,7 +164,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 31, endpoint: m.endpoint })
+    logEvent("app-start", { build: 32, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -357,13 +357,19 @@ sub chooseOrRestoreStation()
     else
         ' Na primeira instalação, inicia a programação padrão sem interromper
         ' a abertura. A seleção continua disponível pelo botão Opções/OK.
-        activateStationChoice(0)
+        if m.stationChoices.Count() = 1
+            activateStationChoice(0)
+        else
+            m.currentStation = invalid
+            m.slides = []
+            m.stationLabel.text = "TV not linked - press OK to select"
+            logEvent("station-binding-required", { stations: m.stationChoices.Count() })
+        end if
     end if
 end sub
 
 sub buildStationChoices()
     m.stationChoices = []
-    representedAreas = {}
 
     for each station in m.stations
         areaId = valueOr(station, "areaId", "geral")
@@ -373,21 +379,6 @@ sub buildStationChoices()
             areaId: areaId
             kind: "station"
         })
-        representedAreas[areaId] = true
-    end for
-
-    areas = arrayOrEmpty(valueOr(m.state, "areas", []))
-    for each area in areas
-        areaId = valueOr(area, "id", "")
-        if areaId <> "" and not representedAreas.DoesExist(areaId)
-            areaName = valueOr(area, "name", "Geral")
-            m.stationChoices.Push({
-                id: "area-" + areaId
-                name: "Setor " + areaName
-                areaId: areaId
-                kind: "area"
-            })
-        end if
     end for
 end sub
 
@@ -465,7 +456,7 @@ sub sendHeartbeat()
         selectionKind: valueOr(m.currentStation, "kind", "station")
         installationId: m.installationId
         sessionId: m.sessionId
-        appVersion: "V_31"
+        appVersion: "V_32"
         currentIndex: currentIndex
         playlistCount: m.slides.Count()
         currentType: currentType
@@ -526,7 +517,9 @@ sub buildPlaylist()
     pprSlides = []
 
     for each dashboard in urls
-        if isDashboardActive(dashboard) and belongsToArea(dashboard, areaId)
+        allowed = dashboardTargetsStation(dashboard, m.currentStation, areaId)
+        logContentDecision("dashboard", dashboard, allowed, areaId)
+        if isDashboardActive(dashboard) and allowed
             dashboardSlides.Push({
                 id: valueOr(dashboard, "id", "")
                 kind: "dashboard"
@@ -539,7 +532,9 @@ sub buildPlaylist()
     end for
 
     for each alert in alerts
-        if isAlertActive(alert) and alertTargetsStation(alert, m.currentStation, areaId)
+        allowed = alertTargetsStation(alert, m.currentStation, areaId)
+        logContentDecision("alert", alert, allowed, areaId)
+        if isAlertActive(alert) and allowed
             mode = LCase(valueOr(alert, "displayMode", "fullscreen"))
             if mode = "banner"
                 temporaryAlerts.Push(alert)
@@ -568,7 +563,9 @@ sub buildPlaylist()
     end for
 
     ppr = valueOr(m.state, "ppr", invalid)
-    if pprTargetsStation(ppr, m.currentStation, areaId)
+    pprAllowed = pprTargetsStation(ppr, m.currentStation, areaId)
+    logContentDecision("ppr", ppr, pprAllowed, areaId)
+    if pprAllowed
         pprSlides = buildPprSlides(ppr)
     end if
 
@@ -953,31 +950,54 @@ sub appendSlides(target as object, source as object)
     end for
 end sub
 
+function dashboardTargetsStation(dashboard as dynamic, station as dynamic, areaId as string) as boolean
+    if dashboard = invalid or station = invalid then return false
+    return targetListMatches(targetListOrLegacy(dashboard, "stationIds", ["*"]), valueOr(station, "id", "")) and targetAreaMatches(targetListOrLegacy(dashboard, "areaIds", ["geral"]), areaId)
+end function
+
 function pprTargetsStation(ppr as dynamic, station as dynamic, areaId as string) as boolean
-    if ppr = invalid or not valueOr(ppr, "enabled", false) then return false
-    stationIds = arrayOrEmpty(valueOr(ppr, "stationIds", ["*"]))
-    areaIds = arrayOrEmpty(valueOr(ppr, "areaIds", ["*"]))
-    stationId = valueOr(station, "id", "")
-    areaMatches = areaId = "__all__" or targetListMatches(areaIds, areaId)
-    return targetListMatches(stationIds, stationId) and areaMatches
+    if ppr = invalid or station = invalid or not valueOr(ppr, "enabled", false) then return false
+    return targetListMatches(targetListOrLegacy(ppr, "stationIds", ["*"]), valueOr(station, "id", "")) and targetAreaMatches(targetListOrLegacy(ppr, "areaIds", ["*"]), areaId)
 end function
 
 function alertTargetsStation(alert as dynamic, station as dynamic, areaId as string) as boolean
     if alert = invalid or station = invalid then return false
-    stationIds = arrayOrEmpty(valueOr(alert, "stationIds", ["*"]))
-    areaIds = arrayOrEmpty(valueOr(alert, "areaIds", ["*"]))
-    stationId = valueOr(station, "id", "")
-    areaMatches = areaId = "__all__" or targetListMatches(areaIds, areaId)
-    return targetListMatches(stationIds, stationId) and areaMatches
+    return targetListMatches(targetListOrLegacy(alert, "stationIds", ["*"]), valueOr(station, "id", "")) and targetAreaMatches(targetListOrLegacy(alert, "areaIds", ["*"]), areaId)
 end function
 
 function targetListMatches(values as object, currentValue as string) as boolean
-    if values.Count() = 0 then return true
+    if values = invalid or values.Count() = 0 then return false
     for each candidate in values
         if candidate = "*" or candidate = currentValue then return true
     end for
     return false
 end function
+
+function targetAreaMatches(areaIds as object, areaId as string) as boolean
+    if areaId = "__all__" then return targetListMatches(areaIds, "*")
+    return targetListMatches(areaIds, areaId)
+end function
+
+function targetListOrLegacy(item as dynamic, key as string, legacyDefault as object) as object
+    if item <> invalid and GetInterface(item, "ifAssociativeArray") <> invalid and item.DoesExist(key)
+        return arrayOrEmpty(item[key])
+    end if
+    return legacyDefault
+end function
+
+sub logContentDecision(kind as string, item as dynamic, allowed as boolean, areaId as string)
+    if item = invalid then return
+    logEvent("content-decision", {
+        contentKind: kind
+        contentId: valueOr(item, "id", "")
+        contentTitle: valueOr(item, "name", valueOr(item, "title", kind))
+        stationId: valueOr(m.currentStation, "id", "")
+        stationAreaId: areaId
+        allowedAreaIds: targetListOrLegacy(item, "areaIds", ["*"])
+        allowedStationIds: targetListOrLegacy(item, "stationIds", ["*"])
+        decision: allowed
+    })
+end sub
 
 function activePprIndicators(ppr as dynamic) as object
     result = []
@@ -1909,7 +1929,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V31 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V32 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -1922,7 +1942,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 31
+        build: 32
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId

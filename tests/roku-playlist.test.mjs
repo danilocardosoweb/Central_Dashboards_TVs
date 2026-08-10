@@ -24,7 +24,9 @@ test('Roku consulta a API de estado sem chave embutida', () => {
 
 test('playlist adiciona todos os dashboards compatíveis com a área', () => {
   assert.match(scene, /for each dashboard in urls/);
-  assert.match(scene, /isDashboardActive\(dashboard\) and belongsToArea\(dashboard, areaId\)/);
+  assert.match(scene, /allowed = dashboardTargetsStation\(dashboard, m\.currentStation, areaId\)/);
+  assert.match(scene, /if isDashboardActive\(dashboard\) and allowed/);
+  assert.match(scene, /function dashboardTargetsStation/);
   assert.match(scene, /dashboardSlides\.Push\(/);
   assert.match(scene, /appendSlides\(m\.slides, dashboardSlides\)/);
 });
@@ -46,9 +48,9 @@ test('combina dashboards, alertas e PPR sem substituicao', () => {
   assert.match(scene, /appendSlides\(m\.slides, dashboardSlides\)/);
   assert.match(scene, /appendSlides\(m\.slides, alertSlides\)/);
   assert.match(scene, /appendSlides\(m\.slides, pprSlides\)/);
-  assert.match(scene, /if pprTargetsStation\(ppr, m\.currentStation, areaId\)/);
+  assert.match(scene, /pprAllowed = pprTargetsStation\(ppr, m\.currentStation, areaId\)/);
   assert.match(scene, /if result\.Count\(\) = 0/);
-  assert.match(scene, /areaMatches = areaId = "__all__" or targetListMatches\(areaIds, areaId\)/);
+  assert.match(scene, /function targetAreaMatches/);
 });
 
 test('alertas temporarios usam fila independente do carrossel', () => {
@@ -72,8 +74,9 @@ test('PPR usa imagens publicadas e mantém o desenho nativo como contingência',
 });
 
 test('primeira instalação inicia sem abrir automaticamente a seleção de setor', () => {
-  assert.match(scene, /Na primeira instalação, inicia a programação padrão/);
-  assert.match(scene, /else\s+' Na primeira instalação[\s\S]*?activateStationChoice\(0\)/);
+  assert.match(scene, /if m\.stationChoices\.Count\(\) = 1/);
+  assert.match(scene, /m\.currentStation = invalid/);
+  assert.match(scene, /station-binding-required/);
   assert.doesNotMatch(scene, /else\s+showStationSelector\(\)\s+end if\s+end sub/);
   assert.match(scene, /key = "options" or key = "OK" or key = "down"/);
 });
@@ -119,7 +122,7 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V31/);
+  assert.match(scene, /Build: V32/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {
