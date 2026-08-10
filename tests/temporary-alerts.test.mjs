@@ -47,8 +47,8 @@ test('destino aceita todas as TVs, setor ou TV especifica', () => {
   assert.match(central, /value="area"/);
   assert.match(central, /value="station"/);
   assert.match(scene, /function alertTargetsStation/);
-  assert.match(scene, /targetListMatches\(stationIds, stationId\)/);
-  assert.match(scene, /targetListMatches\(areaIds, areaId\)/);
+  assert.match(scene, /targetListMatches\(targetListOrLegacy\(alert, "stationIds", \["\*"\]\)/);
+  assert.match(scene, /targetAreaMatches\(targetListOrLegacy\(alert, "areaIds", \["\*"\]\), areaId\)/);
 });
 
 test('Central oferece ciclo completo e historico de alertas', () => {

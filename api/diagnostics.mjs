@@ -9,20 +9,26 @@ import {
   traceIdFromRequest
 } from '../renderer/telemetry.mjs';
 
-function belongsToArea(item, areaId) {
-  if (areaId === '__all__') return true;
-  const areaIds = Array.isArray(item?.areaIds) ? item.areaIds : [];
-  if (!areaIds.length) return areaId === 'geral';
-  return areaIds.includes('*') || areaIds.includes(areaId);
+function targets(item, key, legacyDefault) {
+  if (!item || !Object.prototype.hasOwnProperty.call(item, key)) return legacyDefault;
+  return Array.isArray(item[key]) ? item[key].map(String).filter(Boolean) : [];
+}
+
+function listMatches(values, value) {
+  return values.length > 0 && (values.includes('*') || values.includes(String(value || '')));
+}
+
+export function contentTargetsStation(item, station, dashboard = false) {
+  const areaId = String(station?.areaId || 'geral');
+  const areaIds = targets(item, 'areaIds', dashboard ? ['geral'] : ['*']);
+  const stationIds = targets(item, 'stationIds', ['*']);
+  const areaMatches = areaId === '__all__' ? areaIds.includes('*') : listMatches(areaIds, areaId);
+  return areaMatches && listMatches(stationIds, station?.id);
 }
 
 function pprSlideCount(ppr, station, areaId) {
   if (!ppr?.enabled) return 0;
-  const stationIds = Array.isArray(ppr.stationIds) ? ppr.stationIds : ['*'];
-  const areaIds = Array.isArray(ppr.areaIds) ? ppr.areaIds : ['*'];
-  const stationMatch = !stationIds.length || stationIds.includes('*') || stationIds.includes(station?.id);
-  const areaMatch = areaId === '__all__' || !areaIds.length || areaIds.includes('*') || areaIds.includes(areaId);
-  if (!stationMatch || !areaMatch) return 0;
+  if (!contentTargetsStation(ppr, station)) return 0;
   const rendered = (Array.isArray(ppr.renderedSlides) ? ppr.renderedSlides : [])
     .filter(item => String(item?.imageUrl || '').startsWith('https://'));
   if (rendered.length) return rendered.length;
@@ -80,10 +86,12 @@ export function buildDiagnostics(row, source = 'storage') {
 
   const playlists = stations.map(station => {
     const areaId = station?.areaId || 'geral';
-    const dashboardCount = dashboards.filter(item => item?.enabled !== false && belongsToArea(item, areaId)).length;
-    const alertCount = alerts.filter(item => item?.enabled !== false && belongsToArea(item, areaId))
+    const dashboardItems = dashboards.filter(item => item?.enabled !== false && contentTargetsStation(item, station, true));
+    const eligibleAlerts = alerts.filter(item => item?.enabled !== false && contentTargetsStation(item, station));
+    const dashboardCount = dashboardItems.length;
+    const alertCount = eligibleAlerts
       .filter(item => String(item?.displayMode || 'fullscreen').toLowerCase() !== 'banner').length;
-    const temporaryAlertCount = alerts.filter(item => item?.enabled !== false && belongsToArea(item, areaId))
+    const temporaryAlertCount = eligibleAlerts
       .filter(item => String(item?.displayMode || 'fullscreen').toLowerCase() === 'banner').length;
     const pprCount = pprSlideCount(payload.ppr, station, areaId);
     return {
@@ -94,7 +102,12 @@ export function buildDiagnostics(row, source = 'storage') {
       ppr: pprCount,
       alerts: alertCount,
       temporaryAlerts: temporaryAlertCount,
-      totalSlides: dashboardCount + pprCount + alertCount
+      totalSlides: dashboardCount + pprCount + alertCount,
+      authorization: {
+        dashboards: dashboardItems.map(item => ({ id: item.id || '', title: item.name || 'Dashboard', decision: 'allowed' })),
+        blockedDashboards: dashboards.filter(item => item?.enabled !== false && !contentTargetsStation(item, station, true))
+          .map(item => ({ id: item.id || '', title: item.name || 'Dashboard', decision: 'blocked', areaIds: targets(item, 'areaIds', ['geral']), stationIds: targets(item, 'stationIds', ['*']) }))
+      }
     };
   });
 

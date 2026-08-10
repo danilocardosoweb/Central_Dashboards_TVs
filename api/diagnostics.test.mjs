@@ -37,9 +37,22 @@ test('diagnostics counts dynamic dashboards, PPR and alerts per station', () => 
   };
   const result = buildDiagnostics(row);
   assert.equal(result.ok, true);
-  assert.deepEqual(result.playlists[0], {
+  const { authorization, ...playlist } = result.playlists[0];
+  assert.deepEqual(playlist, {
     stationId: 'tv1', stationName: 'TV 1', areaId: 'geral', dashboards: 8, ppr: 2, alerts: 1, temporaryAlerts: 1, totalSlides: 11
   });
+  assert.equal(authorization.dashboards.length, 8);
+});
+
+test('diagnostics blocks specific sector content from another station', () => {
+  const result = buildDiagnostics({
+    payload: {
+      stations: [{ id: 'usinagem', name: 'TV Usinagem', areaId: 'usinagem' }],
+      urls: [{ id: 'comercial', name: 'Comercial', areaIds: ['comercial'], stationIds: ['*'], enabled: true, rokuImageUrl: 'https://cdn.test/a.png' }]
+    }
+  });
+  assert.equal(result.playlists[0].dashboards, 0);
+  assert.equal(result.playlists[0].authorization.blockedDashboards[0].id, 'comercial');
 });
 
 test('diagnostics detects PPR images from an older Central revision', () => {

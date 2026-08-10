@@ -4648,6 +4648,7 @@
                     combined: combinedUrl,
                     rokuImageUrl,
                     areaIds: [document.getElementById('dashboardAreaId').value || 'geral'],
+                    stationIds: ['*'],
                     order: urls.length + 1
                 });
                 
@@ -7560,6 +7561,15 @@
                     migrated.areaIds = ['geral'];
                     urlsChanged = true;
                 }
+                // Dashboards antigos não tinham destino por TV. Mantemos a
+                // compatibilidade como global somente quando o campo não existe.
+                if (!Object.prototype.hasOwnProperty.call(migrated, 'stationIds')) {
+                    migrated.stationIds = ['*'];
+                    urlsChanged = true;
+                } else if (!Array.isArray(migrated.stationIds)) {
+                    migrated.stationIds = [];
+                    urlsChanged = true;
+                }
                 return migrated;
             });
 
@@ -7614,24 +7624,42 @@
             return area ? area.color : '#3b82f6';
         }
 
-        function dashboardBelongsToArea(item, areaId) {
-            const areaIds = Array.isArray(item.areaIds) && item.areaIds.length
-                ? item.areaIds
-                : ['geral'];
-            return areaId === '__all__' || areaIds.includes('*') || areaIds.includes(areaId);
+        function hasOwnTarget(item, key) {
+            return Boolean(item && Object.prototype.hasOwnProperty.call(item, key));
         }
 
-        function alertBelongsToArea(alert, areaId) {
-            const areaIds = Array.isArray(alert.areaIds) && alert.areaIds.length
-                ? alert.areaIds
-                : ['*'];
-            const stationIds = Array.isArray(alert.stationIds) && alert.stationIds.length
-                ? alert.stationIds
-                : ['*'];
-            const stationId = getCurrentStation()?.id || '';
-            const areaMatches = areaId === '__all__' || areaIds.includes('*') || areaIds.includes(areaId);
-            const stationMatches = stationIds.includes('*') || stationIds.includes(stationId);
-            return areaMatches && stationMatches;
+        // Ausência do campo é compatibilidade com conteúdos antigos (global).
+        // Um campo presente e vazio significa "sem destino": não pode vazar para TVs.
+        function normalizedTargetList(item, key, legacyDefault = ['*']) {
+            if (!hasOwnTarget(item, key)) return [...legacyDefault];
+            return Array.isArray(item[key]) ? item[key].map(String).filter(Boolean) : [];
+        }
+
+        function targetListMatches(values, currentValue) {
+            return Array.isArray(values) && values.length > 0 &&
+                (values.includes('*') || values.includes(String(currentValue || '')));
+        }
+
+        function contentTargetsCurrentStation(item, kind = 'content') {
+            const station = getCurrentStation();
+            if (!station) return false;
+            const areaId = station.areaId || 'geral';
+            const areaIds = normalizedTargetList(item, 'areaIds', kind === 'dashboard' ? ['geral'] : ['*']);
+            const stationIds = normalizedTargetList(item, 'stationIds', ['*']);
+            // "Programação completa" não é uma autorização implícita. Só itens
+            // marcados globalmente são permitidos neste perfil legado.
+            const areaMatches = areaId === '__all__'
+                ? areaIds.includes('*')
+                : targetListMatches(areaIds, areaId);
+            return areaMatches && targetListMatches(stationIds, station.id);
+        }
+
+        function dashboardBelongsToArea(item) {
+            return contentTargetsCurrentStation(item, 'dashboard');
+        }
+
+        function alertBelongsToArea(alert) {
+            return contentTargetsCurrentStation(alert, 'alert');
         }
 
         async function endAlert(id) {
@@ -8057,7 +8085,6 @@
         function applyStationFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const stationReference = params.get('station');
-            const areaReference = params.get('area');
 
             if (stationReference) {
                 const station = dashboardStations.find(item =>
@@ -8067,17 +8094,8 @@
                 if (station) selectedStationId = station.id;
             }
 
-            if (areaReference) {
-                const matchedArea = dashboardAreas.find(area =>
-                    area.id === areaReference ||
-                    normalizeAreaId(area.name) === normalizeAreaId(areaReference)
-                );
-                if (matchedArea) getCurrentStation().areaId = matchedArea.id;
-                if (areaReference === '__all__' || areaReference === 'todas') {
-                    getCurrentStation().areaId = '__all__';
-                }
-            }
-
+            // O endereço identifica uma estação, nunca altera o setor dela.
+            // Isso evita que um link compartilhado transforme outra TV em Comercial.
             persistAreaSystem();
         }
 
@@ -8127,11 +8145,26 @@
             ensureAreaSystem();
             if (!urls[index]) return;
             urls[index].areaIds = [areaId || 'geral'];
+            if (!Array.isArray(urls[index].stationIds)) urls[index].stationIds = ['*'];
             localStorage.setItem('dashboardUrls', JSON.stringify(urls));
             updateUrlList();
             renderAreaList();
             createSlides();
             showToast(`Dashboard direcionado para ${getAreaLabel(areaId)}`, 'success');
+        }
+
+        function setDashboardTargets(index, areaIds, stationIds) {
+            ensureAreaSystem();
+            if (!urls[index]) return;
+            urls[index].areaIds = Array.isArray(areaIds) && areaIds.length ? areaIds : [];
+            urls[index].stationIds = Array.isArray(stationIds) && stationIds.length ? stationIds : [];
+            localStorage.setItem('dashboardUrls', JSON.stringify(urls));
+            if (typeof window.scheduleCloudSectionSave === 'function') {
+                window.scheduleCloudSectionSave('urls', 100);
+            }
+            updateUrlList();
+            createSlides();
+            showToast('Destinos do dashboard atualizados', 'success');
         }
 
         function deleteUrl(index) {
@@ -8279,9 +8312,9 @@
 
                 const areaRow = document.createElement('div');
                 areaRow.className = 'dashboard-area-row';
-                const areaId = Array.isArray(item.areaIds) && item.areaIds.length
-                    ? item.areaIds[0]
-                    : 'geral';
+                const itemAreaIds = Array.isArray(item.areaIds) ? item.areaIds : ['geral'];
+                const itemStationIds = Array.isArray(item.stationIds) ? item.stationIds : ['*'];
+                const areaId = itemAreaIds[0] || 'sem destino';
                 const badge = document.createElement('span');
                 badge.className = 'area-badge';
                 badge.style.setProperty('--badge-color', getAreaColor(areaId));
@@ -8289,15 +8322,33 @@
 
                 const areaSelect = document.createElement('select');
                 areaSelect.className = 'select-field';
+                areaSelect.multiple = true;
+                areaSelect.title = 'Setores autorizados (Ctrl para selecionar mais de um)';
                 areaSelect.style.margin = '0';
                 areaSelect.style.padding = '0.35rem 2rem 0.35rem 0.55rem';
                 areaSelect.style.width = 'auto';
                 areaSelect.style.fontSize = '0.64rem';
-                populateAreaSelect(areaSelect, areaId, 'content');
+                appendOption(areaSelect, '*', 'Todos os setores', '');
+                dashboardAreas.forEach(area => appendOption(areaSelect, area.id, area.name, ''));
+                setMultipleSelection(areaSelect, itemAreaIds);
                 areaSelect.addEventListener('change', event => {
-                    setDashboardArea(index, event.target.value);
+                    setDashboardTargets(index, selectedMultipleValues(event.currentTarget), itemStationIds);
                 });
-                areaRow.append(badge, areaSelect);
+                const stationSelect = document.createElement('select');
+                stationSelect.className = 'select-field';
+                stationSelect.multiple = true;
+                stationSelect.title = 'TVs autorizadas (Ctrl para selecionar mais de uma)';
+                stationSelect.style.margin = '0';
+                stationSelect.style.padding = '0.35rem 2rem 0.35rem 0.55rem';
+                stationSelect.style.width = 'auto';
+                stationSelect.style.fontSize = '0.64rem';
+                appendOption(stationSelect, '*', 'Todas as TVs', '');
+                dashboardStations.forEach(station => appendOption(stationSelect, station.id, station.name, ''));
+                setMultipleSelection(stationSelect, itemStationIds);
+                stationSelect.addEventListener('change', event => {
+                    setDashboardTargets(index, itemAreaIds, selectedMultipleValues(event.currentTarget));
+                });
+                areaRow.append(badge, areaSelect, stationSelect);
                 content.append(name, areaRow);
 
                 const actions = document.createElement('div');
@@ -8453,8 +8504,12 @@
                     : 'after-dashboards',
                 showSummary: source.showSummary !== false,
                 showIndicators: source.showIndicators !== false,
-                areaIds: Array.isArray(source.areaIds) && source.areaIds.length ? source.areaIds : ['*'],
-                stationIds: Array.isArray(source.stationIds) && source.stationIds.length ? source.stationIds : ['*'],
+                areaIds: hasOwnTarget(source, 'areaIds')
+                    ? (Array.isArray(source.areaIds) ? source.areaIds : [])
+                    : ['*'],
+                stationIds: hasOwnTarget(source, 'stationIds')
+                    ? (Array.isArray(source.stationIds) ? source.stationIds : [])
+                    : ['*'],
                 indicators,
                 rules: Array.isArray(source.rules) && source.rules.length ? source.rules : fallback.rules,
                 audit: Array.isArray(source.audit) ? source.audit.slice(0, 100) : []
@@ -8563,11 +8618,11 @@
 
         function selectedMultipleValues(select) {
             const values = Array.from(select?.selectedOptions || []).map(option => option.value);
-            return values.includes('*') || values.length === 0 ? ['*'] : values;
+            return values.includes('*') ? ['*'] : values;
         }
 
         function setMultipleSelection(select, values) {
-            const selected = Array.isArray(values) && values.length ? values : ['*'];
+            const selected = Array.isArray(values) ? values : ['*'];
             Array.from(select?.options || []).forEach(option => {
                 option.selected = selected.includes(option.value);
             });
@@ -9281,7 +9336,7 @@
         function getVisibleDashboards() {
             ensureAreaSystem();
             const areaId = getCurrentAreaId();
-            return urls.filter(item => dashboardBelongsToArea(item, areaId));
+            return urls.filter(item => dashboardBelongsToArea(item));
         }
 
         function getActiveAlerts() {
@@ -9290,7 +9345,7 @@
             const areaId = getCurrentAreaId();
             return alerts
                 .filter(alert => getAlertStatus(alert, now).key === 'active')
-                .filter(alert => alertBelongsToArea(alert, areaId))
+                .filter(alert => alertBelongsToArea(alert))
                 .sort(compareAlertsForPlayback);
         }
 
