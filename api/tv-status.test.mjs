@@ -6,11 +6,13 @@ import { classifyPresence, normalizeHeartbeat, resolveHeartbeatStation } from '.
 test('normaliza heartbeat sem aceitar campos arbitrários', () => {
   const heartbeat = normalizeHeartbeat({
     stationId: 'station-prensas', stationName: 'TV Prensas', playlistCount: '8',
-    currentIndex: 3, currentTitle: 'Produção', secret: 'não deve sair'
+    currentIndex: 3, currentTitle: 'Produção', previousExitReason: 'EXIT_IDLE_AUTO_EXIT',
+    secret: 'não deve sair'
   }, new Date('2026-08-05T12:00:00Z'));
   assert.equal(heartbeat.stationId, 'station-prensas');
   assert.equal(heartbeat.playlistCount, 8);
   assert.equal(heartbeat.currentIndex, 3);
+  assert.equal(heartbeat.previousExitReason, 'EXIT_IDLE_AUTO_EXIT');
   assert.equal(heartbeat.receivedAt, '2026-08-05T12:00:00.000Z');
   assert.equal('secret' in heartbeat, false);
 });

@@ -1,0 +1,37 @@
+﻿{
+    "refreshSeconds":  15,
+    "autoRecovery":  true,
+    "recoveryCooldownSeconds":  60,
+    "maxRecoveryAttempts":  3,
+    "ui":  {
+               "minimal":  false
+           },
+    "expectedTitles":  [
+                           "Central Dashboards TVs",
+                           "Central de Dashboards",
+                           "Dashboard Player"
+                       ],
+    "expectedAppIds":  [
+                           "dev"
+                       ],
+    "stations":  [
+                     {
+                         "name":  "TV Sala de reuniao",
+                         "sector":  "Comercial",
+                         "ip":  "192.168.0.195",
+                         "autoRecovery":  false
+                     },
+                     {
+                         "name":  "TV Prensas",
+                         "sector":  "Producao",
+                         "ip":  "192.168.0.199",
+                         "autoRecovery":  true
+                     },
+                     {
+                         "name":  "TV Usinagem",
+                         "sector":  "Usinagem",
+                         "ip":  "192.168.0.148",
+                         "autoRecovery":  true
+                     }
+                 ]
+}

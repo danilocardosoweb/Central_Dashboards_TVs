@@ -1,6 +1,9 @@
 sub init()
     m.endpoint = "https://central-dashboards-t-vs.vercel.app/api/state"
     m.heartbeatEndpoint = "https://central-dashboards-t-vs.vercel.app/api/tv-status"
+    appInfo = CreateObject("roAppInfo")
+    m.appVersion = "V_" + appInfo.GetValue("build_version")
+    m.top.backExitsScene = false
 
     m.canvas = m.top.FindNode("canvas")
     m.contentGroup = m.top.FindNode("contentGroup")
@@ -80,9 +83,12 @@ sub init()
     m.imageLoadTimer = m.top.FindNode("imageLoadTimer")
     m.introGroup = m.top.FindNode("introGroup")
     m.introVideo = m.top.FindNode("introVideo")
+    m.idleGuardVideo = m.top.FindNode("idleGuardVideo")
+    m.idleGuardAudio = m.top.FindNode("idleGuardAudio")
     m.introFallbackTimer = m.top.FindNode("introFallbackTimer")
     m.fetchWatchdogTimer = m.top.FindNode("fetchWatchdogTimer")
     m.playbackWatchdogTimer = m.top.FindNode("playbackWatchdogTimer")
+    m.idleGuardRestartTimer = m.top.FindNode("idleGuardRestartTimer")
     m.temporaryAlertTimer = m.top.FindNode("temporaryAlertTimer")
     m.temporaryAlertGapTimer = m.top.FindNode("temporaryAlertGapTimer")
     m.diagnosticsOverlay = m.top.FindNode("diagnosticsOverlay")
@@ -113,8 +119,10 @@ sub init()
     m.introVideo.ObserveField("state", "onIntroVideoState")
     m.introVideo.ObserveField("position", "onIntroVideoPosition")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
+    m.idleGuardAudio.ObserveField("state", "onIdleGuardState")
     m.fetchWatchdogTimer.ObserveField("fire", "onFetchWatchdogTimer")
     m.playbackWatchdogTimer.ObserveField("fire", "onPlaybackWatchdogTimer")
+    m.idleGuardRestartTimer.ObserveField("fire", "onIdleGuardRestartTimer")
     m.temporaryAlertTimer.ObserveField("fire", "onTemporaryAlertTimer")
     m.temporaryAlertGapTimer.ObserveField("fire", "onTemporaryAlertGapTimer")
     m.dashboardImageA.ObserveField("loadStatus", "onImageALoadStatus")
@@ -145,12 +153,17 @@ sub init()
     m.pendingImageAttempts = 0
     m.introPlaying = false
     m.introRemoved = false
+    m.idleGuardStarted = false
+    m.idleGuardHealthChecks = 0
     m.preservePlaybackOnBuild = false
     m.sessionId = currentClock().Replace(":", "")
     m.lastTraceId = ""
     m.lastError = ""
     m.stateSource = "network"
     m.heartbeatBusy = false
+    m.fetchTask = invalid
+    m.heartbeatTask = invalid
+    m.alertEventTask = invalid
     m.recoveryCount = 0
     m.lastSlideStartedAt = 0
     m.sessionUptime = CreateObject("roTimespan")
@@ -163,8 +176,13 @@ sub init()
     end if
 
     applyResolutionScale()
+    configureIdleProtection()
     startIntroVideo()
-    logEvent("app-start", { build: 34, endpoint: m.endpoint })
+    logEvent("app-start", {
+        endpoint: m.endpoint
+        previousExitReason: m.top.previousExitReason
+        backExitsScene: m.top.backExitsScene
+    })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -217,6 +235,8 @@ sub finishIntroVideo()
         m.introRemoved = true
     end if
 
+    startIdleGuard()
+
     if m.stationOverlay.visible
         m.stationList.SetFocus(true)
     else
@@ -226,6 +246,76 @@ sub finishIntroVideo()
     if m.activeTemporaryAlert = invalid and m.temporaryAlertQueue <> invalid and m.temporaryAlertQueue.Count() > 0
         showNextTemporaryAlert()
     end if
+end sub
+
+sub startIdleGuard()
+    if m.idleGuardAudio = invalid then return
+
+    content = CreateObject("roSGNode", "ContentNode")
+    content.url = "pkg:/audio/idle-guard.wav"
+    content.streamFormat = "wav"
+    m.idleGuardAudio.content = content
+    m.idleGuardAudio.loop = true
+    m.idleGuardAudio.mute = false
+    m.idleGuardStarted = true
+    m.idleGuardAudio.control = "play"
+    logEvent("idle-guard-start", {
+        source: "local-near-silent-audio"
+        screenSaverBlocked: m.idleGuardVideo <> invalid
+    })
+end sub
+
+sub configureIdleProtection()
+    if m.idleGuardVideo = invalid
+        logEvent("idle-protection-error", { reason: "video-node-missing" })
+        return
+    end if
+    m.idleGuardVideo.enableUI = false
+    m.idleGuardVideo.disableScreenSaver = true
+    m.idleGuardVideo.enableScreenSaverWhilePlaying = false
+    logEvent("idle-protection-ready", {
+        disableScreenSaver: m.idleGuardVideo.disableScreenSaver
+    })
+end sub
+
+sub ensureIdleGuard()
+    if m.introPlaying or m.idleGuardAudio = invalid then return
+    state = m.idleGuardAudio.state
+    m.idleGuardHealthChecks = m.idleGuardHealthChecks + 1
+    if m.idleGuardHealthChecks >= 20
+        m.idleGuardHealthChecks = 0
+        logEvent("idle-guard-health", {
+            audioState: state
+            screenSaverBlocked: m.idleGuardVideo <> invalid and m.idleGuardVideo.disableScreenSaver
+            uptimeSeconds: Int(m.sessionUptime.TotalSeconds())
+        })
+    end if
+    if state <> "playing" and state <> "buffering"
+        logEvent("idle-guard-recover", { state: state })
+        startIdleGuard()
+    end if
+end sub
+
+sub onIdleGuardState()
+    if m.idleGuardAudio = invalid then return
+    state = m.idleGuardAudio.state
+    if state = "playing" or state = "buffering"
+        logEvent("idle-guard-state", { state: state })
+        return
+    end if
+
+    if m.idleGuardStarted and not m.introPlaying
+        logEvent("idle-guard-state", {
+            state: state
+            errorCode: m.idleGuardAudio.errorCode
+            error: m.idleGuardAudio.errorMsg
+        })
+        m.idleGuardRestartTimer.control = "start"
+    end if
+end sub
+
+sub onIdleGuardRestartTimer()
+    ensureIdleGuard()
 end sub
 
 sub applyResolutionScale()
@@ -238,6 +328,18 @@ sub applyResolutionScale()
         if resolution.DoesExist("height") then height = resolution.height
     end if
     m.canvas.scale = [width / 1920.0, height / 1080.0]
+    ' Uma textura RGBA usa largura x altura x 4 bytes. Em aparelhos HD,
+    ' decodificar os PNGs em 1280x720 reduz cada poster de ~8,3 MB para
+    ' ~3,7 MB sem perda visual na saida do dispositivo.
+    m.dashboardImageA.loadWidth = width
+    m.dashboardImageA.loadHeight = height
+    m.dashboardImageB.loadWidth = width
+    m.dashboardImageB.loadHeight = height
+    logEvent("display-profile", {
+        width: width
+        height: height
+        estimatedPosterBytes: width * height * 4
+    })
 end sub
 
 sub fetchCentralState()
@@ -255,13 +357,18 @@ sub fetchCentralState()
 end sub
 
 sub onFetchResult()
+    if m.fetchTask = invalid then return
     row = m.fetchTask.result
+    traceId = m.fetchTask.traceId
+    fromCache = m.fetchTask.fromCache
+    warning = m.fetchTask.warning
+    statusCode = m.fetchTask.statusCode
     m.fetching = false
     m.fetchWatchdogTimer.control = "stop"
-    m.lastTraceId = m.fetchTask.traceId
-    if m.fetchTask.fromCache
+    m.lastTraceId = traceId
+    if fromCache
         m.stateSource = "cache"
-        m.lastError = m.fetchTask.warning
+        m.lastError = warning
     else
         m.stateSource = "network"
         m.lastError = ""
@@ -278,20 +385,32 @@ sub onFetchResult()
         updatedAt: updatedAt
         traceId: m.lastTraceId
         source: m.stateSource
-        statusCode: m.fetchTask.statusCode
+        statusCode: statusCode
     })
-
-    if revision = m.lastRevision and updatedAt = m.lastUpdatedAt and m.state <> invalid
-        return
-    end if
+    releaseFetchTask()
 
     payload = valueOr(row, "payload", invalid)
     if payload = invalid
         showError("A configuração central está vazia.")
         return
     end if
-
+    ' A revisão é uma otimização do endpoint, não a fonte da verdade. Em
+    ' algumas versões do Storage o payload pode mudar antes dos metadados;
+    ' compare também o conteúdo para não manter a TV presa à configuração
+    ' anterior (especialmente duração, PPR e alertas).
     playbackSignature = statePlaybackSignature(payload)
+    metadataUnchanged = revision = m.lastRevision and updatedAt = m.lastUpdatedAt
+
+    if metadataUnchanged and m.state <> invalid and playbackSignature = m.lastPlaybackSignature
+        return
+    else if metadataUnchanged and m.state <> invalid and playbackSignature <> m.lastPlaybackSignature
+        logEvent("state-payload-changed-without-metadata", {
+            revision: revision
+            updatedAt: updatedAt
+            previousSignature: m.lastPlaybackSignature
+            nextSignature: playbackSignature
+        })
+    end if
     playbackChanged = playbackSignature <> m.lastPlaybackSignature
     m.preservePlaybackOnBuild = m.state <> invalid
     m.lastRevision = revision
@@ -308,11 +427,15 @@ sub onFetchResult()
 end sub
 
 sub onFetchError()
+    if m.fetchTask = invalid then return
     errorMessage = m.fetchTask.error
+    traceId = m.fetchTask.traceId
+    statusCode = m.fetchTask.statusCode
     m.fetching = false
     m.fetchWatchdogTimer.control = "stop"
     m.lastError = errorMessage
-    logEvent("fetch-error", { error: errorMessage, traceId: m.fetchTask.traceId, statusCode: m.fetchTask.statusCode })
+    logEvent("fetch-error", { error: errorMessage, traceId: traceId, statusCode: statusCode })
+    releaseFetchTask()
     if errorMessage = "" then errorMessage = "Não foi possível consultar a Central."
     m.syncLabel.text = "Sem sincronização • nova tentativa em 60s"
     m.loading.control = "stop"
@@ -323,19 +446,40 @@ sub onFetchError()
     end if
 end sub
 
+sub releaseFetchTask()
+    if m.fetchTask = invalid then return
+    m.fetchTask.UnobserveField("result")
+    m.fetchTask.UnobserveField("error")
+    m.fetchTask.control = "stop"
+    m.fetchTask = invalid
+end sub
+
 sub configureDefaultDuration(payload as object)
     settings = valueOr(payload, "settings", invalid)
     if settings = invalid then return
     transitionTime = valueOr(settings, "transitionTime", 30000)
-    seconds = Int(transitionTime / 1000)
+    transitionTimeValue = Val(transitionTime.ToStr())
+    if transitionTimeValue <= 0 then transitionTimeValue = 30000
+    ' A Central grava milissegundos. Aceite também segundos para manter
+    ' compatibilidade com estados antigos/exportados que usavam 5 em vez de
+    ' 5000, sem deixar a TV cair no valor padrão de 30 segundos.
+    if transitionTimeValue < 1000 then transitionTimeValue = transitionTimeValue * 1000
+    seconds = Int(transitionTimeValue / 1000)
     if seconds < 5 then seconds = 5
+    if seconds > 3600 then seconds = 3600
     m.defaultDuration = seconds
 
     m.transitionEffect = LCase(valueOr(settings, "transitionEffect", "fade"))
-    transitionDurationMs = valueOr(settings, "transitionDuration", 1400)
+    transitionDurationMs = Val(valueOr(settings, "transitionDuration", 1400).ToStr())
+    if transitionDurationMs <= 0 then transitionDurationMs = 1400
     m.transitionDuration = transitionDurationMs / 1000.0
     if m.transitionDuration < 0.3 then m.transitionDuration = 0.3
     if m.transitionDuration > 4.0 then m.transitionDuration = 4.0
+    logEvent("playback-settings", {
+        transitionTimeMs: transitionTimeValue
+        displaySeconds: m.defaultDuration
+        transitionDurationMs: transitionDurationMs
+    })
 end sub
 
 sub chooseOrRestoreStation()
@@ -464,7 +608,8 @@ sub sendHeartbeat()
         selectionKind: valueOr(m.currentStation, "kind", "station")
         installationId: m.installationId
         sessionId: m.sessionId
-        appVersion: "V_34"
+        appVersion: m.appVersion
+        previousExitReason: m.top.previousExitReason
         currentIndex: currentIndex
         playlistCount: m.slides.Count()
         currentType: currentType
@@ -485,6 +630,7 @@ sub sendHeartbeat()
 end sub
 
 sub onHeartbeatResult()
+    if m.heartbeatTask = invalid then return
     m.heartbeatBusy = false
     m.lastHeartbeatError = ""
     logEvent("heartbeat-ok", {
@@ -492,16 +638,28 @@ sub onHeartbeatResult()
         currentIndex: m.slideIndex + 1
         total: m.slides.Count()
     })
+    releaseHeartbeatTask()
 end sub
 
 sub onHeartbeatError()
+    if m.heartbeatTask = invalid then return
     m.heartbeatBusy = false
     heartbeatError = m.heartbeatTask.error
+    heartbeatStatusCode = m.heartbeatTask.statusCode
     if heartbeatError <> ""
         m.lastHeartbeatError = heartbeatError
         m.lastError = heartbeatError
-        logEvent("heartbeat-error", { error: heartbeatError, statusCode: m.heartbeatTask.statusCode })
+        logEvent("heartbeat-error", { error: heartbeatError, statusCode: heartbeatStatusCode })
     end if
+    releaseHeartbeatTask()
+end sub
+
+sub releaseHeartbeatTask()
+    if m.heartbeatTask = invalid then return
+    m.heartbeatTask.UnobserveField("result")
+    m.heartbeatTask.UnobserveField("error")
+    m.heartbeatTask.control = "stop"
+    m.heartbeatTask = invalid
 end sub
 
 sub buildPlaylist()
@@ -743,6 +901,7 @@ sub onFetchWatchdogTimer()
     m.fetching = false
     m.lastError = "A consulta da Central excedeu 20 segundos."
     logEvent("fetch-watchdog", { error: m.lastError })
+    releaseFetchTask()
     if m.state = invalid then showError(m.lastError)
 end sub
 
@@ -750,6 +909,7 @@ end sub
 ' Não depende de internet e não fecha o canal: avança apenas para a próxima tela
 ' quando a tela atual já excedeu o próprio tempo de exibição com margem segura.
 sub onPlaybackWatchdogTimer()
+    if not m.introPlaying then ensureIdleGuard()
     if m.paused or m.introPlaying or m.stationOverlay.visible then return
     if m.activeTemporaryAlert <> invalid then return
     if m.slides.Count() = 0 then return
@@ -945,10 +1105,16 @@ end sub
 
 sub startSlideTimer(slide as dynamic)
     if slide = invalid then return
-    duration = valueOr(slide, "duration", m.defaultDuration)
+    duration = Val(valueOr(slide, "duration", m.defaultDuration).ToStr())
+    if duration <= 0 then duration = m.defaultDuration
     if duration < 5 then duration = 5
     m.lastSlideStartedAt = m.sessionUptime.TotalSeconds()
     m.slideTimer.duration = duration
+    logEvent("slide-timer-start", {
+        slideId: valueOr(slide, "id", "")
+        durationSeconds: duration
+        timerSeconds: m.slideTimer.duration
+    })
     if not m.paused then m.slideTimer.control = "start"
 end sub
 
@@ -1051,7 +1217,10 @@ function buildPprSlides(ppr as dynamic) as object
                 kind: "ppr-image"
                 title: valueOr(rendered, "title", "Indicador do PPR")
                 imageUrl: imageUrl
-                duration: valueOr(rendered, "duration", duration)
+                ' A duração do PPR é controlada pela Central. O campo salvo
+                ' dentro de renderedSlides pode pertencer a uma captura antiga
+                ' e não deve substituir a configuração atual.
+                duration: duration
             })
         end if
     end for
@@ -1473,6 +1642,20 @@ sub configureTemporaryAlerts(alerts as object)
     sorted = sortTemporaryAlerts(alerts)
     m.temporaryAlerts = sorted
 
+    ' Cada edicao produz uma nova versao. Retemos somente marcadores que
+    ' ainda pertencem aos alertas atuais para impedir crescimento sem limite.
+    currentVersions = {}
+    for each currentAlert in sorted
+        currentVersions[temporaryAlertVersion(currentAlert)] = true
+    end for
+    retainedCompleted = {}
+    for each completedVersion in m.completedTemporaryAlertVersions
+        if currentVersions.DoesExist(completedVersion)
+            retainedCompleted[completedVersion] = true
+        end if
+    end for
+    m.completedTemporaryAlertVersions = retainedCompleted
+
     if m.activeTemporaryAlert <> invalid
         activeId = valueOr(m.activeTemporaryAlert, "id", "")
         stillActive = false
@@ -1819,6 +2002,7 @@ end sub
 
 sub sendAlertHistoryEvent(alert as dynamic, eventType as string)
     if alert = invalid or m.currentStation = invalid then return
+    releaseAlertEventTask()
     task = CreateObject("roSGNode", "AlertEventTask")
     task.endpoint = m.endpoint
     task.eventPayload = {
@@ -1846,6 +2030,14 @@ sub onAlertEventTaskState()
     else
         logEvent("temporary-alert-history-saved", { statusCode: m.alertEventTask.statusCode })
     end if
+    releaseAlertEventTask()
+end sub
+
+sub releaseAlertEventTask()
+    if m.alertEventTask = invalid then return
+    m.alertEventTask.UnobserveField("state")
+    m.alertEventTask.control = "stop"
+    m.alertEventTask = invalid
 end sub
 
 sub renderBanner(alert as dynamic)
@@ -1937,7 +2129,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V34 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: " + m.appVersion + " | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -1950,7 +2142,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 34
+        build: m.appVersion
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId

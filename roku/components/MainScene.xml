@@ -2,6 +2,10 @@
 <component name="MainScene" extends="Scene">
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
 
+    <interface>
+        <field id="previousExitReason" type="string" value="EXIT_UNKNOWN" />
+    </interface>
+
     <children>
         <Rectangle id="background" width="1920" height="1080" color="0x08111FFF" />
 
@@ -241,6 +245,16 @@
                     enableUI="false" />
             </Group>
 
+            <!--
+                Protecao em duas camadas contra EXIT_IDLE_AUTO_EXIT: o Video
+                bloqueia explicitamente o protetor de tela e o Audio mantem
+                uma midia local praticamente inaudivel em reproducao continua.
+            -->
+            <Video id="idleGuardVideo" visible="false" width="1" height="1"
+                enableUI="false" disableScreenSaver="true"
+                enableScreenSaverWhilePlaying="false" />
+            <Audio id="idleGuardAudio" loop="true" mute="false" />
+
             <Group id="diagnosticsOverlay" visible="false">
                 <Rectangle translation="[50,50]" width="1820" height="300" color="0x050B14F4" />
                 <Label id="diagnosticsTitle" translation="[90,78]" width="1720" height="48"
@@ -250,7 +264,8 @@
             </Group>
 
             <Timer id="slideTimer" repeat="false" />
-            <Timer id="syncTimer" duration="60" repeat="true" />
+            <!-- Reconsulta a configuração em até 15s após uma alteração na Central. -->
+            <Timer id="syncTimer" duration="15" repeat="true" />
             <Timer id="heartbeatTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />
             <Timer id="imageLoadTimer" duration="8" repeat="false" />
@@ -259,6 +274,7 @@
             <!-- Confere se o temporizador de troca continua ativo. Ele só atua
                  enquanto o canal ainda está aberto e jamais fecha o player. -->
             <Timer id="playbackWatchdogTimer" duration="15" repeat="true" />
+            <Timer id="idleGuardRestartTimer" duration="5" repeat="false" />
             <Timer id="temporaryAlertTimer" duration="15" repeat="false" />
             <Timer id="temporaryAlertGapTimer" duration="1" repeat="false" />
             <Animation id="fadeIn" duration="0.75" easeFunction="outQuad">

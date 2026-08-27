@@ -94,3 +94,18 @@ test('mudanca de dashboard ou PPR altera a assinatura da apresentacao web', () =
   );
 });
 
+test('tempo de exibição e velocidade são enviados para a base central', () => {
+  assert.match(web, /function updateTransitionTime\(\)[\s\S]*?scheduleCloudSectionSave\('settings', 150\)/);
+  assert.match(web, /function updateTransitionEffect\(\)[\s\S]*?scheduleCloudSectionSave\('settings', 150\)/);
+  assert.match(web, /function updateTransitionDuration\(\)[\s\S]*?scheduleCloudSectionSave\('settings', 150\)/);
+  assert.match(web, /function updateRefreshInterval\(\)[\s\S]*?scheduleCloudSectionSave\('settings', 150\)/);
+});
+
+test('assinatura de reprodução inclui as configurações de tempo', () => {
+  const base = { urls: [], ppr: {}, settings: { transitionTime: 30000 } };
+  assert.notEqual(
+    context.playbackPayloadSignature(base),
+    context.playbackPayloadSignature({ ...base, settings: { transitionTime: 5000 } })
+  );
+});
+

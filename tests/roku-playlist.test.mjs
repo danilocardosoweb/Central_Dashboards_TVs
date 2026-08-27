@@ -66,6 +66,30 @@ test('sincroniza quando updated_at muda mesmo sem nova revisao', () => {
   assert.match(scene, /revision = m\.lastRevision and updatedAt = m\.lastUpdatedAt/);
 });
 
+test('não ignora mudança de conteúdo quando metadados da linha permanecem iguais', () => {
+  assert.match(scene, /payload = valueOr\(row, "payload", invalid\)/);
+  assert.match(scene, /playbackSignature = statePlaybackSignature\(payload\)/);
+  assert.match(scene, /metadataUnchanged and m\.state <> invalid and playbackSignature = m\.lastPlaybackSignature/);
+  assert.match(scene, /state-payload-changed-without-metadata/);
+});
+
+test('duração do PPR vem sempre da configuração atual da Central', () => {
+  assert.match(scene, /duration: duration/);
+  assert.match(scene, /campo salvo[\s\S]*renderedSlides/);
+});
+
+test('aceita configuração de dashboard em segundos e limita valores extremos', () => {
+  assert.match(scene, /transitionTimeValue < 1000/);
+  assert.match(scene, /displaySeconds: m\.defaultDuration/);
+  assert.match(scene, /if seconds > 3600 then seconds = 3600/);
+});
+
+test('cronometro da TV usa exatamente a duração configurada após o carregamento', () => {
+  assert.match(scene, /durationSeconds: duration/);
+  assert.match(scene, /timerSeconds: m\.slideTimer\.duration/);
+  assert.match(xml, /id="syncTimer" duration="15" repeat="true"/);
+});
+
 test('PPR usa imagens publicadas e mantém o desenho nativo como contingência', () => {
   assert.match(scene, /renderedSlides = arrayOrEmpty\(valueOr\(ppr, "renderedSlides", \[\]\)\)/);
   assert.match(scene, /kind: "ppr-image"/);
@@ -104,8 +128,21 @@ test('abertura sempre libera a camada de video antes do carrossel', () => {
   assert.match(scene, /if key = "OK" or key = "back"[\s\S]*?finishIntroVideo\(\)/);
 });
 
+test('player mantem midia silenciosa local para evitar EXIT_IDLE_AUTO_EXIT', () => {
+  assert.match(xml, /id="idleGuardVideo"[\s\S]*?disableScreenSaver="true"/);
+  assert.match(xml, /id="idleGuardAudio"[\s\S]*?loop="true"[\s\S]*?mute="false"/);
+  assert.match(xml, /id="idleGuardRestartTimer" duration="5"/);
+  assert.match(scene, /sub configureIdleProtection\(\)/);
+  assert.match(scene, /sub startIdleGuard\(\)/);
+  assert.match(scene, /pkg:\/audio\/idle-guard\.wav/);
+  assert.match(scene, /sub ensureIdleGuard\(\)/);
+  assert.match(scene, /sub onIdleGuardState\(\)/);
+  assert.match(scene, /idle-guard-recover/);
+  assert.match(scene, /idle-guard-health/);
+});
+
 test('Roku consulta atualizacoes sem intervalo agressivo', () => {
-  assert.match(xml, /id="syncTimer" duration="60"/);
+  assert.match(xml, /id="syncTimer" duration="15"/);
 });
 
 test('consulta de estado possui timeout, cache local e retomada do ciclo', () => {
@@ -124,7 +161,16 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V34/);
+  assert.match(scene, /Build: " \+ m\.appVersion/);
+});
+
+test('player libera tarefas e bloqueia saida acidental pelo botao voltar', () => {
+  assert.match(xml, /previousExitReason/);
+  assert.match(scene, /m\.top\.backExitsScene = false/);
+  assert.match(scene, /sub releaseFetchTask\(\)/);
+  assert.match(scene, /sub releaseHeartbeatTask\(\)/);
+  assert.match(scene, /sub releaseAlertEventTask\(\)/);
+  assert.match(scene, /UnobserveField\("result"\)/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {

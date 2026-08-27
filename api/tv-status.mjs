@@ -51,6 +51,7 @@ export function normalizeHeartbeat(input = {}, now = new Date()) {
     installationId: safeText(input.installationId, 120),
     sessionId: safeText(input.sessionId, 120),
     appVersion: safeText(input.appVersion, 32),
+    previousExitReason: safeText(input.previousExitReason, 80) || 'EXIT_UNKNOWN',
     currentIndex: Math.max(0, Number(input.currentIndex) || 0),
     playlistCount: Math.max(0, Number(input.playlistCount) || 0),
     currentType: safeText(input.currentType, 40),

@@ -20,7 +20,9 @@
     "capture:install-browser": "playwright install chromium",
     "capture:local-upload": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture-local-upload.ps1",
     "roku:check": "bsc --project roku/bsconfig.json",
-    "roku:package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-roku.ps1"
+    "roku:idle-audio": "node scripts/generate-idle-audio.mjs",
+    "roku:package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-roku.ps1",
+    "roku:monitor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/roku-tv-monitor.ps1"
   },
   "dependencies": {
     "@sparticuz/chromium": "149.0.0",
