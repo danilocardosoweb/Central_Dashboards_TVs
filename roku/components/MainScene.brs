@@ -1166,6 +1166,10 @@ sub renderPprSlide(slide as object)
     ppr = valueOr(slide, "source", {})
     applyPprTheme(valueOr(ppr, "theme", "light"))
     m.pprPeriod.text = "PERÍODO " + valueOr(ppr, "referencePeriod", "")
+    m.top.FindNode("pprKicker").text = "PROGRAMA DE PARTICIPAÇÃO NOS RESULTADOS"
+    if valueOr(ppr, "referencePeriod", "") = "2026/2027"
+        m.top.FindNode("pprKicker").text = "PPR 2026/2027 – pagamento JUL/2027"
+    end if
     resetPprLayout()
     if slide.kind = "ppr-individual"
         renderPprIndividual(ppr, valueOr(slide, "indicator", {}))
@@ -1235,11 +1239,18 @@ sub setPprScaleColor(regular as string, meta as string)
     m.pprScale100.color = meta
 end sub
 
+function pprMaximum(indicator as dynamic) as integer
+    profile = valueOr(indicator, "evaluationProfile", "standard")
+    if profile = "audit-score" or profile = "audit-bands" then return 100
+    if profile = "returns" then return 120
+    return 150
+end function
+
 sub renderPprIndividual(ppr as dynamic, indicator as dynamic)
     value = pprNumericValue(valueOr(indicator, "result", 0))
     rule = pprRuleFor(ppr, value)
     color = rokuColor(valueOr(rule, "color", "#22C55E"))
-    fillHeight = Int((value / 150.0) * 608.0)
+    fillHeight = Int((value / pprMaximum(indicator)) * 608.0)
     if fillHeight < 0 then fillHeight = 0
     if fillHeight > 608 then fillHeight = 608
     m.pprThermometerGroup.visible = true
@@ -1265,7 +1276,7 @@ sub renderPprIndividual(ppr as dynamic, indicator as dynamic)
     m.pprDescription.text = valueOr(indicator, "description", "")
     m.pprStatusBackground.color = color
     m.pprStatus.text = valueOr(rule, "message", "Resultado atualizado")
-    progressWidth = Int((value / 150.0) * 1020.0)
+    progressWidth = Int((value / pprMaximum(indicator)) * 1020.0)
     if progressWidth < 0 then progressWidth = 0
     if progressWidth > 1020 then progressWidth = 1020
     m.pprProgressFill.width = progressWidth
@@ -1279,6 +1290,10 @@ sub renderPprIndividual(ppr as dynamic, indicator as dynamic)
 end sub
 
 sub updatePprScaleLabels(indicator as dynamic)
+    profile = valueOr(indicator, "evaluationProfile", "standard")
+    percentages = [150, 125, 100, 75, 50, 0]
+    if profile = "returns" then percentages = [120, 110, 100, 50, 25, 0]
+    if profile = "audit-score" or profile = "audit-bands" then percentages = [100, 75, 50, 25, 0]
     rows = [
         { node: m.pprScale150, percent: 150 },
         { node: m.pprScale125, percent: 125 },
@@ -1288,13 +1303,20 @@ sub updatePprScaleLabels(indicator as dynamic)
         { node: m.pprScale0, percent: 0 }
     ]
     unit = valueOr(indicator, "unit", "")
+    index = 0
     for each row in rows
+        row.node.visible = index < percentages.Count()
+        if index < percentages.Count()
+        row.percent = percentages[index]
+        row.node.translation = [315, 848 - Int(row.percent / pprMaximum(indicator) * 608)]
         prefix = row.percent.ToStr() + "%"
         if row.percent = 100 then prefix = "100% META"
         expected = pprBandLabel(indicator, row.percent)
         if expected <> "" and unit <> "" and Instr(1, LCase(expected), LCase(unit)) = 0 then expected = expected + " " + unit
         if expected <> "" then prefix = prefix + "   " + expected
         row.node.text = prefix
+        end if
+        index = index + 1
     end for
 end sub
 

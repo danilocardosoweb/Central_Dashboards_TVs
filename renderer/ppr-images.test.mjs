@@ -83,3 +83,23 @@ test('remove somente objetos PPR depois da troca de geração', async () => {
   assert.equal(result.removed, 1);
   assert.deepEqual(removed, ['ppr/rev-antiga/ppr-summary.png']);
 });
+
+test('pendentes e resultados inválidos não entram nas imagens nem na média', () => {
+  const config = { ...ppr, indicators: [null, '', undefined, -1, 151, 'inválido', 0, 112.5].map((result, index) => ({ id: String(index), name: `Indicador ${index}`, result, enabled: true })) };
+  const slides = buildPprImageSlides(config);
+  assert.equal(slides.length, 3);
+  const html = buildPprSlideHtml(config, slides[0]);
+  assert.match(html, /56,25%/);
+  assert.match(html, /PPR 2026\/2027 – pagamento JUL\/2027/);
+  assert.doesNotMatch(html, /Indicador 0/);
+});
+
+test('cada indicador usa sua escala sem alterar o PPR padrão', () => {
+  for (const [evaluationProfile, result, expected, absent] of [
+    ['returns', 120, '120%', '150%'], ['audit-bands',100,'100% Meta','125%'], ['standard',150,'150%','120%']
+  ]) {
+    const indicator={...ppr.indicators[0],evaluationProfile,result};
+    const html=buildPprSlideHtml(ppr,{kind:'individual',indicator});
+    assert.ok(html.includes(expected)); assert.ok(!html.includes(absent)); assert.match(html,/height:100%/);
+  }
+});

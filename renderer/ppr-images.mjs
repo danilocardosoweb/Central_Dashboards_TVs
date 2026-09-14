@@ -7,6 +7,15 @@ import { safeObjectName } from './capture.mjs';
 
 const SCALE = [150, 125, 100, 75, 50, 0];
 
+function maximumFor(indicator) {
+  return ['audit-score', 'audit-bands'].includes(indicator?.evaluationProfile) ? 100 : indicator?.evaluationProfile === 'returns' ? 120 : 150;
+}
+
+function scaleFor(indicator) {
+  return ['audit-score', 'audit-bands'].includes(indicator?.evaluationProfile) ? [100, 75, 50, 25, 0]
+    : indicator?.evaluationProfile === 'returns' ? [120, 110, 100, 50, 25, 0] : SCALE;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -35,7 +44,8 @@ function formatMeasure(indicator) {
 function activeIndicators(ppr) {
   return (Array.isArray(ppr?.indicators) ? ppr.indicators : [])
     .filter(item => item?.enabled !== false)
-    .filter(item => Number.isFinite(Number(item?.result)))
+    .filter(item => item?.result !== null && item?.result !== undefined && item?.result !== ''
+      && Number.isFinite(Number(item.result)) && Number(item.result) >= 0 && Number(item.result) <= maximumFor(item))
     .sort((left, right) => numeric(left?.order, 999) - numeric(right?.order, 999));
 }
 
@@ -85,7 +95,7 @@ export function buildPprImageSlides(ppr) {
 
 function header(ppr) {
   return `<header>
-    <div><div class="kicker">PROGRAMA DE PARTICIPAÇÃO NOS RESULTADOS</div><h1>${escapeHtml(ppr.title || 'Acompanhamento do PPR')}</h1></div>
+    <div><div class="kicker">${ppr.referencePeriod === '2026/2027' ? 'PPR 2026/2027 – pagamento JUL/2027' : 'PROGRAMA DE PARTICIPAÇÃO NOS RESULTADOS'}</div><h1>${escapeHtml(ppr.title || 'Acompanhamento do PPR')}</h1></div>
     <div class="period"><span></span>Período ${escapeHtml(ppr.referencePeriod || '')}</div>
   </header>`;
 }
@@ -104,14 +114,14 @@ function summaryHtml(ppr) {
     return `<article class="indicator-card" style="--accent:${escapeHtml(rule.color)}">
       <div class="indicator-head"><strong>${escapeHtml(indicator.name)}</strong><em>${escapeHtml(rule.message)}</em></div>
       <div class="indicator-result"><b>${escapeHtml(formatPercent(value))}</b><span>${escapeHtml(measure ? `Realizado ${measure}` : 'Resultado atualizado')}</span></div>
-      <div class="progress"><i style="width:${Math.min(100, value / 1.5)}%"></i></div>
+      <div class="progress"><i style="width:${Math.min(100, value / maximumFor(indicator) * 100)}%"></i></div>
       <div class="indicator-meta"><span>${escapeHtml(expected ? `Faixa ${expected}` : 'Faixa não informada')}</span><span>Meta 100%</span></div>
     </article>`;
   }).join('');
   const angle = Math.max(0, Math.min(360, (average / 150) * 360));
   return `${header(ppr)}<main class="summary">
     <section class="score-card">
-      <div class="ring" style="--angle:${angle}deg"><div>${escapeHtml(formatPercent(average))}</div></div>
+      <div class="ring" style="--angle:${angle}deg"><div>${indicators.length ? escapeHtml(formatPercent(average)) : 'Sem resultado'}</div></div>
       <div><small>ÍNDICE CONSOLIDADO</small><strong>${reached} de ${indicators.length}<br>indicadores na meta</strong><p>Leitura executiva do desempenho atual do programa.</p></div>
     </section>
     <section class="stats">
@@ -124,9 +134,10 @@ function summaryHtml(ppr) {
 }
 
 function thermometer(indicator, color) {
-  const value = Math.max(0, Math.min(150, numeric(indicator.result)));
-  const ticks = SCALE.map(percent => {
-    const bottom = percent / 1.5;
+  const maximum = maximumFor(indicator);
+  const value = Math.max(0, Math.min(maximum, numeric(indicator.result)));
+  const ticks = scaleFor(indicator).map(percent => {
+    const bottom = percent / maximum * 100;
     const expected = bandLabel(indicator, percent);
     return `<div class="tick ${percent === 100 ? 'target' : ''}" style="bottom:${bottom}%">
       <span>${percent === 100 ? '100% Meta' : `${percent}%`}</span><small>${escapeHtml(expected)}</small>
@@ -134,7 +145,7 @@ function thermometer(indicator, color) {
   }).join('');
   return `<section class="gauge-card">
     <div class="thermometer">
-      <div class="tube"><div class="fill" style="height:${value / 1.5}%;--accent:${escapeHtml(color)}"></div></div>
+      <div class="tube"><div class="fill" style="height:${value / maximum * 100}%;--accent:${escapeHtml(color)}"></div></div>
       <div class="bulb" style="--accent:${escapeHtml(color)}"></div>
       <div class="ticks">${ticks}</div>
     </div>
@@ -161,7 +172,7 @@ function individualHtml(ppr, indicator) {
         ${measure ? `<article><small>Valor realizado</small><strong>${escapeHtml(measure)}</strong></article>` : ''}
         ${expected ? `<article><small>Faixa esperada</small><strong>${escapeHtml(expected)}</strong></article>` : ''}
       </div>
-      <div class="progress large"><i style="width:${Math.min(100, value / 1.5)}%"></i></div>
+      <div class="progress large"><i style="width:${Math.min(100, value / maximumFor(indicator) * 100)}%"></i></div>
       <div class="status">${escapeHtml(rule.message)}</div>
       <footer>Referência: ${escapeHtml(indicator.referenceDate || 'Não informada')} · Atualizado em ${escapeHtml(String(indicator.updatedAt || ppr.updatedAt || '').replace('T', ' ').slice(0, 16))}</footer>
     </section>
