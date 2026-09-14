@@ -3896,7 +3896,7 @@
             <div class="ppr-admin-header">
                 <div>
                     <h3>Acompanhamento do PPR</h3>
-                    <p>Resultados manuais, escala oficial de 0% a 150% e exibição nas TVs.</p>
+                    <p>PPR 2026/2027 – pagamento JUL/2027. Escala: 0%, 50%, 75%, 100%, 125% e 150%; 100% é a meta integral e 150% é o máximo.</p>
                 </div>
                 <label class="ppr-master-toggle">
                     <input type="checkbox" id="pprEnabled" onchange="savePprSettingsFromForm()">
@@ -4041,12 +4041,21 @@
                         </div>
                     </div>
                     <label class="checkbox-field ppr-auto-calculate">
+                        <span>Regra do indicador</span>
+                        <select id="pprIndicatorEvaluationProfile" class="select-field" onchange="changePprEvaluationProfile()">
+                            <option value="standard">PPR padrão — escala até 150%</option>
+                            <option value="returns">Devolução — quanto menor, melhor (até 120%)</option>
+                            <option value="audit-bands">Auditoria — faixas de 0% a 100%</option>
+                            <option value="audit-score">Auditoria — nota direta de 0% a 100%</option>
+                        </select>
+                    </label>
+                    <label class="checkbox-field ppr-auto-calculate">
                         <input type="checkbox" id="pprIndicatorAutoCalculate" onchange="togglePprAutomaticCalculation()">
                         Calcular o percentual automaticamente pelo valor realizado
                     </label>
                     <details id="pprBandEditor" class="ppr-band-editor">
                         <summary><strong>Valores esperados da escala</strong></summary>
-                        <p class="ppr-help">Configure uma vez. Exemplos: “Abaixo de 1.250”, “1.310 a 1.339” ou “1.360 ou mais”.</p>
+                        <p class="ppr-help">Informe o realizado na unidade do indicador, separado do atingimento do PPR. O cálculo automático usa a faixa cadastrada, sem interpolação. Para um resultado proporcional apurado pela regra oficial (ex.: 112,50%), desmarque o cálculo automático. Exemplos de faixas: “Até 1,5%”, “70 a 79” ou “1.360 ou mais”. Não invente limites ausentes.</p>
                         <div id="pprIndicatorBandList" class="ppr-band-list"></div>
                     </details>
                     <label for="pprIndicatorDescription">Descrição resumida *</label>
@@ -8453,7 +8462,16 @@
             ];
         }
 
-        function defaultPprBands() {
+        function defaultPprBands(profile = 'standard') {
+            if (profile === 'returns') return [
+                { percent: 120, label: '0,09% a 0,08%' },
+                { percent: 110, label: '0,11% a 0,10%' },
+                { percent: 100, label: '0,13% a 0,12%' },
+                { percent: 50, label: '0,15% a 0,14%' },
+                { percent: 25, label: '0,17% a 0,16%' },
+                { percent: 0, label: 'Maior que 0,18%' }
+            ];
+            if (['audit-score', 'audit-bands'].includes(profile)) return [100, 75, 50, 25, 0].map(percent => ({ percent, label: '' }));
             return [150, 125, 100, 75, 50, 0].map(percent => ({ percent, label: '' }));
         }
 
@@ -8525,19 +8543,20 @@
                         id: String(item?.id || createEntityId('ppr')),
                         name: String(item?.name || `Indicador ${index + 1}`),
                         description: String(item?.description || ''),
-                        result: Number.isFinite(parsedResult) && parsedResult >= 0 && parsedResult <= 150
+                        evaluationProfile: ['returns', 'audit-score', 'audit-bands'].includes(item?.evaluationProfile) ? item.evaluationProfile : 'standard',
+                        result: Number.isFinite(parsedResult) && parsedResult >= 0 && parsedResult <= getPprMaxResult(item)
                             ? parsedResult
                             : null,
-                        operationalValue: String(item?.operationalValue || ''),
-                        targetValue: String(item?.targetValue || ''),
+                        operationalValue: String(item?.operationalValue ?? ''),
+                        targetValue: String(item?.targetValue ?? ''),
                         unit: String(item?.unit || ''),
                         calculationMode: item?.calculationMode === 'automatic' ? 'automatic' : 'manual',
                         performanceBands: Array.isArray(item?.performanceBands)
-                            ? defaultPprBands().map(fallbackBand => {
+                            ? defaultPprBands(item?.evaluationProfile).map(fallbackBand => {
                                 const savedBand = item.performanceBands.find(band => Number(band?.percent) === fallbackBand.percent);
                                 return { percent: fallbackBand.percent, label: String(savedBand?.label || '') };
                             })
-                            : defaultPprBands(),
+                            : defaultPprBands(item?.evaluationProfile),
                         referenceDate: String(item?.referenceDate || ''),
                         updatedAt: String(item?.updatedAt || ''),
                         order: Math.max(1, Number(item?.order) || index + 1),
@@ -8785,45 +8804,66 @@
             showToast(pprConfig.enabled ? 'PPR atualizado e incluído na programação' : 'Configuração do PPR salva', 'success');
         }
 
+        function hasPprResult(value) {
+            return value !== null && value !== undefined && value !== ''
+                && Number.isFinite(Number(value)) && Number(value) >= 0 && Number(value) <= 150;
+        }
+
         function formatPprPercent(value) {
-            if (!Number.isFinite(Number(value))) return 'Sem resultado';
+            if (!hasPprResult(value)) return 'Sem resultado';
             return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
         }
 
         function formatPprMeasure(value, unit = '') {
-            const cleanValue = String(value || '').trim();
+            const cleanValue = String(value ?? '').trim();
             const cleanUnit = String(unit || '').trim();
             if (!cleanValue) return '';
             return cleanUnit ? `${cleanValue} ${cleanUnit}` : cleanValue;
         }
 
         function parsePprMeasureNumber(value) {
-            let text = String(value || '').trim().replace(/\s/g, '');
+            let text = String(value ?? '').trim().replace(/\s/g, '').replace(/%$/, '');
             if (!text) return null;
+            if (!/^[+-]?\d[\d.,]*$/.test(text)) return null;
             if (text.includes(',')) text = text.replace(/\./g, '').replace(',', '.');
             else if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) text = text.replace(/\./g, '');
             const numeric = Number(text);
             return Number.isFinite(numeric) ? numeric : null;
         }
 
-        function parsePprBandRange(label) {
+        function getPprMaxResult(indicator) {
+            return ['audit-score', 'audit-bands'].includes(indicator?.evaluationProfile) ? 100 : indicator?.evaluationProfile === 'returns' ? 120 : 150;
+        }
+
+        function getPprScale(indicator) {
+            if (['returns', 'audit-score', 'audit-bands'].includes(indicator?.evaluationProfile)) {
+                return defaultPprBands(indicator.evaluationProfile).map(band => [band.percent, band.percent / getPprMaxResult(indicator) * 100, band.percent === 100]);
+            }
+            return [[150, 100, false], [125, 83.333, false], [100, 66.667, true],
+                [75, 50, false], [50, 33.333, false], [0, 0, false]];
+        }
+
+        function parsePprBandRange(label, lowerIsBetter = false) {
             const text = String(label || '').trim().toLocaleLowerCase('pt-BR');
             const values = (text.match(/-?\d[\d.,]*/g) || []).map(parsePprMeasureNumber).filter(Number.isFinite);
             if (!values.length) return null;
-            if (/abaixo|menor/.test(text)) return { min: -Infinity, max: values[0] - 1e-9 };
-            if (/acima|maior|ou\s+mais|\+/.test(text)) return { min: values[0], max: Infinity };
+            if (/menor\s+ou\s+igual|<=|≤/.test(text)) return { min: -Infinity, max: values[0] };
+            if (/maior\s+ou\s+igual|>=|≥/.test(text)) return { min: values[0], max: Infinity };
+            if (/abaixo|menor|</.test(text)) return { min: -Infinity, max: values[0], maxExclusive: true };
+            if (/acima|maior|>/.test(text)) return { min: values[0], max: Infinity, minExclusive: true };
+            if (/ou\s+mais|\+/.test(text)) return { min: values[0], max: Infinity };
             if (/at[eé]|no\s+m[aá]ximo|ou\s+menos/.test(text) && values.length === 1) return { min: -Infinity, max: values[0] };
             if (values.length >= 2) return {
-                min: values[0],
-                max: values[1],
-                reversed: values[0] > values[1]
+                min: lowerIsBetter ? Math.min(values[0], values[1]) : values[0],
+                max: lowerIsBetter ? Math.max(values[0], values[1]) : values[1],
+                reversed: !lowerIsBetter && values[0] > values[1]
             };
             return { min: values[0], max: values[0] };
         }
 
-        function getPprBandValidationIssue(bands) {
+        function getPprBandValidationIssue(bands, lowerIsBetter = false) {
             for (const band of bands || []) {
-                const range = parsePprBandRange(band.label);
+                const range = parsePprBandRange(band.label, lowerIsBetter);
                 if (range?.reversed) {
                     return {
                         percent: Number(band.percent),
@@ -8837,23 +8877,28 @@
         function calculatePprResultFromBands(indicator, rawValue = indicator?.operationalValue) {
             const value = parsePprMeasureNumber(rawValue);
             if (!Number.isFinite(value)) return null;
+            if (indicator?.evaluationProfile === 'audit-score') return value >= 0 && value <= 100 ? value : null;
+            if (indicator?.evaluationProfile === 'returns' && value < 0) return null;
             const match = (indicator?.performanceBands || [])
-                .map(band => ({ ...band, range: parsePprBandRange(band.label) }))
+                .map(band => ({ ...band, range: parsePprBandRange(band.label, indicator?.evaluationProfile === 'returns') }))
                 .filter(band => band.range && !band.range.reversed)
                 .sort((a, b) => Number(b.percent) - Number(a.percent))
-                .find(band => value >= band.range.min && value <= band.range.max);
+                .find(band => (band.range.minExclusive ? value > band.range.min : value >= band.range.min)
+                    && (band.range.maxExclusive ? value < band.range.max : value <= band.range.max));
             return match ? Number(match.percent) : null;
         }
 
-        function findPprBandOverlap(bands) {
+        function findPprBandOverlap(bands, lowerIsBetter = false) {
             const parsed = (bands || [])
-                .map(band => ({ ...band, range: parsePprBandRange(band.label) }))
+                .map(band => ({ ...band, range: parsePprBandRange(band.label, lowerIsBetter) }))
                 .filter(band => band.range && !band.range.reversed);
             for (let index = 0; index < parsed.length; index += 1) {
                 for (let otherIndex = index + 1; otherIndex < parsed.length; otherIndex += 1) {
                     const current = parsed[index].range;
                     const other = parsed[otherIndex].range;
-                    if (current.min <= other.max && other.min <= current.max) {
+                    if (current.min <= other.max && other.min <= current.max
+                        && !(current.min === other.max && (current.minExclusive || other.maxExclusive))
+                        && !(other.min === current.max && (other.minExclusive || current.maxExclusive))) {
                         return [parsed[index], parsed[otherIndex]];
                     }
                 }
@@ -8879,7 +8924,7 @@
         }
 
         function getPprIndicatorFreshness(indicator) {
-            if (!Number.isFinite(Number(indicator.result)) || !indicator.referenceDate) return 'missing';
+            if (!hasPprResult(indicator.result) || !indicator.referenceDate) return 'missing';
             const reference = new Date(`${indicator.referenceDate}T12:00:00`);
             if (Number.isNaN(reference.getTime())) return 'missing';
             const ageDays = (Date.now() - reference.getTime()) / 86400000;
@@ -8900,7 +8945,7 @@
         function getActivePprIndicators(includeMissing = false) {
             return (pprConfig?.indicators || [])
                 .filter(item => item.enabled)
-                .filter(item => includeMissing || Number.isFinite(Number(item.result)))
+                .filter(item => includeMissing || hasPprResult(item.result))
                 .sort((a, b) => Number(a.order) - Number(b.order));
         }
 
@@ -9005,6 +9050,7 @@
             document.getElementById('pprIndicatorOperationalValue').value = '';
             document.getElementById('pprIndicatorUnit').value = '';
             document.getElementById('pprIndicatorAutoCalculate').checked = true;
+            document.getElementById('pprIndicatorEvaluationProfile').value = 'standard';
             renderPprBandEditor(defaultPprBands());
             togglePprAutomaticCalculation();
             document.getElementById('pprIndicatorReferenceDate').value = '';
@@ -9024,6 +9070,7 @@
             document.getElementById('pprIndicatorResult').value = indicator.result ?? '';
             document.getElementById('pprIndicatorOperationalValue').value = indicator.operationalValue || '';
             document.getElementById('pprIndicatorUnit').value = indicator.unit || '';
+            document.getElementById('pprIndicatorEvaluationProfile').value = indicator.evaluationProfile || 'standard';
             document.getElementById('pprIndicatorAutoCalculate').checked = indicator.calculationMode === 'automatic';
             renderPprBandEditor(indicator.performanceBands || defaultPprBands());
             togglePprAutomaticCalculation();
@@ -9043,14 +9090,15 @@
             const list = document.getElementById('pprIndicatorBandList');
             if (!list) return;
             list.replaceChildren();
-            defaultPprBands().forEach(defaultBand => {
+            const profile = document.getElementById('pprIndicatorEvaluationProfile')?.value || 'standard';
+            defaultPprBands(profile).forEach(defaultBand => {
                 const saved = bands.find(band => Number(band.percent) === defaultBand.percent) || defaultBand;
                 const row = createPprElement('div', 'ppr-band-row');
                 row.appendChild(createPprElement('div', 'ppr-band-percent', `${defaultBand.percent}%`));
                 const input = createPprElement('input', 'input-field');
                 input.type = 'text';
                 input.maxLength = 60;
-                input.placeholder = defaultBand.percent === 150 ? 'Ex.: 1.360 ou mais' : defaultBand.percent === 0 ? 'Ex.: Abaixo de 1.250' : 'Ex.: 1.310 a 1.339';
+                input.placeholder = profile === 'returns' ? defaultBand.label : 'Valor ou intervalo da faixa';
                 input.value = saved.label || '';
                 input.dataset.pprBandPercent = String(defaultBand.percent);
                 input.addEventListener('input', () => row.classList.remove('invalid'));
@@ -9066,17 +9114,33 @@
             }));
         }
 
+        function changePprEvaluationProfile() {
+            const profile = document.getElementById('pprIndicatorEvaluationProfile').value;
+            renderPprBandEditor(defaultPprBands(profile));
+            if (profile !== 'standard') {
+                document.getElementById('pprIndicatorUnit').value = '%';
+                document.getElementById('pprIndicatorAutoCalculate').checked = true;
+            }
+            togglePprAutomaticCalculation();
+        }
+
         function togglePprAutomaticCalculation() {
             const automatic = document.getElementById('pprIndicatorAutoCalculate')?.checked === true;
+            const profile = document.getElementById('pprIndicatorEvaluationProfile')?.value || 'standard';
+            const maximum = getPprMaxResult({ evaluationProfile: profile });
             const resultInput = document.getElementById('pprIndicatorResult');
             const resultLabel = document.querySelector('label[for="pprIndicatorResult"]');
             const editor = document.getElementById('pprBandEditor');
             if (resultInput) {
                 resultInput.disabled = automatic;
-                resultInput.placeholder = automatic ? 'Calculado pelo valor realizado' : '0 a 150';
+                resultInput.max = String(maximum);
+                resultInput.placeholder = automatic ? 'Calculado ao salvar' : `0 a ${maximum}`;
             }
             if (resultLabel) resultLabel.textContent = automatic ? 'Resultado (%) calculado automaticamente' : 'Resultado atual (%) *';
-            if (editor) editor.open = automatic;
+            if (editor) {
+                editor.open = automatic;
+                editor.hidden = profile === 'audit-score';
+            }
         }
 
         function savePprIndicator() {
@@ -9087,25 +9151,25 @@
             const automatic = document.getElementById('pprIndicatorAutoCalculate').checked;
             const operationalValue = document.getElementById('pprIndicatorOperationalValue').value.trim();
             const performanceBands = readPprBandsFromForm();
+            const evaluationProfile = document.getElementById('pprIndicatorEvaluationProfile').value;
             const resultText = document.getElementById('pprIndicatorResult').value.replace(',', '.');
-            const draftIndicator = { operationalValue, performanceBands };
-            const result = automatic ? calculatePprResultFromBands(draftIndicator) : Number(resultText);
+            const draftIndicator = { operationalValue, performanceBands, evaluationProfile };
+            const maximum = getPprMaxResult(draftIndicator);
+            const usesBands = automatic && evaluationProfile !== 'audit-score';
+            const pending = automatic ? operationalValue === '' : resultText === '' && operationalValue === '';
+            const result = pending ? null : automatic ? calculatePprResultFromBands(draftIndicator) : Number(resultText);
             let referenceDate = document.getElementById('pprIndicatorReferenceDate').value;
-            if (automatic && operationalValue !== String(existing?.operationalValue || '')) {
-                referenceDate = new Date().toISOString().slice(0, 10);
-                document.getElementById('pprIndicatorReferenceDate').value = referenceDate;
-            }
-            if (!name || !description || !referenceDate || (automatic ? !operationalValue : resultText === '')) {
+            if (!name || !description || (!pending && (!referenceDate || (automatic ? !operationalValue : resultText === '')))) {
                 showToast(automatic ? 'Preencha nome, descrição, valor realizado e data de referência' : 'Preencha nome, descrição, resultado e data de referência', 'error');
                 return;
             }
-            if (automatic && !performanceBands.some(band => parsePprBandRange(band.label))) {
+            if (usesBands && !performanceBands.some(band => parsePprBandRange(band.label))) {
                 showToast('Configure pelo menos uma faixa de valor esperado', 'error');
                 return;
             }
             document.querySelectorAll('.ppr-band-row.invalid')
                 .forEach(row => row.classList.remove('invalid'));
-            const bandIssue = automatic ? getPprBandValidationIssue(performanceBands) : null;
+            const bandIssue = usesBands ? getPprBandValidationIssue(performanceBands, evaluationProfile === 'returns') : null;
             if (bandIssue) {
                 const input = document.querySelector(`[data-ppr-band-percent="${bandIssue.percent}"]`);
                 input?.closest('.ppr-band-row')?.classList.add('invalid');
@@ -9113,7 +9177,7 @@
                 showToast(bandIssue.message, 'error');
                 return;
             }
-            const overlap = automatic ? findPprBandOverlap(performanceBands) : null;
+            const overlap = usesBands ? findPprBandOverlap(performanceBands, evaluationProfile === 'returns') : null;
             if (overlap) {
                 overlap.forEach(band => {
                     document.querySelector(`[data-ppr-band-percent="${band.percent}"]`)
@@ -9122,16 +9186,16 @@
                 showToast(`As faixas de ${overlap[0].percent}% e ${overlap[1].percent}% estão sobrepostas. Revise os limites destacados.`, 'error');
                 return;
             }
-            if (automatic && !Number.isFinite(result)) {
-                showToast('O valor realizado não pertence a nenhuma faixa configurada', 'error');
+            if (!pending && automatic && !Number.isFinite(result)) {
+                showToast(evaluationProfile === 'audit-score' ? 'A nota de auditoria deve estar entre 0% e 100%' : 'O valor realizado não pertence a nenhuma faixa configurada. Confira os limites oficiais.', 'error');
                 return;
             }
-            if (!Number.isFinite(result) || result < 0 || result > 150) {
-                showToast('O resultado deve estar entre 0% e 150%', 'error');
+            if (!pending && (!Number.isFinite(result) || result < 0 || result > maximum)) {
+                showToast(`O resultado deve estar entre 0% e ${maximum}%`, 'error');
                 return;
             }
 
-            if (existing && Number(existing.result) !== result && Number.isFinite(Number(existing.result))) {
+            if (existing && existing.result !== null && existing.result !== '' && Number(existing.result) !== result && Number.isFinite(Number(existing.result))) {
                 if (!window.confirm(`Substituir o resultado de ${formatPprPercent(existing.result)} por ${formatPprPercent(result)}?`)) return;
             }
             const indicator = {
@@ -9139,6 +9203,7 @@
                 name,
                 description,
                 result,
+                evaluationProfile,
                 operationalValue,
                 targetValue: '',
                 unit: document.getElementById('pprIndicatorUnit').value.trim(),
@@ -9245,7 +9310,7 @@
             const header = createPprElement('header', 'ppr-screen-header');
             const titleGroup = createPprElement('div', 'ppr-header-copy');
             titleGroup.append(
-                createPprElement('div', 'ppr-screen-kicker', 'Programa de Participação nos Resultados'),
+                createPprElement('div', 'ppr-screen-kicker', pprConfig.referencePeriod === '2026/2027' ? 'PPR 2026/2027 – pagamento JUL/2027' : 'Programa de Participação nos Resultados'),
                 createPprElement('div', 'ppr-screen-title', 'Acompanhamento do PPR')
             );
             header.append(titleGroup, createPprElement('div', 'ppr-period-badge', `Período ${pprConfig.referencePeriod || 'não informado'}`));
@@ -9253,18 +9318,16 @@
         }
 
         function buildPprThermometer(indicator) {
-            const value = Math.max(0, Math.min(150, Number(indicator.result) || 0));
+            const maximum = getPprMaxResult(indicator);
+            const value = Math.max(0, Math.min(maximum, Number(indicator.result) || 0));
             const rule = getPprRule(value);
             const wrap = createPprElement('div', 'ppr-thermometer-wrap');
             const thermometer = createPprElement('div', 'ppr-thermometer');
             thermometer.style.setProperty('--ppr-color', rule.color);
             const fill = createPprElement('div', 'ppr-fill');
-            fill.style.setProperty('--ppr-fill', `${(value / 150) * 100}%`);
+            fill.style.setProperty('--ppr-fill', `${(value / maximum) * 100}%`);
             const scale = createPprElement('div', 'ppr-scale');
-            [
-                [150, 100, false], [125, 83.333, false], [100, 66.667, true],
-                [75, 50, false], [50, 33.333, false], [0, 0, false]
-            ].forEach(([label, bottom, meta]) => {
+            getPprScale(indicator).forEach(([label, bottom, meta]) => {
                 const tick = createPprElement('div', `ppr-tick${meta ? ' meta' : ''}`);
                 tick.appendChild(createPprElement('span', 'ppr-tick-percent', meta ? '100% Meta' : `${label}%`));
                 const expected = getPprBandLabel(indicator, label);
@@ -9287,7 +9350,7 @@
             const indicators = getActivePprIndicators();
             const average = indicators.length
                 ? indicators.reduce((sum, item) => sum + Number(item.result), 0) / indicators.length
-                : 0;
+                : null;
             const reached = indicators.filter(item => Number(item.result) >= 100).length;
             const latest = indicators.map(item => item.updatedAt).filter(Boolean).sort().pop() || pprConfig.updatedAt;
             const hero = createPprElement('div', 'ppr-summary-hero');
@@ -9331,7 +9394,7 @@
                 resultRow.append(createPprElement('span', '', formatPprPercent(indicator.result)), createPprElement('small', '', operational ? `Realizado ${operational}` : 'Resultado informado'));
                 const progress = createPprElement('div', 'ppr-progress');
                 const progressFill = createPprElement('span', 'ppr-progress-fill');
-                progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+                progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / getPprMaxResult(indicator) * 100))}%`);
                 progress.appendChild(progressFill);
                 const meta = createPprElement('div', 'ppr-indicator-meta');
                 meta.append(createPprElement('span', '', expectedBand ? `Faixa ${expectedBand}` : 'Faixa não informada'), createPprElement('span', '', 'Meta 100%'));
@@ -9375,7 +9438,7 @@
             if (operationalValues.childElementCount) copy.appendChild(operationalValues);
             const progress = createPprElement('div', 'ppr-progress');
             const progressFill = createPprElement('span', 'ppr-progress-fill');
-            progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+            progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / getPprMaxResult(indicator) * 100))}%`);
             progress.appendChild(progressFill);
             copy.appendChild(progress);
             copy.append(createPprElement('div', 'ppr-status-message', rule.message), createPprElement('div', 'ppr-result-footer', `Referência: ${formatPprDate(indicator.referenceDate)} · Atualizado em ${formatPprDate(indicator.updatedAt, true)}${indicator.note ? ` · ${indicator.note}` : ''}`));
@@ -9394,7 +9457,7 @@
                 card.style.setProperty('--ppr-color', rule.color);
                 const mini = createPprElement('div', 'ppr-mini-thermometer');
                 const fill = createPprElement('div', 'ppr-fill');
-                fill.style.setProperty('--ppr-fill', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+                fill.style.setProperty('--ppr-fill', `${Math.max(0, Math.min(100, Number(indicator.result) / getPprMaxResult(indicator) * 100))}%`);
                 mini.appendChild(fill);
                 const copy = createPprElement('div');
                 copy.append(
@@ -9407,7 +9470,7 @@
                 if (operational || expectedBand) copy.appendChild(createPprElement('div', 'ppr-general-operational', [operational ? `Realizado ${operational}` : '', expectedBand ? `Faixa ${expectedBand}` : ''].filter(Boolean).join(' · ')));
                 const progress = createPprElement('div', 'ppr-progress');
                 const progressFill = createPprElement('span', 'ppr-progress-fill');
-                progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / 1.5))}%`);
+                progressFill.style.setProperty('--ppr-progress', `${Math.max(0, Math.min(100, Number(indicator.result) / getPprMaxResult(indicator) * 100))}%`);
                 progress.appendChild(progressFill);
                 card.append(mini, copy, progress);
                 grid.appendChild(card);

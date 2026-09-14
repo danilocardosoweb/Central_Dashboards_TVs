@@ -54,7 +54,7 @@ test('escala mantém os seis marcos e o resultado decimal', () => {
         assert.match(web, new RegExp(`\\[${mark},`));
     }
     assert.match(web, /step="0\.01"/);
-    assert.match(web, /value \/ 150/);
+    assert.match(web, /value \/ maximum/);
 });
 
 test('layout do PPR respeita a area segura de TVs 16:9', () => {
@@ -126,4 +126,53 @@ test('Roku aceita numeros encapsulados pelo ParseJson e nao exibe zero falso', (
     assert.match(roku, /enabledPprIndicatorCount\(ppr\)/);
     assert.match(roku, /m\.pprSummaryAverage\.text = "--"/);
     assert.match(roku, /ppr-invalid-results/);
+});
+
+test('limites exclusivos, inclusivos, zero e percentuais brasileiros', () => {
+    const context = { Number, String };
+    vm.createContext(context);
+    vm.runInContext(web.slice(web.indexOf('function parsePprMeasureNumber'), web.indexOf('function getPprBandLabel')), context);
+    assert.equal(context.parsePprMeasureNumber(0), 0);
+    assert.equal(context.parsePprMeasureNumber('0,25%'), 0.25);
+    assert.equal(context.parsePprMeasureNumber(''), null);
+    assert.equal(context.parsePprMeasureNumber('0x10'), null);
+    const performanceBands = [{ percent: 150, label: 'Até 1,5%' }, { percent: 100, label: 'Maior que 1,5%' }];
+    assert.equal(context.pprBandsOverlap(performanceBands), false);
+    assert.equal(context.calculatePprResultFromBands({ operationalValue: '1,5%', performanceBands }), 150);
+    assert.equal(context.calculatePprResultFromBands({ operationalValue: '1,5001%', performanceBands }), 100);
+    assert.equal(context.parsePprBandRange('maior ou igual a 79').min, 79);
+    assert.equal(context.parsePprBandRange('menor ou igual a 79').max, 79);
+    assert.equal(context.calculatePprResultFromBands({ operationalValue: '84,02', performanceBands: [{ percent: 100, label: '84 a 84,9 %' }] }), 100);
+});
+
+test('admin distingue pendência de zero e preserva decimais proporcionais', () => {
+    const context = { Number, String };
+    vm.createContext(context);
+    vm.runInContext(web.slice(web.indexOf('function hasPprResult'), web.indexOf('function parsePprMeasureNumber')), context);
+    assert.equal(context.formatPprPercent(null), 'Sem resultado');
+    assert.equal(context.formatPprPercent(''), 'Sem resultado');
+    assert.equal(context.formatPprPercent(0), '0%');
+    assert.equal(context.formatPprPercent(112.5), '112,5%');
+    assert.equal(context.hasPprResult(150.01), false);
+    assert.equal(context.formatPprMeasure(0, '%'), '0 %');
+});
+
+test('Devolução aceita faixas decrescentes e preserva os percentuais da referência', () => {
+    const c = { Number, String, createEntityId: () => 'id', hasOwnTarget: (item, key) => Object.hasOwn(item, key) };
+    vm.createContext(c);
+    vm.runInContext(web.slice(web.indexOf('function defaultPprRules'), web.indexOf('function initializePpr')), c);
+    vm.runInContext(web.slice(web.indexOf('function parsePprMeasureNumber'), web.indexOf('function getPprBandLabel')), c);
+    const indicator = { evaluationProfile: 'returns', performanceBands: c.defaultPprBands('returns') };
+    const samples = [['0,08%',120],['0,09',120],['0,10',110],['0,11',110],['0,12',100],['0,13',100],['0,14',50],['0,15',50],['0,16',25],['0,17',25],['0,18',null],['0,19',0],['0,07',null],['0,135',null],['-0,1',null],['',null]];
+    for (const [value, result] of samples) assert.equal(c.calculatePprResultFromBands(indicator, value), result, value);
+    assert.equal(c.getPprBandValidationIssue(indicator.performanceBands, true), null);
+    assert.equal(c.findPprBandOverlap(indicator.performanceBands, true), null);
+    const restored = c.normalizePprConfig({ indicators: [indicator] }).indicators[0];
+    assert.deepEqual(Array.from(restored.performanceBands, b => b.percent), [120,110,100,50,25,0]);
+    assert.equal(restored.evaluationProfile, 'returns');
+    assert.equal(c.getPprMaxResult(restored), 120);
+    assert.equal(c.calculatePprResultFromBands({evaluationProfile:'audit-score'},'79,5%'),79.5);
+    assert.equal(c.calculatePprResultFromBands({evaluationProfile:'audit-score'},'100,01'),null);
+    assert.equal(c.getPprMaxResult({evaluationProfile:'audit-bands'}),100);
+    assert.equal(c.normalizePprConfig({ indicators: [{evaluationProfile:'audit-bands',result:125}] }).indicators[0].result,null);
 });
