@@ -176,3 +176,15 @@ test('Devolução aceita faixas decrescentes e preserva os percentuais da refer�
     assert.equal(c.getPprMaxResult({evaluationProfile:'audit-bands'}),100);
     assert.equal(c.normalizePprConfig({ indicators: [{evaluationProfile:'audit-bands',result:125}] }).indicators[0].result,null);
 });
+
+test('Auditoria usa a tabela oficial de 0% a 100%', () => {
+    const context = { Number, String, createEntityId: () => 'id', hasOwnTarget: (item, key) => Object.hasOwn(item, key) };
+    vm.createContext(context);
+    vm.runInContext(web.slice(web.indexOf('function defaultPprRules'), web.indexOf('function initializePpr')), context);
+    vm.runInContext(web.slice(web.indexOf('function parsePprMeasureNumber'), web.indexOf('function getPprBandLabel')), context);
+    const indicator = { evaluationProfile: 'audit-bands', performanceBands: context.defaultPprBands('audit-bands') };
+    for (const [value, expected] of [['100', 100], ['90',100], ['89',75], ['80',75], ['79',50], ['70',50], ['69',25], ['51',25], ['50',null], ['49,9',0]]) {
+        assert.equal(context.calculatePprResultFromBands(indicator, value), expected, value);
+    }
+    assert.equal(context.getPprMaxResult(indicator), 100);
+});
