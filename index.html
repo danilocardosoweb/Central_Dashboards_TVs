@@ -8471,7 +8471,14 @@
                 { percent: 25, label: '0,17% a 0,16%' },
                 { percent: 0, label: 'Maior que 0,18%' }
             ];
-            if (['audit-score', 'audit-bands'].includes(profile)) return [100, 75, 50, 25, 0].map(percent => ({ percent, label: '' }));
+            if (profile === 'audit-bands') return [
+                { percent: 100, label: '90 a 100%' },
+                { percent: 75, label: '80 a 89%' },
+                { percent: 50, label: '70 a 79%' },
+                { percent: 25, label: '51 a 69%' },
+                { percent: 0, label: 'Abaixo de 50%' }
+            ];
+            if (profile === 'audit-score') return [100, 75, 50, 25, 0].map(percent => ({ percent, label: '' }));
             return [150, 125, 100, 75, 50, 0].map(percent => ({ percent, label: '' }));
         }
 
