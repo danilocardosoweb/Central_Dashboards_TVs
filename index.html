@@ -2918,6 +2918,24 @@
         }
 
         .settings-nav-button i { display: block; margin-bottom: 0.35rem; font-size: 1rem; }
+        .usinagem-shell { display: grid; gap: 1rem; }
+        .usinagem-tabs, .usinagem-filters { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+        .usinagem-tab { border: 1px solid var(--border-color); background: var(--surface-color); color: var(--text-secondary); border-radius: 0.55rem; padding: 0.55rem 0.75rem; cursor: pointer; font-weight: 700; }
+        .usinagem-tab.active { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .usinagem-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); align-items: end; }
+        .usinagem-filters label { display: grid; gap: 0.3rem; font-size: 0.7rem; color: var(--text-secondary); font-weight: 700; }
+        .usinagem-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 0.7rem; }
+        .usinagem-kpi { border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 0.8rem; background: var(--surface-color); }
+        .usinagem-kpi small { color: var(--text-secondary); display: block; font-size: 0.68rem; }
+        .usinagem-kpi strong { display: block; font-size: 1.25rem; margin-top: 0.25rem; }
+        .usinagem-table-wrap { overflow: auto; max-height: 430px; border: 1px solid var(--border-color); border-radius: 0.65rem; }
+        .usinagem-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 900px; }
+        .usinagem-table th, .usinagem-table td { padding: 0.55rem; border-bottom: 1px solid var(--border-color); text-align: left; white-space: nowrap; }
+        .usinagem-table th { position: sticky; top: 0; background: var(--surface-color); color: var(--text-secondary); }
+        .usinagem-state { padding: 1.2rem; border: 1px dashed var(--border-color); border-radius: 0.75rem; color: var(--text-secondary); }
+        .usinagem-bars { display: grid; gap: 0.55rem; }
+        .usinagem-bar { display: grid; grid-template-columns: minmax(100px, 22%) 1fr auto; align-items: center; gap: 0.55rem; font-size: 0.72rem; }
+        .usinagem-bar i { display: block; height: 0.65rem; background: #3b82f6; border-radius: 99px; }
         .settings-nav-button:hover { color: #1d4ed8; background: #eff6ff; }
         .settings-nav-button.active {
             color: #1d4ed8;
@@ -2966,7 +2984,7 @@
 
         @media (max-width: 720px) {
             .config-panel { width: 100vw; }
-            .settings-nav { grid-template-columns: repeat(7, 88px); justify-content: start; }
+            .settings-nav { grid-template-columns: repeat(8, 88px); justify-content: start; }
             .station-selector-grid, .alert-form-grid, .area-create-grid { grid-template-columns: 1fr; }
             .presentation-estimate-heading { display: block; }
             .presentation-estimate-total { margin-top: 0.8rem; text-align: left; }
@@ -3663,6 +3681,9 @@
                     <span id="alertNavCount" class="settings-nav-count">0</span>
                     <i class="fas fa-bullhorn"></i>Avisos
                 </button>
+                <button type="button" class="settings-nav-button" data-settings-target="usinagem" role="tab" aria-selected="false" onclick="showSettingsSection('usinagem', this)">
+                    <i class="fas fa-industry"></i>Usinagem
+                </button>
                 <button type="button" class="settings-nav-button" data-settings-target="organization" role="tab" aria-selected="false" onclick="showSettingsSection('organization', this)">
                     <i class="fas fa-sitemap"></i>TVs e setores
                 </button>
@@ -4084,6 +4105,11 @@
                     </div>
                 </details>
             </div>
+        </div>
+
+        <div class="input-group" data-settings-section="usinagem" id="usinagemSection">
+            <div class="area-manager-header"><h3>🏭 Central de Indicadores da Usinagem</h3><p>Produção, produtividade, paradas, refugo, ordens e máquinas.</p></div>
+            <div id="usinagemRoot" class="usinagem-shell"></div>
         </div>
 
         <div class="input-group" data-settings-section="organization">
@@ -5048,6 +5074,10 @@
             ppr: {
                 title: 'Acompanhamento do PPR',
                 description: 'Cadastre resultados manuais e escolha em quais TVs o acompanhamento será exibido.'
+            },
+            usinagem: {
+                title: 'Central de Indicadores da Usinagem',
+                description: 'Acompanhe produção, produtividade, paradas, refugo, ordens e máquinas.'
             },
             alerts: {
                 title: 'Central de avisos',
@@ -10527,5 +10557,6 @@
             });
         })();
     </script>
+    <script type="module" src="./ui/usinagem-dashboard.mjs"></script>
 </body>
 </html>
