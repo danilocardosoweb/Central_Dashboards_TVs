@@ -61,6 +61,22 @@ recebe os dashboards, áreas, estações e avisos salvos.
 O perfil selecionado em cada TV continua sendo uma preferência local. Assim,
 alterar a estação de um Raspberry não troca a estação dos demais.
 
+## Central de Indicadores da Usinagem
+
+A aba **🏭 Usinagem** usa uma conexão Supabase independente da base das TVs.
+Configure `VITE_USINAGEM_SUPABASE_URL` e `VITE_USINAGEM_SUPABASE_ANON_KEY` no
+ambiente de publicação (ou em `window.__USINAGEM_CONFIG__` no runtime). A área
+permanece em estado “Fonte de dados ainda não configurada” quando essas
+variáveis não existem. O cliente usa somente a chave pública de leitura e não
+altera o estado da Central das TVs.
+
+Os dados são lidos de `apontamentos`, `paradas`, `pedidos` e `maquinas`, com
+filtros de período e dimensões combináveis. Produção líquida usa `quantidade`,
+refugo usa `qtd_refugo`, e produtividade e paradas descartam intervalos sem
+início, fim ou com duração não positiva. A camada de integração está em
+`services/usinagem-service.mjs`; o SQL de views futuras deve ser executado
+separadamente no projeto Supabase da Usinagem.
+
 ## Avisos somente por imagem
 
 Na seção **Avisos**, use **Postar imagem** para publicar uma arte pronta sem
