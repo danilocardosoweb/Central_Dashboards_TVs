@@ -133,3 +133,20 @@ test('player recupera o carrossel se o temporizador da tela parar', () => {
   assert.match(scene, /playback-recovery-stalled/);
   assert.match(scene, /station-selector-closed/);
 });
+
+test('contador minimalista mostra o tempo restante sem controlar a rotação', () => {
+  assert.match(xml, /id="countdownOverlay"/);
+  assert.match(xml, /id="countdownLabel"/);
+  assert.match(xml, /id="countdownTimer" duration="1" repeat="true"/);
+  assert.match(scene, /sub updateCountdownOverlay\(\)/);
+  assert.match(scene, /remaining = Int\(duration - currentPlaybackAge\(\)/);
+  assert.match(scene, /m\.countdownTimer\.control = "start"/);
+  assert.match(scene, /m\.countdownTimer\.control = "stop"/);
+});
+
+test('contador usa a mesma duração configurada no slide', () => {
+  assert.match(scene, /duration = valueOr\(slide, "duration", m\.defaultDuration\)/);
+  assert.match(scene, /m\.slideTimer\.duration = duration/);
+  assert.match(scene, /remaining = Int\(duration - currentPlaybackAge\(\)/);
+  assert.match(scene, /startSlideTimer\(completedSlide\)/);
+});

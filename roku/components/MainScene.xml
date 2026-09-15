@@ -140,6 +140,12 @@
                     </Group>
                 </Group>
             </Group>
+            <Group id="countdownOverlay" translation="[1705,1008]" visible="false">
+                <Rectangle width="205" height="48" color="0x08111FCC" />
+                <Label id="countdownLabel" translation="[10,7]" width="185" height="34"
+                    text="PRÓXIMA TELA 00:00" horizAlign="right"
+                    color="0xFFFFFFFF" font="font:SmallSystemFont" />
+            </Group>
 
             <Group id="bannerGroup" translation="[48,832]" opacity="0" visible="false">
                 <Rectangle id="bannerShadow" translation="[10,12]" width="1824" height="200" color="0x02061788" />
@@ -250,6 +256,7 @@
             </Group>
 
             <Timer id="slideTimer" repeat="false" />
+            <Timer id="countdownTimer" duration="1" repeat="true" />
             <Timer id="syncTimer" duration="60" repeat="true" />
             <Timer id="heartbeatTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />

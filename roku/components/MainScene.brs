@@ -74,6 +74,9 @@ sub init()
     m.stationList = m.top.FindNode("stationList")
     m.loading = m.top.FindNode("loading")
     m.slideTimer = m.top.FindNode("slideTimer")
+    m.countdownTimer = m.top.FindNode("countdownTimer")
+    m.countdownOverlay = m.top.FindNode("countdownOverlay")
+    m.countdownLabel = m.top.FindNode("countdownLabel")
     m.syncTimer = m.top.FindNode("syncTimer")
     m.heartbeatTimer = m.top.FindNode("heartbeatTimer")
     m.transitionTimer = m.top.FindNode("transitionTimer")
@@ -106,6 +109,7 @@ sub init()
     m.temporaryAlertBlink = m.top.FindNode("temporaryAlertBlink")
 
     m.slideTimer.ObserveField("fire", "onSlideTimer")
+    m.countdownTimer.ObserveField("fire", "onCountdownTimer")
     m.syncTimer.ObserveField("fire", "onSyncTimer")
     m.heartbeatTimer.ObserveField("fire", "onHeartbeatTimer")
     m.transitionTimer.ObserveField("fire", "onTransitionTimer")
@@ -949,7 +953,29 @@ sub startSlideTimer(slide as dynamic)
     if duration < 5 then duration = 5
     m.lastSlideStartedAt = m.sessionUptime.TotalSeconds()
     m.slideTimer.duration = duration
-    if not m.paused then m.slideTimer.control = "start"
+    updateCountdownOverlay()
+    if not m.paused then
+        m.slideTimer.control = "start"
+        m.countdownTimer.control = "start"
+    end if
+end sub
+
+sub onCountdownTimer()
+    updateCountdownOverlay()
+end sub
+
+sub updateCountdownOverlay()
+    if m.countdownLabel = invalid then return
+    if m.paused or m.slideIndex < 0 or m.slideIndex >= m.slides.Count()
+        m.countdownOverlay.visible = false
+        return
+    end if
+    duration = valueOr(m.slides[m.slideIndex], "duration", m.defaultDuration)
+    if duration < 5 then duration = 5
+    remaining = Int(duration - currentPlaybackAge() + 0.999)
+    if remaining < 0 then remaining = 0
+    m.countdownLabel.text = "PRÓXIMA TELA " + pad2(Int(remaining / 60)) + ":" + pad2(remaining mod 60)
+    m.countdownOverlay.visible = true
 end sub
 
 sub appendSlides(target as object, source as object)
@@ -2023,9 +2049,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.paused = not m.paused
         if m.paused
             m.slideTimer.control = "stop"
+            m.countdownTimer.control = "stop"
         else if m.slides.Count() > 0
             m.slideTimer.control = "start"
+            m.countdownTimer.control = "start"
         end if
+        updateCountdownOverlay()
         updateSlideStatus()
         return true
     end if
