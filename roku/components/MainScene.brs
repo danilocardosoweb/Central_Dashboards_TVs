@@ -142,6 +142,7 @@ sub init()
     m.fetching = false
     m.paused = false
     m.defaultDuration = 30
+    m.countdownEnabled = true
     m.transitionEffect = "fade"
     m.transitionDuration = 1.4
     m.currentImageName = ""
@@ -172,7 +173,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 35, endpoint: m.endpoint })
+    logEvent("app-start", { build: 36, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -340,6 +341,7 @@ sub configureDefaultDuration(payload as object)
     m.defaultDuration = seconds
 
     m.transitionEffect = LCase(valueOr(settings, "transitionEffect", "fade"))
+    m.countdownEnabled = valueOr(settings, "countdownEnabled", true) <> false
     transitionDurationMs = valueOr(settings, "transitionDuration", 1400)
     m.transitionDuration = transitionDurationMs / 1000.0
     if m.transitionDuration < 0.3 then m.transitionDuration = 0.3
@@ -1031,7 +1033,7 @@ sub startSlideTimer(slide as dynamic)
     updateCountdownOverlay()
     if not m.paused then
         m.slideTimer.control = "start"
-        m.countdownTimer.control = "start"
+        if m.countdownEnabled then m.countdownTimer.control = "start"
     end if
 end sub
 
@@ -1041,7 +1043,8 @@ end sub
 
 sub updateCountdownOverlay()
     if m.countdownLabel = invalid then return
-    if m.paused or m.slideIndex < 0 or m.slideIndex >= m.slides.Count()
+    if not m.countdownEnabled or m.paused or m.slideIndex < 0 or m.slideIndex >= m.slides.Count()
+        m.countdownTimer.control = "stop"
         m.countdownOverlay.visible = false
         return
     end if
@@ -2060,7 +2063,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V35 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V36 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -2073,7 +2076,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 35
+        build: 36
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId
@@ -2129,7 +2132,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             m.countdownTimer.control = "stop"
         else if m.slides.Count() > 0
             m.slideTimer.control = "start"
-            m.countdownTimer.control = "start"
+            if m.countdownEnabled then m.countdownTimer.control = "start"
         end if
         updateCountdownOverlay()
         updateSlideStatus()
