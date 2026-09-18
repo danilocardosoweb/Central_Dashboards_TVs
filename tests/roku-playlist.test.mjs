@@ -134,6 +134,17 @@ test('player recupera o carrossel se o temporizador da tela parar', () => {
   assert.match(scene, /station-selector-closed/);
 });
 
+test('Roku reproduz vídeos MP4 de alertas em tela cheia', () => {
+  assert.match(xml, /id="alertVideo"/);
+  assert.match(scene, /mediaType = "video"/);
+  assert.match(scene, /mediaUrl: alertImageUrl/);
+  assert.match(scene, /sub startAlertVideo\(slide as object, mediaUrl as string\)/);
+  assert.match(scene, /content\.streamFormat = "mp4"/);
+  assert.match(scene, /sub onAlertVideoState\(\)/);
+  assert.match(scene, /state = "finished"/);
+  assert.doesNotMatch(scene, /logEvent\("alert-skipped-video"/);
+});
+
 test('contador minimalista mostra o tempo restante sem controlar a rotação', () => {
   assert.match(xml, /id="countdownOverlay"/);
   assert.match(xml, /id="countdownLabel"/);
