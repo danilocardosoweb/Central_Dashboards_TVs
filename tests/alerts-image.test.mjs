@@ -46,7 +46,7 @@ test('Roku continua consumindo a URL remota do aviso', () => {
 });
 
 test('a Central exige uma URL HTTPS para imagens que serão exibidas na TV', () => {
-    assert.match(web, /Envie uma imagem para a TV antes de salvar/);
+    assert.match(web, /Envie o arquivo antes de salvar/);
     assert.match(web, /uploadAlertAsset\(asset\.blob, asset\.mimeType, asset\.extension\)/);
     assert.doesNotMatch(web, /uploadAlertImage\(/);
 });

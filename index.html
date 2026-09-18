@@ -4383,7 +4383,7 @@
 
                 <label for="alertImage">Arquivo opcional</label>
                 <input type="file" id="alertImage" class="input-field"
-                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,application/pdf,video/mp4,video/webm,video/quicktime"
+                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,application/pdf,video/mp4"
                        onchange="handleAlertImage(event)">
                 <button type="button" id="removeAlertImageButton" class="btn btn-outline"
                         style="display: none;" onclick="removeAlertImage()">
@@ -5621,6 +5621,28 @@
         }
 
         function buildAlertVisual(alert) {
+            if (alert.mediaType === 'video') {
+                const visual = document.createElement('div');
+                visual.className = 'alert-image-only';
+                visual.style.background = alert.imageBackground || '#000000';
+                const videoSource = alert.mediaUrl || alert.attachmentUrl || alert.fileUrl;
+                if (videoSource) {
+                    const video = document.createElement('video');
+                    video.src = videoSource;
+                    video.muted = true;
+                    video.autoplay = true;
+                    video.loop = true;
+                    video.playsInline = true;
+                    video.controls = false;
+                    video.style.width = '100%';
+                    video.style.height = '100%';
+                    video.style.objectFit = alert.imageFit === 'cover' ? 'cover' : 'contain';
+                    visual.appendChild(video);
+                } else {
+                    visual.appendChild(createTextElement('div', 'alert-image-only-placeholder', 'Selecione um vídeo para visualizar'));
+                }
+                return visual;
+            }
             if (alert.contentType === 'image') {
                 const visual = document.createElement('div');
                 visual.className = 'alert-image-only';
@@ -6660,13 +6682,14 @@
         async function saveAlert() {
         const draft = getAlertDraft();
         const isImageOnly = draft.contentType === 'image';
+        const isVideo = draft.mediaType === 'video';
         const mediaUrl = draft.imageUrl || draft.mediaUrl || draft.attachmentUrl || '';
-        if (isImageOnly && draft.mediaType && draft.mediaType !== 'image') {
-            showToast('Avisos em tela cheia da TV aceitam imagens. Use PDF ou vídeo como anexo de um comunicado.', 'error');
+        if (isImageOnly && draft.mediaType && !['image', 'video'].includes(draft.mediaType)) {
+            showToast('Avisos em tela cheia aceitam imagens ou vídeos MP4 compatíveis.', 'error');
             return;
         }
-        if (isImageOnly && !/^https:\/\//i.test(mediaUrl)) {
-            showToast('Envie uma imagem para a TV antes de salvar. Ela precisa gerar um link HTTPS.', 'error');
+        if ((isImageOnly || isVideo) && !/^https:\/\//i.test(mediaUrl)) {
+            showToast('Envie o arquivo antes de salvar. Ele precisa gerar um link HTTPS.', 'error');
             return;
         }
             if (!isImageOnly && !draft.title) {
@@ -6674,7 +6697,7 @@
                 document.getElementById('alertTitle').focus();
                 return;
             }
-            if (!isImageOnly && !draft.body && !draft.action && !draft.imageUrl && !draft.imageData) {
+            if (!isImageOnly && !draft.body && !draft.action && !draft.imageUrl && !draft.imageData && !mediaUrl) {
                 showToast('Informe uma mensagem, uma ação ou uma imagem', 'error');
                 return;
             }
@@ -6691,6 +6714,12 @@
                 draft.owner = '';
                 draft.displayMode = 'fullscreen';
                 draft.layoutMode = 'automatic';
+            }
+            if (isVideo) {
+                draft.displayMode = 'fullscreen';
+                draft.layoutMode = 'automatic';
+                draft.body = '';
+                draft.action = '';
             }
 
             const id = document.getElementById('alertId').value;
@@ -6963,9 +6992,9 @@
             if (!file) return;
 
             const allowedImageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp'];
-            const supportedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+            const supportedVideoTypes = ['video/mp4'];
             const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-            const isVideo = supportedVideoTypes.includes(file.type);
+            const isVideo = supportedVideoTypes.includes(file.type) || (!file.type && /\.mp4$/i.test(file.name));
             const isImage = allowedImageTypes.includes(file.type);
 
             if (!isImage && !isPdf && !isVideo) {
@@ -6988,7 +7017,7 @@
             try {
                 let asset = {
                     blob: file,
-                    mimeType: alertEditorMediaMime || 'application/octet-stream',
+                    mimeType: alertEditorMediaMime || (isVideo ? 'video/mp4' : 'application/octet-stream'),
                     extension: (file.name.split('.').pop() || 'bin').toLowerCase()
                 };
                 if (isImage) asset = await optimizeAlertImage(file);

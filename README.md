@@ -81,7 +81,7 @@ separadamente no projeto Supabase da Usinagem.
 
 Na seção **Avisos**, use **Postar imagem** para publicar uma arte pronta sem
 preencher título, mensagem ou ação. A Central aceita PNG, JPEG e WebP de até
-10 MB, reduz automaticamente para até 1920×1080 e permite escolher entre
+50 MB, reduz automaticamente para até 1920×1080 e permite escolher entre
 mostrar a imagem inteira ou preencher a tela.
 
 Para que a mesma imagem funcione no navegador e no aplicativo Roku, execute
@@ -98,6 +98,12 @@ Depois disso:
 
 Se o bucket ainda não estiver configurado, a Central mantém uma cópia local
 para teste no navegador, mas o Roku precisa da URL HTTPS criada no Storage.
+
+Vídeos curtos em **MP4** também podem ser enviados pelo mesmo campo de arquivo.
+Eles são reproduzidos em tela cheia no Roku por meio do componente `Video`.
+Use URL HTTPS e, para melhor compatibilidade, MP4 com vídeo H.264 e áudio AAC.
+O limite do bucket é 50 MB; PDF, WebM e QuickTime não entram no carrossel do
+Roku.
 
 ## Acompanhamento do PPR
 

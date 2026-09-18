@@ -6,6 +6,7 @@ sub init()
     m.contentGroup = m.top.FindNode("contentGroup")
     m.dashboardImageA = m.top.FindNode("dashboardImageA")
     m.dashboardImageB = m.top.FindNode("dashboardImageB")
+    m.alertVideo = m.top.FindNode("alertVideo")
     m.messagePanel = m.top.FindNode("messagePanel")
     m.accent = m.top.FindNode("accent")
     m.kicker = m.top.FindNode("kicker")
@@ -123,6 +124,7 @@ sub init()
     m.temporaryAlertGapTimer.ObserveField("fire", "onTemporaryAlertGapTimer")
     m.dashboardImageA.ObserveField("loadStatus", "onImageALoadStatus")
     m.dashboardImageB.ObserveField("loadStatus", "onImageBLoadStatus")
+    m.alertVideo.ObserveField("state", "onAlertVideoState")
     m.stationList.ObserveField("itemSelected", "onStationSelected")
 
     m.state = invalid
@@ -147,6 +149,8 @@ sub init()
     m.pendingImageUri = ""
     m.pendingSlide = invalid
     m.pendingImageAttempts = 0
+    m.videoPlaying = false
+    m.videoSlide = invalid
     m.introPlaying = false
     m.introRemoved = false
     m.preservePlaybackOnBuild = false
@@ -556,7 +560,17 @@ sub buildPlaylist()
                 if mediaType = "pdf" then
                     logEvent("alert-skipped-pdf", { id: valueOr(alert, "id", "") })
                 else if mediaType = "video" then
-                    logEvent("alert-skipped-video", { id: valueOr(alert, "id", "") })
+                    alertSlides.Push({
+                        id: valueOr(alert, "id", "")
+                        kind: "alert"
+                        source: alert
+                        title: valueOr(alert, "title", "Vídeo")
+                        body: valueOr(alert, "body", "")
+                        imageUrl: ""
+                        mediaUrl: alertImageUrl
+                        mediaType: "video"
+                        duration: valueOr(alert, "duration", 20)
+                    })
                 else if valueOr(alert, "contentType", "message") = "image" and alertImageUrl = "" then
                     logEvent("alert-skipped-no-remote-image", { id: valueOr(alert, "id", "") })
                 else
@@ -649,6 +663,7 @@ end sub
 
 sub renderSlide(slide as object)
     cancelPendingImage()
+    stopAlertVideo()
     m.slideTimer.control = "stop"
     logEvent("slide-start", {
         index: m.slideIndex
@@ -659,6 +674,13 @@ sub renderSlide(slide as object)
     })
     updateDiagnostics()
     imageUrl = valueOr(slide, "imageUrl", "")
+    mediaType = LCase(valueOr(slide, "mediaType", ""))
+    mediaUrl = valueOr(slide, "mediaUrl", "")
+
+    if mediaType = "video" and Left(LCase(mediaUrl), 8) = "https://"
+        startAlertVideo(slide, mediaUrl)
+        return
+    end if
 
     if imageUrl <> ""
         queueImageSlide(slide, imageUrl)
@@ -685,6 +707,57 @@ sub renderSlide(slide as object)
     updateSlideStatus()
 
     startSlideTimer(slide)
+end sub
+
+sub startAlertVideo(slide as object, mediaUrl as string)
+    hideDashboardImages()
+    m.messagePanel.visible = false
+    m.pprPanel.visible = false
+    content = CreateObject("roSGNode", "ContentNode")
+    content.url = mediaUrl
+    content.streamFormat = "mp4"
+    m.alertVideo.content = content
+    m.alertVideo.visible = true
+    m.videoSlide = slide
+    m.videoPlaying = true
+    m.countdownOverlay.visible = false
+    m.countdownTimer.control = "stop"
+    m.slideTimer.control = "stop"
+    m.contentGroup.opacity = 1.0
+    m.alertVideo.control = "play"
+    logEvent("alert-video-start", { id: valueOr(slide, "id", "") })
+    updateSlideStatus()
+end sub
+
+sub onAlertVideoState()
+    if m.alertVideo = invalid then return
+    state = LCase(m.alertVideo.state)
+    logEvent("alert-video-state", { id: valueOr(m.videoSlide, "id", ""), state: state })
+    if not m.videoPlaying then return
+    if state = "finished"
+        stopAlertVideo()
+        showNextSlide()
+    else if state = "error"
+        failedSlide = m.videoSlide
+        stopAlertVideo()
+        m.messagePanel.visible = true
+        renderAlertSlide(failedSlide)
+        m.contentGroup.opacity = 0.0
+        m.fadeIn.control = "start"
+        startSlideTimer(failedSlide)
+        m.lastError = "Falha ao reproduzir vídeo " + valueOr(failedSlide, "id", "")
+    end if
+end sub
+
+sub stopAlertVideo()
+    if m.alertVideo = invalid then return
+    wasPlaying = m.videoPlaying
+    m.videoPlaying = false
+    m.videoSlide = invalid
+    m.alertVideo.control = "stop"
+    m.alertVideo.visible = false
+    m.alertVideo.content = invalid
+    if wasPlaying then logEvent("alert-video-stop", {})
 end sub
 
 sub queueImageSlide(slide as object, imageUrl as string)
@@ -756,6 +829,7 @@ end sub
 sub onPlaybackWatchdogTimer()
     if m.paused or m.introPlaying or m.stationOverlay.visible then return
     if m.activeTemporaryAlert <> invalid then return
+    if m.videoPlaying then return
     if m.slides.Count() = 0 then return
 
     if m.slideIndex < 0 or m.slideIndex >= m.slides.Count()
@@ -933,6 +1007,7 @@ sub cancelPendingImage()
 end sub
 
 sub hideDashboardImages()
+    stopAlertVideo()
     m.imageEnter.control = "stop"
     m.transitionTimer.control = "stop"
     m.imageLoadTimer.control = "stop"
@@ -2047,7 +2122,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     else if key = "play"
         m.paused = not m.paused
-        if m.paused
+        if m.videoPlaying
+            if m.paused then m.alertVideo.control = "pause" else m.alertVideo.control = "resume"
+        else if m.paused
             m.slideTimer.control = "stop"
             m.countdownTimer.control = "stop"
         else if m.slides.Count() > 0

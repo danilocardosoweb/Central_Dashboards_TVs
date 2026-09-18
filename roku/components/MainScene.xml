@@ -23,6 +23,12 @@
                     loadHeight="1080"
                     loadDisplayMode="scaleToFit"
                     visible="false" />
+                <Video
+                    id="alertVideo"
+                    width="1920"
+                    height="1080"
+                    visible="false"
+                    loop="false" />
 
                 <Group id="messagePanel">
                     <Rectangle width="1920" height="1080" color="0x08111FFF" />
