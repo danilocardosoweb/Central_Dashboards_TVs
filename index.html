@@ -3831,6 +3831,14 @@
                 O tempo de exibição mantém o painel parado. A velocidade controla somente a animação entre duas telas.
             </div>
 
+            <label class="checkbox-field" style="margin-top: 0.85rem;">
+                <input type="checkbox" id="countdownEnabled" onchange="updateCountdownSetting()" checked>
+                <span>Mostrar cronômetro discreto nas TVs</span>
+            </label>
+            <div class="transition-description">
+                Exibe o tempo restante no canto inferior direito para conferir se a programação está respeitando a duração configurada.
+            </div>
+
             <label class="transition-setting-label" for="refreshInterval">
                 Atualização dos dados
             </label>
@@ -4533,6 +4541,7 @@
         let slideTimeout;
         let transitionCleanupTimeout;
         let currentTransitionEffect = 'fade';
+        let countdownEnabled = true;
         let refreshInterval = 5 * 60 * 1000; // 5 minutos em milissegundos
         let lastRefreshTime = new Date();
         let alerts = [];
@@ -4586,6 +4595,10 @@
             document.getElementById('transitionDuration').value =
                 String(transitionDuration);
             applyTransitionDuration();
+
+            const savedCountdown = localStorage.getItem('countdownEnabled');
+            countdownEnabled = savedCountdown === null ? true : savedCountdown === 'true';
+            document.getElementById('countdownEnabled').checked = countdownEnabled;
 
             const savedRefresh = localStorage.getItem('refreshInterval');
             if (savedRefresh) {
@@ -4651,6 +4664,12 @@
             applyTransitionDuration();
             updatePresentationEstimate();
             showToast('Velocidade da animação atualizada', 'success');
+        }
+
+        function updateCountdownSetting() {
+            countdownEnabled = document.getElementById('countdownEnabled').checked;
+            localStorage.setItem('countdownEnabled', String(countdownEnabled));
+            showToast(countdownEnabled ? 'Cronômetro habilitado nas TVs' : 'Cronômetro desabilitado nas TVs', 'success');
         }
 
         // Extrair o identificador da página de URLs antigas e atuais do Power BI
@@ -9723,6 +9742,7 @@
                 'transitionEffect',
                 'transitionDuration',
                 'refreshInterval',
+                'countdownEnabled',
                 'messageConfig'
             ]);
 
@@ -9751,6 +9771,7 @@
                     transitionEffect: 'settings',
                     transitionDuration: 'settings',
                     refreshInterval: 'settings',
+                    countdownEnabled: 'settings',
                     messageConfig: 'messageConfig'
                 };
                 return sections[String(key)] || '';
@@ -9814,7 +9835,9 @@
                         transitionDuration:
                             Number(localStorage.getItem('transitionDuration')) || 1400,
                         refreshInterval:
-                            Number(localStorage.getItem('refreshInterval')) || 5
+                            Number(localStorage.getItem('refreshInterval')) || 5,
+                        countdownEnabled:
+                            localStorage.getItem('countdownEnabled') !== 'false'
                     }
                 };
             }
@@ -10234,6 +10257,10 @@
                         'refreshInterval',
                         String(Number(settings.refreshInterval) || 5)
                     );
+                    localStorage.setItem(
+                        'countdownEnabled',
+                        settings.countdownEnabled !== false ? 'true' : 'false'
+                    );
 
                     urls = Array.isArray(state.urls) ? state.urls : [];
                     alerts = normalizeAlertCollection(state.alerts).items;
@@ -10244,6 +10271,7 @@
                     transitionDuration = Number(settings.transitionDuration) || 1400;
                     refreshInterval =
                         (Number(settings.refreshInterval) || 5) * 60 * 1000;
+                    countdownEnabled = settings.countdownEnabled !== false;
                     areaSystemReady = false;
 
                     ensureAreaSystem();
@@ -10255,6 +10283,8 @@
                         document.getElementById('transitionDuration');
                     const refreshSelect =
                         document.getElementById('refreshInterval');
+                    const countdownToggle =
+                        document.getElementById('countdownEnabled');
                     if (timeSelect) {
                         timeSelect.value = String(transitionTime / 1000);
                     }
@@ -10268,6 +10298,7 @@
                         refreshSelect.value =
                             String(Number(settings.refreshInterval) || 5);
                     }
+                    if (countdownToggle) countdownToggle.checked = countdownEnabled;
                     applyTransitionDuration();
                     if (playbackChanged) {
                         refreshAreaExperience();
