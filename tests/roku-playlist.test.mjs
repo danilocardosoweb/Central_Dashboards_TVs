@@ -124,7 +124,7 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V36/);
+  assert.match(scene, /Build: V37/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {
@@ -155,6 +155,9 @@ test('contador minimalista mostra o tempo restante sem controlar a rotação', (
   assert.match(scene, /m\.countdownTimer\.control = "stop"/);
   assert.match(scene, /m\.countdownEnabled = valueOr\(settings, "countdownEnabled", true\)/);
   assert.match(scene, /if not m\.countdownEnabled or m\.paused/);
+  assert.match(scene, /m\.countdownLabel\.text = pad2\(Int\(remaining \/ 60\)\)/);
+  assert.doesNotMatch(scene, /PRÓXIMA TELA/);
+  assert.match(xml, /text="00:00" horizAlign="center"/);
 });
 
 test('contador usa a mesma duração configurada no slide', () => {
