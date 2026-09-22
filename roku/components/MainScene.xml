@@ -146,10 +146,10 @@
                     </Group>
                 </Group>
             </Group>
-            <Group id="countdownOverlay" translation="[1705,1008]" visible="false">
-                <Rectangle width="205" height="48" color="0x08111FCC" />
-                <Label id="countdownLabel" translation="[10,7]" width="185" height="34"
-                    text="PRÓXIMA TELA 00:00" horizAlign="right"
+            <Group id="countdownOverlay" translation="[1800,1008]" visible="false">
+                <Rectangle width="76" height="48" color="0x08111FCC" />
+                <Label id="countdownLabel" translation="[6,7]" width="64" height="34"
+                    text="00:00" horizAlign="center"
                     color="0xFFFFFFFF" font="font:SmallSystemFont" />
             </Group>
 

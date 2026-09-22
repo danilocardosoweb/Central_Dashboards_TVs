@@ -173,7 +173,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 36, endpoint: m.endpoint })
+    logEvent("app-start", { build: 37, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -1052,7 +1052,7 @@ sub updateCountdownOverlay()
     if duration < 5 then duration = 5
     remaining = Int(duration - currentPlaybackAge() + 0.999)
     if remaining < 0 then remaining = 0
-    m.countdownLabel.text = "PRÓXIMA TELA " + pad2(Int(remaining / 60)) + ":" + pad2(remaining mod 60)
+    m.countdownLabel.text = pad2(Int(remaining / 60)) + ":" + pad2(remaining mod 60)
     m.countdownOverlay.visible = true
 end sub
 
@@ -2063,7 +2063,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V36 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V37 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -2076,7 +2076,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 36
+        build: 37
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId
