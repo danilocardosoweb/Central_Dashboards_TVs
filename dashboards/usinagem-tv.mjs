@@ -3,6 +3,7 @@ import { supabaseUsinagem, loadUsinagem } from '../services/usinagem-service.mjs
 const app = document.getElementById('app');
 const screenNames = { resumo: 'Resumo operacional', producao: 'Produção por máquina', qualidade: 'Qualidade e refugo', paradas: 'Paradas e ordens' };
 const requestedScreen = new URLSearchParams(window.location.search).get('screen') || 'auto';
+const previewMode = new URLSearchParams(window.location.search).get('preview') === '1';
 const screenKeys = Object.keys(screenNames);
 let data = null;
 let screenIndex = 0;
@@ -71,21 +72,21 @@ function summaryData() {
 
 function resumoScreen(summary) {
   const rate = summary.gross ? summary.scrap / summary.gross * 100 : 0;
-  return `<div class="metric-grid">${card('Produção líquida', fmt(summary.good), 'peças apontadas', 'blue')}${card('Produtividade', summary.productive ? `${fmt(summary.good / summary.productive)}/h` : '—', 'produção por hora', 'violet')}${card('Refugo', `${fmt(summary.scrap)} · ${fmt(rate)}%`, 'sobre a produção bruta', 'orange')}${card('Tempo produtivo', fmtHours(summary.productive), 'intervalos válidos', 'green')}${card('Tempo de parada', fmtHours(summary.stops), 'no período', 'red')}</div><div class="panel-grid">${panel('Produção por unidade', 'VISÃO GERAL', (data.totals || []).map(item => `<div class="unit-line"><span>${esc(unitName(item.unit))}</span><strong>${fmt(item.good)}</strong><small>${fmt(item.productivity || 0)}/h</small></div>`).join('') || '<div class="empty-panel">Sem produção.</div>')}${panel('Destaques da semana', 'ACOMPANHAMENTO', `<div class="insight-list"><div><b>${fmt(data.scoped.length)}</b><span>apontamentos válidos</span></div><div><b>${fmt(data.pedidos.length)}</b><span>ordens carregadas</span></div><div><b>${fmt(summary.machines.length)}</b><span>máquinas com produção</span></div></div>`)}</div>`;
+  return `<div class="metric-grid compact">${card('Produção', fmt(summary.good), 'peças boas', 'blue')}${card('Produtividade', summary.productive ? `${fmt(summary.good / summary.productive)}/h` : '—', 'peças por hora', 'violet')}${card('Refugo', `${fmt(summary.scrap)} · ${fmt(rate)}%`, 'da produção bruta', 'orange')}${card('Paradas', fmtHours(summary.stops), 'tempo perdido', 'red')}</div><div class="panel-grid">${panel('Produção por máquina', 'RANKING', bars(summary.machines))}${panel('Ordens por status', 'PROGRAMAÇÃO', bars(summary.orderStatus))}</div>`;
 }
 
 function producaoScreen(summary) {
-  return `<div class="metric-grid compact">${card('Peças produzidas', fmt(summary.good), 'produção líquida', 'blue')}${card('Máquinas ativas', fmt(summary.machines.length), 'com apontamento no período', 'green')}${card('Operadores', fmt(summary.operators.length), 'com apontamento no período', 'violet')}</div><div class="panel-grid wide-left">${panel('Ranking de produção por máquina', 'TOP 8', bars(summary.machines))}${panel('Produção por operador', 'TOP 8', bars(summary.operators))}</div><div class="callout"><strong>Leitura da tela</strong><span>As barras mostram a produção líquida apontada no período selecionado. A próxima atualização consulta a base automaticamente.</span></div>`;
+  return `<div class="metric-grid compact">${card('Peças produzidas', fmt(summary.good), 'produção líquida', 'blue')}${card('Máquinas ativas', fmt(summary.machines.length), 'no período', 'green')}${card('Operadores', fmt(summary.operators.length), 'no período', 'violet')}</div><div class="panel-grid wide-left">${panel('Produção por máquina', 'TOP 8', bars(summary.machines))}${panel('Produção por operador', 'TOP 8', bars(summary.operators))}</div>`;
 }
 
 function qualidadeScreen(summary) {
   const rate = summary.gross ? summary.scrap / summary.gross * 100 : 0;
-  return `<div class="metric-grid compact">${card('Produção bruta', fmt(summary.gross), 'líquida + refugo', 'blue')}${card('Refugo total', fmt(summary.scrap), 'quantidade apontada', 'orange')}${card('Taxa de refugo', `${fmt(rate)}%`, 'meta de qualidade', rate > 2 ? 'red' : 'green')}${card('Apontamentos', fmt(data.scoped.length), 'registros no período', 'violet')}</div><div class="panel-grid wide-left">${panel('Refugo por máquina', 'QUALIDADE', bars(summary.scrapByMachine))}${panel('Produção por unidade', 'COMPARATIVO', (data.totals || []).map(item => `<div class="quality-line"><span>${esc(unitName(item.unit))}</span><div><i style="width:${Math.min(100, number(item.scrapRate))}%"></i></div><b>${fmt(item.scrapRate)}%</b></div>`).join('') || '<div class="empty-panel">Sem dados de qualidade.</div>')}</div><div class="callout orange-callout"><strong>Critério</strong><span>Taxa calculada por unidade: refugo dividido pela produção bruta.</span></div>`;
+  return `<div class="metric-grid compact">${card('Produção bruta', fmt(summary.gross), 'boas + refugo', 'blue')}${card('Refugo total', fmt(summary.scrap), 'quantidade apontada', 'orange')}${card('Taxa de refugo', `${fmt(rate)}%`, 'indicador de qualidade', rate > 2 ? 'red' : 'green')}</div><div class="panel-grid wide-left">${panel('Refugo por máquina', 'QUALIDADE', bars(summary.scrapByMachine))}${panel('Taxa por unidade', 'COMPARATIVO', (data.totals || []).map(item => `<div class="quality-line"><span>${esc(unitName(item.unit))}</span><div><i style="width:${Math.min(100, number(item.scrapRate))}%"></i></div><b>${fmt(item.scrapRate)}%</b></div>`).join('') || '<div class="empty-panel">Sem dados de qualidade.</div>')}</div>`;
 }
 
 function paradasScreen(summary) {
   const pending = summary.orderStatus.find(item => /pend|abert|wip/i.test(item.name))?.value || 0;
-  return `<div class="metric-grid compact">${card('Tempo parado', fmtHours(summary.stops), 'paradas válidas', 'red')}${card('Ocorrências', fmt(data.validStops.length), 'registros de parada', 'orange')}${card('Ordens carregadas', fmt(data.pedidos.length), 'base de pedidos', 'blue')}${card('Pendentes', fmt(pending), 'status pendente/aberto', 'violet')}</div><div class="panel-grid wide-left">${panel('Principais motivos de parada', 'PARETO', bars(summary.stopReasons, ' h'))}${panel('Status das ordens', 'PROGRAMAÇÃO', bars(summary.orderStatus))}</div><div class="callout"><strong>Gestão à vista</strong><span>Use esta tela para priorizar causas de parada e acompanhar o volume de ordens pendentes.</span></div>`;
+  return `<div class="metric-grid compact">${card('Tempo parado', fmtHours(summary.stops), 'paradas válidas', 'red')}${card('Ocorrências', fmt(data.validStops.length), 'registros', 'orange')}${card('Ordens', fmt(data.pedidos.length), 'carregadas', 'blue')}${card('Pendentes', fmt(pending), 'em aberto', 'violet')}</div><div class="panel-grid wide-left">${panel('Principais motivos', 'PARETO', bars(summary.stopReasons, ' h'))}${panel('Status das ordens', 'PROGRAMAÇÃO', bars(summary.orderStatus))}</div>`;
 }
 
 function screenBody(key, summary) {
@@ -127,6 +128,7 @@ async function refresh() {
   } finally { refreshBusy = false; }
 }
 
+if (previewMode) document.body.classList.add('preview-mode');
 render();
 refresh();
 if (requestedScreen === 'auto') setInterval(() => { screenIndex = (screenIndex + 1) % screenKeys.length; render(); }, 15000);

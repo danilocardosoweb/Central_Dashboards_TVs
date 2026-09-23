@@ -10,8 +10,19 @@ test('Central lista as telas da Usinagem com prévia e controle de rotação', (
   assert.match(html, /function toggleUsinagemTvScreen\(index, enabled\)/);
   assert.match(html, /Participa da rotação/);
   assert.match(html, /item\.enabled = Boolean\(enabled\)/);
+  assert.match(html, /function setUsinagemTvScreenStations\(index, stationIds\)/);
+  assert.match(html, /Todas as TVs da Usinagem/);
 });
 
 test('telas desativadas não entram na rotação web', () => {
   assert.match(html, /urls\s*\n?\s*\.filter\(item => item\?\.enabled !== false\)/);
+});
+
+test('prévia administrativa preserva a leitura em formato compacto', () => {
+  const screen = fs.readFileSync(new URL('../dashboards/usinagem-tv.mjs', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../dashboards/usinagem-tv.css', import.meta.url), 'utf8');
+  assert.match(screen, /previewMode/);
+  assert.match(screen, /document\.body\.classList\.add\('preview-mode'\)/);
+  assert.match(css, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(css, /\.preview-mode \.panel-grid/);
 });

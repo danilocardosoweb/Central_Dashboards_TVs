@@ -2950,6 +2950,8 @@
         .usinagem-tv-screen-status.is-active { color: #166534; background: #dcfce7; }
         .usinagem-tv-screen-status.is-inactive { color: #64748b; background: #e2e8f0; }
         .usinagem-tv-screen-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.65rem; }
+        .usinagem-tv-screen-target { margin-top: 0.65rem; }
+        .usinagem-tv-screen-target .dashboard-target-picker { width: 100%; }
         .usinagem-tv-screen-open { color: #2563eb; font-size: 0.78rem; font-weight: 600; text-decoration: none; }
         .usinagem-tv-screen-toggle { display: inline-flex; align-items: center; gap: 0.35rem; color: #49627f; font-size: 0.78rem; cursor: pointer; }
         .usinagem-tv-screen-toggle input { width: 1rem; height: 1rem; accent-color: #2563eb; }
@@ -4893,7 +4895,14 @@
                 const preview = document.createElement('iframe');
                 preview.className = 'usinagem-tv-screen-preview';
                 preview.loading = 'lazy';
-                preview.src = item.combined || item.public || '';
+                const previewUrl = item.combined || item.public || '';
+                try {
+                    const parsedPreviewUrl = new URL(previewUrl, window.location.href);
+                    parsedPreviewUrl.searchParams.set('preview', '1');
+                    preview.src = parsedPreviewUrl.toString();
+                } catch {
+                    preview.src = previewUrl;
+                }
                 preview.title = `Pré-visualização: ${item.name || 'Tela da Usinagem'}`;
                 card.appendChild(preview);
 
@@ -4929,9 +4938,39 @@
                 toggleLabel.append(toggle, document.createTextNode('Participa da rotação'));
                 actions.append(open, toggleLabel);
                 body.appendChild(actions);
+
+                const target = document.createElement('div');
+                target.className = 'usinagem-tv-screen-target';
+                target.appendChild(createDashboardTargetPicker({
+                    icon: 'fa-tv',
+                    globalLabel: 'Todas as TVs da Usinagem',
+                    singularLabel: 'TV selecionada',
+                    pluralLabel: 'TVs selecionadas',
+                    selected: Array.isArray(item.stationIds) ? item.stationIds : ['*'],
+                    options: dashboardStations.map(station => ({ value: station.id, label: station.name })),
+                    onChange: values => setUsinagemTvScreenStations(index, values)
+                }));
+                body.appendChild(target);
                 card.appendChild(body);
                 container.appendChild(card);
             });
+        }
+
+        function setUsinagemTvScreenStations(index, stationIds) {
+            const item = urls[index];
+            if (!item || item.type !== 'usinagem-screen') return;
+            const selected = Array.isArray(stationIds) && stationIds.length ? stationIds : [];
+            item.stationIds = selected;
+            // Ao escolher TVs específicas, a autorização passa a ser por TV,
+            // independentemente da área atualmente atribuída à estação.
+            item.areaIds = selected.includes('*') ? ['usinagem'] : ['*'];
+            localStorage.setItem('dashboardUrls', JSON.stringify(urls));
+            if (typeof window.scheduleCloudSectionSave === 'function') {
+                window.scheduleCloudSectionSave('urls', 100);
+            }
+            renderUsinagemTvScreenList();
+            createSlides();
+            showToast('TVs da tela atualizadas.', 'success');
         }
 
         function toggleUsinagemTvScreen(index, enabled) {
