@@ -91,13 +91,28 @@ export function normalizeDashboardUrl(dashboard) {
   }
 
   if (parsed.protocol !== 'https:') return '';
-  if (!parsed.hostname.endsWith('powerbi.com')) return '';
+  const isUsinagemScreen = dashboard?.type === 'usinagem-screen'
+    && parsed.hostname === 'central-dashboards-t-vs.vercel.app'
+    && parsed.pathname === '/dashboards/usinagem-tv.html';
+  if (!parsed.hostname.endsWith('powerbi.com') && !isUsinagemScreen) return '';
 
   if (dashboard?.pageName && !parsed.searchParams.has('pageName')) {
     parsed.searchParams.set('pageName', String(dashboard.pageName));
   }
 
   return parsed.toString();
+}
+
+export function isUsinagemScreen(dashboard, url = '') {
+  if (dashboard?.type !== 'usinagem-screen') return false;
+  try {
+    const parsed = new URL(url || dashboard?.combined || '');
+    return parsed.protocol === 'https:'
+      && parsed.hostname === 'central-dashboards-t-vs.vercel.app'
+      && parsed.pathname === '/dashboards/usinagem-tv.html';
+  } catch {
+    return false;
+  }
 }
 
 export function safeObjectName(value) {
@@ -292,19 +307,21 @@ async function captureDashboard(page, dashboard, config) {
       timeout: config.navigationTimeoutMs
     });
 
-    const reportDetected = await waitForPowerBi(page, config);
-    await preparePageForCapture(page, config);
-    await page.waitForTimeout(1000);
-    const appliedZoom =
-      (await page.locator('button.zoomValue').first().textContent().catch(() => ''))
-        ?.trim() || 'desconhecido';
+    const customScreen = isUsinagemScreen(dashboard, captureUrl);
+    const reportDetected = customScreen || await waitForPowerBi(page, config);
+    if (!customScreen) await preparePageForCapture(page, config);
+    await page.waitForTimeout(customScreen ? 1200 : 1000);
+    const appliedZoom = customScreen
+      ? 'nativo'
+      : (await page.locator('button.zoomValue').first().textContent().catch(() => ''))
+          ?.trim() || 'desconhecido';
     if (config.debug) {
       console.log(`[captura] Zoom aplicado: ${appliedZoom}`);
     }
 
-    const reportArea = page.locator('.displayArea').first();
+    const reportArea = customScreen ? null : page.locator('.displayArea').first();
     const hasReportArea =
-      (await reportArea.count()) > 0 && (await reportArea.isVisible());
+      reportArea && (await reportArea.count()) > 0 && (await reportArea.isVisible());
     const reportBox = hasReportArea ? await reportArea.boundingBox() : null;
     if (config.debug && reportBox) {
       console.log(

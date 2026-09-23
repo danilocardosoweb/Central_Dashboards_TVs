@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   captureObjectName,
+  isUsinagemScreen,
   mergeCaptureResults,
   normalizeDashboardUrl,
   readConfiguration,
@@ -20,6 +21,13 @@ test('seleciona o link combinado e aceita somente Power BI em HTTPS', () => {
   );
   assert.equal(normalizeDashboardUrl({ combined: 'http://powerbi.com/view' }), '');
   assert.equal(normalizeDashboardUrl({ combined: 'https://example.com/view' }), '');
+  const usinagem = {
+    type: 'usinagem-screen',
+    combined: 'https://central-dashboards-t-vs.vercel.app/dashboards/usinagem-tv.html?screen=producao'
+  };
+  assert.equal(normalizeDashboardUrl(usinagem), usinagem.combined);
+  assert.equal(isUsinagemScreen(usinagem, usinagem.combined), true);
+  assert.equal(isUsinagemScreen({ ...usinagem, type: 'dashboard' }, usinagem.combined), false);
 });
 
 test('normaliza o nome do objeto sem caracteres inseguros', () => {

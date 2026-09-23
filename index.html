@@ -2936,6 +2936,11 @@
         .usinagem-bars { display: grid; gap: 0.55rem; }
         .usinagem-bar { display: grid; grid-template-columns: minmax(100px, 22%) 1fr auto; align-items: center; gap: 0.55rem; font-size: 0.72rem; }
         .usinagem-bar i { display: block; height: 0.65rem; background: #3b82f6; border-radius: 99px; }
+        .usinagem-tv-publish-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; padding: 1rem; border: 1px solid #cfe0f5; border-radius: 0.75rem; background: #f5f9ff; }
+        .usinagem-tv-publish-card strong, .usinagem-tv-publish-card span { display: block; }
+        .usinagem-tv-publish-card strong { color: #193152; }
+        .usinagem-tv-publish-card span { margin-top: 0.25rem; color: #637896; font-size: 0.78rem; }
+        @media (max-width: 720px) { .usinagem-tv-publish-card { align-items: stretch; flex-direction: column; } }
         .settings-nav-button:hover { color: #1d4ed8; background: #eff6ff; }
         .settings-nav-button.active {
             color: #1d4ed8;
@@ -4118,6 +4123,15 @@
         <div class="input-group" data-settings-section="usinagem" id="usinagemSection">
             <div class="area-manager-header"><h3>🏭 Central de Indicadores da Usinagem</h3><p>Produção, produtividade, paradas, refugo, ordens e máquinas.</p></div>
             <div id="usinagemRoot" class="usinagem-shell"></div>
+            <div class="usinagem-tv-publish-card">
+                <div>
+                    <strong>Publicar telas da Usinagem nas TVs</strong>
+                    <span>Adiciona quatro telas prontas à rotação da área Usinagem: resumo, produção, qualidade e paradas.</span>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="addUsinagemTvScreens()">
+                    <i class="fas fa-tv"></i> Adicionar telas à rotação
+                </button>
+            </div>
         </div>
 
         <div class="input-group" data-settings-section="organization">
@@ -4798,6 +4812,46 @@
                 console.error('Erro ao processar links:', error);
                 showToast('Erro ao processar os links. Verifique se são válidos.', 'error');
             }
+        }
+
+        function addUsinagemTvScreens() {
+            const baseUrl = location.protocol === 'file:'
+                ? 'https://central-dashboards-t-vs.vercel.app'
+                : location.origin;
+            const screenDefinitions = [
+                ['resumo', 'Usinagem · Resumo operacional'],
+                ['producao', 'Usinagem · Produção por máquina'],
+                ['qualidade', 'Usinagem · Qualidade e refugo'],
+                ['paradas', 'Usinagem · Paradas e ordens']
+            ];
+            const existing = new Set(urls.filter(item => item?.type === 'usinagem-screen').map(item => item.combined));
+            const added = [];
+            screenDefinitions.forEach(([screen, name]) => {
+                const combined = `${baseUrl}/dashboards/usinagem-tv.html?screen=${screen}`;
+                if (existing.has(combined)) return;
+                added.push({
+                    id: createDashboardId(),
+                    name,
+                    type: 'usinagem-screen',
+                    public: combined,
+                    service: combined,
+                    combined,
+                    rokuImageUrl: '',
+                    areaIds: ['usinagem'],
+                    stationIds: ['*'],
+                    order: urls.length + added.length + 1
+                });
+            });
+            if (!added.length) {
+                showToast('As telas da Usinagem já estão na rotação.', 'info');
+                return;
+            }
+            urls.push(...added);
+            localStorage.setItem('dashboardUrls', JSON.stringify(urls));
+            updateUrlList();
+            createSlides();
+            updateEmptyState();
+            showToast(`${added.length} telas da Usinagem adicionadas à rotação.`, 'success');
         }
 
         // Atualizar lista de URLs
