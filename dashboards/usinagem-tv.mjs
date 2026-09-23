@@ -81,7 +81,8 @@ function producaoScreen(summary) {
 
 function qualidadeScreen(summary) {
   const rate = summary.gross ? summary.scrap / summary.gross * 100 : 0;
-  return `<div class="metric-grid compact">${card('Produção bruta', fmt(summary.gross), 'boas + refugo', 'blue')}${card('Refugo total', fmt(summary.scrap), 'quantidade apontada', 'orange')}${card('Taxa de refugo', `${fmt(rate)}%`, 'indicador de qualidade', rate > 2 ? 'red' : 'green')}</div><div class="panel-grid wide-left">${panel('Refugo por máquina', 'QUALIDADE', bars(summary.scrapByMachine))}${panel('Taxa por unidade', 'COMPARATIVO', (data.totals || []).map(item => `<div class="quality-line"><span>${esc(unitName(item.unit))}</span><div><i style="width:${Math.min(100, number(item.scrapRate))}%"></i></div><b>${fmt(item.scrapRate)}%</b></div>`).join('') || '<div class="empty-panel">Sem dados de qualidade.</div>')}</div>`;
+  const rateWidth = Math.min(100, rate);
+  return `<div class="metric-grid compact">${card('Produção bruta', fmt(summary.gross), 'boas + refugo', 'blue')}${card('Refugo total', fmt(summary.scrap), 'quantidade apontada', 'orange')}${card('Taxa de refugo', `${fmt(rate)}%`, 'indicador de qualidade', rate > 2 ? 'red' : 'green')}</div><div class="panel-grid wide-left">${panel('Refugo por máquina', 'QUALIDADE', bars(summary.scrapByMachine))}${panel('Resultado geral', 'INDICADOR', `<div class="quality-focus"><strong>${fmt(rate)}%</strong><span>refugo sobre a produção bruta</span><div><i style="width:${rateWidth}%"></i></div></div>`)}</div>`;
 }
 
 function paradasScreen(summary) {
