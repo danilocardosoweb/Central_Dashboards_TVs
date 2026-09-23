@@ -11,7 +11,7 @@ test('Central lista as telas da Usinagem com prévia e controle de rotação', (
   assert.match(html, /Participa da rotação/);
   assert.match(html, /item\.enabled = Boolean\(enabled\)/);
   assert.match(html, /function setUsinagemTvScreenStations\(index, stationIds\)/);
-  assert.match(html, /Todas as TVs da Usinagem/);
+  assert.match(html, /globalLabel: 'Todas as TVs'/);
 });
 
 test('telas desativadas não entram na rotação web', () => {
