@@ -23,9 +23,8 @@ export const supabaseUsinagem = {
   get configured() { return Boolean(this.config.url && this.config.anonKey); },
   async select(table, { columns = '*', filters = [], limit = 5000 } = {}) {
     if (!this.configured) throw new Error('Fonte de dados da Usinagem ainda não configurada.');
-    const params = new URLSearchParams({ select: columns, limit: String(limit) });
-    filters.forEach(({ field, op = 'eq', value }) => { if (value !== '' && value != null) params.set(`${field}=${op}`, String(value)); });
-    const response = await fetch(`${this.config.url}/rest/v1/${this.config.tables[table] || table}?${params}`, {
+    const query = buildSelectQuery(columns, filters, limit);
+    const response = await fetch(`${this.config.url}/rest/v1/${this.config.tables[table] || table}?${query}`, {
       headers: { apikey: this.config.anonKey, Authorization: `Bearer ${this.config.anonKey}` }
     });
     if (!response.ok) throw new Error(`Usinagem: falha ao consultar ${table} (${response.status}).`);
@@ -33,6 +32,14 @@ export const supabaseUsinagem = {
     return Array.isArray(data) ? data : [];
   }
 };
+
+export function buildSelectQuery(columns = '*', filters = [], limit = 5000) {
+  const params = new URLSearchParams({ select: columns, limit: String(limit) });
+  filters.forEach(({ field, op = 'eq', value }) => {
+    if (value !== '' && value != null) params.set(field, `${op}.${value}`);
+  });
+  return params.toString();
+}
 
 export function validInterval(row, start = 'inicio', end = 'fim') {
   const from = new Date(row?.[start]); const to = new Date(row?.[end]);

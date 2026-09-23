@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { aggregate, durationHours, groupByUnit, operationalDay, shiftFor, supabaseUsinagem, validInterval } from '../services/usinagem-service.mjs';
+import { aggregate, buildSelectQuery, durationHours, groupByUnit, operationalDay, shiftFor, supabaseUsinagem, validInterval } from '../services/usinagem-service.mjs';
+
+test('Usinagem monta filtros no formato aceito pela API do Supabase', () => {
+  const query = buildSelectQuery('*', [{ field: 'inicio', op: 'gte', value: '2026-09-23T00:00:00.000Z' }], 1);
+  assert.match(query, /inicio=gte\./);
+  assert.doesNotMatch(query, /inicio%3Dgte/);
+});
 
 test('Usinagem calcula produção boa, bruta, refugo e produtividade por unidade', () => {
   const rows = [
