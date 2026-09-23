@@ -23,6 +23,6 @@ test('prévia administrativa preserva a leitura em formato compacto', () => {
   const css = fs.readFileSync(new URL('../dashboards/usinagem-tv.css', import.meta.url), 'utf8');
   assert.match(screen, /previewMode/);
   assert.match(screen, /document\.body\.classList\.add\('preview-mode'\)/);
-  assert.match(css, /aspect-ratio:\s*16\s*\/\s*9/);
+  assert.match(html, /usinagem-tv-screen-preview[^}]*aspect-ratio:\s*16\s*\/\s*9/);
   assert.match(css, /\.preview-mode \.panel-grid/);
 });
