@@ -23,7 +23,7 @@ test('seleciona o link combinado e aceita somente Power BI em HTTPS', () => {
   assert.equal(normalizeDashboardUrl({ combined: 'https://example.com/view' }), '');
   const usinagem = {
     type: 'usinagem-screen',
-    combined: 'https://central-dashboards-t-vs.vercel.app/dashboards/usinagem-tv.html?screen=producao'
+    combined: 'https://central-dashboards-t-vs.vercel.app/dashboards/usinagem.html?screen=producao'
   };
   assert.equal(normalizeDashboardUrl(usinagem), usinagem.combined);
   assert.equal(isUsinagemScreen(usinagem, usinagem.combined), true);

@@ -93,7 +93,7 @@ export function normalizeDashboardUrl(dashboard) {
   if (parsed.protocol !== 'https:') return '';
   const isUsinagemScreen = dashboard?.type === 'usinagem-screen'
     && parsed.hostname === 'central-dashboards-t-vs.vercel.app'
-    && parsed.pathname === '/dashboards/usinagem-tv.html';
+    && parsed.pathname === '/dashboards/usinagem.html';
   if (!parsed.hostname.endsWith('powerbi.com') && !isUsinagemScreen) return '';
 
   if (dashboard?.pageName && !parsed.searchParams.has('pageName')) {
@@ -109,7 +109,7 @@ export function isUsinagemScreen(dashboard, url = '') {
     const parsed = new URL(url || dashboard?.combined || '');
     return parsed.protocol === 'https:'
       && parsed.hostname === 'central-dashboards-t-vs.vercel.app'
-      && parsed.pathname === '/dashboards/usinagem-tv.html';
+      && parsed.pathname === '/dashboards/usinagem.html';
   } catch {
     return false;
   }

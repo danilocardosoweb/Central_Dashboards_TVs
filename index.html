@@ -4827,7 +4827,7 @@
             const existing = new Set(urls.filter(item => item?.type === 'usinagem-screen').map(item => item.combined));
             const added = [];
             screenDefinitions.forEach(([screen, name]) => {
-                const combined = `${baseUrl}/dashboards/usinagem-tv.html?screen=${screen}`;
+                const combined = `${baseUrl}/dashboards/usinagem.html?screen=${screen}`;
                 if (existing.has(combined)) return;
                 added.push({
                     id: createDashboardId(),
