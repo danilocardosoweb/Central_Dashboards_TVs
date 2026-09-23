@@ -11,6 +11,9 @@ test('Central lista as telas da Usinagem com prévia e controle de rotação', (
   assert.match(html, /Participa da rotação/);
   assert.match(html, /item\.enabled = Boolean\(enabled\)/);
   assert.match(html, /function setUsinagemTvScreenStations\(index, stationIds\)/);
+  assert.match(html, /function setUsinagemTvScreenDuration\(index, value\)/);
+  assert.match(html, /Tempo na TV/);
+  assert.match(html, /iframe\.dataset\.duration/);
   assert.match(html, /globalLabel: 'Todas as TVs'/);
 });
 

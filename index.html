@@ -2952,6 +2952,10 @@
         .usinagem-tv-screen-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.65rem; }
         .usinagem-tv-screen-target { padding: 0.65rem 0.75rem 0; background: #f8fbff; }
         .usinagem-tv-screen-target .dashboard-target-picker { width: 100%; }
+        .usinagem-tv-screen-duration { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.45rem; color: #49627f; font-size: 0.75rem; }
+        .usinagem-tv-screen-duration select { min-width: 8.5rem; padding: 0.38rem 0.5rem; border: 1px solid #bfd2e8; border-radius: 0.45rem; color: #193152; background: #fff; font-size: 0.75rem; }
+        .usinagem-tv-screen-target-help { margin: 0.4rem 0 0.1rem; color: #637896; font-size: 0.7rem; }
+        .usinagem-tv-screen-target-help button { border: 0; padding: 0; color: #2563eb; background: transparent; font: inherit; text-decoration: underline; cursor: pointer; }
         .usinagem-tv-screen-open { color: #2563eb; font-size: 0.78rem; font-weight: 600; text-decoration: none; }
         .usinagem-tv-screen-toggle { display: inline-flex; align-items: center; gap: 0.35rem; color: #49627f; font-size: 0.78rem; cursor: pointer; }
         .usinagem-tv-screen-toggle input { width: 1rem; height: 1rem; accent-color: #2563eb; }
@@ -4857,6 +4861,7 @@
                     areaIds: ['usinagem'],
                     stationIds: ['*'],
                     enabled: true,
+                    duration: Math.max(5, Math.round(transitionTime / 1000)),
                     order: urls.length + added.length + 1
                 });
             });
@@ -4903,6 +4908,33 @@
                     options: dashboardStations.map(station => ({ value: station.id, label: station.name })),
                     onChange: values => setUsinagemTvScreenStations(index, values)
                 }));
+                const durationLabel = document.createElement('label');
+                durationLabel.className = 'usinagem-tv-screen-duration';
+                durationLabel.appendChild(document.createTextNode('Tempo na TV'));
+                const durationSelect = document.createElement('select');
+                durationSelect.setAttribute('aria-label', `Tempo na TV: ${item.name || 'tela da Usinagem'}`);
+                const selectedDuration = Number(item.duration) || Math.max(5, Math.round(transitionTime / 1000));
+                [5, 10, 15, 20, 30, 45, 60, 90, 120].forEach(seconds => {
+                    const option = document.createElement('option');
+                    option.value = String(seconds);
+                    option.textContent = seconds >= 60 ? `${seconds / 60} min` : `${seconds} segundos`;
+                    option.selected = seconds === selectedDuration;
+                    durationSelect.appendChild(option);
+                });
+                durationSelect.addEventListener('change', () => setUsinagemTvScreenDuration(index, durationSelect.value));
+                durationLabel.appendChild(durationSelect);
+                target.appendChild(durationLabel);
+                if (dashboardStations.length <= 1) {
+                    const targetHelp = document.createElement('div');
+                    targetHelp.className = 'usinagem-tv-screen-target-help';
+                    targetHelp.appendChild(document.createTextNode('Só há uma TV cadastrada. '));
+                    const manageStations = document.createElement('button');
+                    manageStations.type = 'button';
+                    manageStations.textContent = 'Cadastrar outras TVs';
+                    manageStations.addEventListener('click', () => showSettingsSection('organization'));
+                    targetHelp.appendChild(manageStations);
+                    target.appendChild(targetHelp);
+                }
                 card.appendChild(target);
 
                 const preview = document.createElement('iframe');
@@ -4972,6 +5004,20 @@
             renderUsinagemTvScreenList();
             createSlides();
             showToast('TVs da tela atualizadas.', 'success');
+        }
+
+        function setUsinagemTvScreenDuration(index, value) {
+            const item = urls[index];
+            const duration = Number(value);
+            if (!item || item.type !== 'usinagem-screen' || ![5, 10, 15, 20, 30, 45, 60, 90, 120].includes(duration)) return;
+            item.duration = duration;
+            localStorage.setItem('dashboardUrls', JSON.stringify(urls));
+            if (typeof window.scheduleCloudSectionSave === 'function') {
+                window.scheduleCloudSectionSave('urls', 100);
+            }
+            createSlides();
+            updatePresentationEstimate();
+            showToast(`Tela configurada para ${duration >= 60 ? `${duration / 60} min` : `${duration} s`}.`, 'success');
         }
 
         function toggleUsinagemTvScreen(index, enabled) {
@@ -5318,6 +5364,9 @@
         function calculatePresentationEstimate(input = {}) {
             const dashboardCount = Math.max(0, Number(input.dashboardCount) || 0);
             const dashboardDurationSeconds = Math.max(0, Number(input.dashboardDurationSeconds) || 0);
+            const dashboardDurations = Array.isArray(input.dashboardDurations)
+                ? input.dashboardDurations.map(value => Math.max(0, Number(value) || 0))
+                : [];
             const alertDurations = Array.isArray(input.alertDurations)
                 ? input.alertDurations.map(value => Math.max(0, Number(value) || 0))
                 : [];
@@ -5326,7 +5375,9 @@
             const bannerCount = Math.max(0, Number(input.bannerCount) || 0);
             const slideCount = dashboardCount + alertDurations.length + pprSlideCount;
             const contentSeconds =
-                dashboardCount * dashboardDurationSeconds +
+                (dashboardDurations.length
+                    ? dashboardDurations.reduce((total, value) => total + value, 0)
+                    : dashboardCount * dashboardDurationSeconds) +
                 alertDurations.reduce((total, value) => total + value, 0) +
                 pprSlideCount * pprDurationSeconds;
             const transitionSeconds = slideCount > 1
@@ -5334,7 +5385,9 @@
                 : 0;
             return {
                 dashboardCount,
-                dashboardSeconds: dashboardCount * dashboardDurationSeconds,
+                dashboardSeconds: dashboardDurations.length
+                    ? dashboardDurations.reduce((total, value) => total + value, 0)
+                    : dashboardCount * dashboardDurationSeconds,
                 alertCount: alertDurations.length,
                 alertSeconds: alertDurations.reduce((total, value) => total + value, 0),
                 pprSlideCount,
@@ -5376,6 +5429,7 @@
             }
             return calculatePresentationEstimate({
                 dashboardCount: getVisibleDashboards().length,
+                dashboardDurations: getVisibleDashboards().map(item => Number(item.duration) || transitionTime / 1000),
                 dashboardDurationSeconds: transitionTime / 1000,
                 alertDurations: fullscreenAlerts.map(alert => Number(alert.duration) || 20),
                 pprSlideCount,
@@ -9840,6 +9894,7 @@
                 iframe.allowFullscreen = true;
                 iframe.dataset.slideType = 'dashboard';
                 iframe.dataset.dashboardId = item.id;
+                iframe.dataset.duration = String(Number(item.duration) || transitionTime / 1000);
                 iframe.title = item.name || 'Dashboard Power BI';
                 return iframe;
             });
