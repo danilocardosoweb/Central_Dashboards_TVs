@@ -2940,6 +2940,20 @@
         .usinagem-tv-publish-card strong, .usinagem-tv-publish-card span { display: block; }
         .usinagem-tv-publish-card strong { color: #193152; }
         .usinagem-tv-publish-card span { margin-top: 0.25rem; color: #637896; font-size: 0.78rem; }
+        .usinagem-tv-screen-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.85rem; margin-top: 0.85rem; }
+        .usinagem-tv-screen-card { overflow: hidden; border: 1px solid #d7e3f1; border-radius: 0.75rem; background: #fff; box-shadow: 0 3px 12px rgba(37, 73, 112, 0.06); }
+        .usinagem-tv-screen-preview { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; background: #0f172a; }
+        .usinagem-tv-screen-card-body { padding: 0.75rem; }
+        .usinagem-tv-screen-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+        .usinagem-tv-screen-card-title { color: #193152; font-weight: 700; font-size: 0.9rem; }
+        .usinagem-tv-screen-status { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; border-radius: 999px; padding: 0.2rem 0.45rem; font-size: 0.68rem; font-weight: 700; }
+        .usinagem-tv-screen-status.is-active { color: #166534; background: #dcfce7; }
+        .usinagem-tv-screen-status.is-inactive { color: #64748b; background: #e2e8f0; }
+        .usinagem-tv-screen-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.65rem; }
+        .usinagem-tv-screen-open { color: #2563eb; font-size: 0.78rem; font-weight: 600; text-decoration: none; }
+        .usinagem-tv-screen-toggle { display: inline-flex; align-items: center; gap: 0.35rem; color: #49627f; font-size: 0.78rem; cursor: pointer; }
+        .usinagem-tv-screen-toggle input { width: 1rem; height: 1rem; accent-color: #2563eb; }
+        .usinagem-tv-screen-empty { margin-top: 0.85rem; padding: 0.85rem; border: 1px dashed #cbd8e8; border-radius: 0.65rem; color: #637896; font-size: 0.82rem; }
         @media (max-width: 720px) { .usinagem-tv-publish-card { align-items: stretch; flex-direction: column; } }
         .settings-nav-button:hover { color: #1d4ed8; background: #eff6ff; }
         .settings-nav-button.active {
@@ -4132,6 +4146,7 @@
                     <i class="fas fa-tv"></i> Adicionar telas à rotação
                 </button>
             </div>
+            <div id="usinagemTvScreenList" class="usinagem-tv-screen-list" aria-live="polite"></div>
         </div>
 
         <div class="input-group" data-settings-section="organization">
@@ -4839,6 +4854,7 @@
                     rokuImageUrl: '',
                     areaIds: ['usinagem'],
                     stationIds: ['*'],
+                    enabled: true,
                     order: urls.length + added.length + 1
                 });
             });
@@ -4852,6 +4868,82 @@
             createSlides();
             updateEmptyState();
             showToast(`${added.length} telas da Usinagem adicionadas à rotação.`, 'success');
+        }
+
+        function renderUsinagemTvScreenList() {
+            const container = document.getElementById('usinagemTvScreenList');
+            if (!container) return;
+            container.replaceChildren();
+
+            const screens = urls
+                .map((item, index) => ({ item, index }))
+                .filter(({ item }) => item?.type === 'usinagem-screen');
+            if (!screens.length) {
+                const empty = document.createElement('div');
+                empty.className = 'usinagem-tv-screen-empty';
+                empty.textContent = 'Nenhuma tela publicada. Clique em “Adicionar telas à rotação” para criar as telas da Usinagem.';
+                container.appendChild(empty);
+                return;
+            }
+
+            screens.forEach(({ item, index }) => {
+                const card = document.createElement('article');
+                card.className = 'usinagem-tv-screen-card';
+
+                const preview = document.createElement('iframe');
+                preview.className = 'usinagem-tv-screen-preview';
+                preview.loading = 'lazy';
+                preview.src = item.combined || item.public || '';
+                preview.title = `Pré-visualização: ${item.name || 'Tela da Usinagem'}`;
+                card.appendChild(preview);
+
+                const body = document.createElement('div');
+                body.className = 'usinagem-tv-screen-card-body';
+                const header = document.createElement('div');
+                header.className = 'usinagem-tv-screen-card-header';
+                const title = document.createElement('div');
+                title.className = 'usinagem-tv-screen-card-title';
+                title.textContent = item.name || 'Tela da Usinagem';
+                const status = document.createElement('span');
+                const active = item.enabled !== false;
+                status.className = `usinagem-tv-screen-status ${active ? 'is-active' : 'is-inactive'}`;
+                status.innerHTML = `<i class="fas ${active ? 'fa-circle-check' : 'fa-circle-pause'}"></i> ${active ? 'Ativa' : 'Desativada'}`;
+                header.append(title, status);
+                body.appendChild(header);
+
+                const actions = document.createElement('div');
+                actions.className = 'usinagem-tv-screen-card-actions';
+                const open = document.createElement('a');
+                open.className = 'usinagem-tv-screen-open';
+                open.href = item.combined || item.public || '#';
+                open.target = '_blank';
+                open.rel = 'noopener';
+                open.textContent = 'Abrir tela';
+                const toggleLabel = document.createElement('label');
+                toggleLabel.className = 'usinagem-tv-screen-toggle';
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.checked = active;
+                toggle.setAttribute('aria-label', `Ativar ${item.name || 'tela da Usinagem'}`);
+                toggle.addEventListener('change', () => toggleUsinagemTvScreen(index, toggle.checked));
+                toggleLabel.append(toggle, document.createTextNode('Participa da rotação'));
+                actions.append(open, toggleLabel);
+                body.appendChild(actions);
+                card.appendChild(body);
+                container.appendChild(card);
+            });
+        }
+
+        function toggleUsinagemTvScreen(index, enabled) {
+            const item = urls[index];
+            if (!item || item.type !== 'usinagem-screen') return;
+            item.enabled = Boolean(enabled);
+            localStorage.setItem('dashboardUrls', JSON.stringify(urls));
+            renderUsinagemTvScreenList();
+            updateUrlList();
+            createSlides();
+            updateEmptyState();
+            showToast(item.enabled ? 'Tela da Usinagem ativada.' : 'Tela da Usinagem desativada.', 'success');
         }
 
         // Atualizar lista de URLs
@@ -8463,15 +8555,19 @@
             orderHint.textContent = 'Arraste pelo marcador ou use as setas para definir a sequência exibida nas TVs.';
             urlList.appendChild(orderHint);
 
-            if (!urls.length) {
+            const regularUrls = urls
+                .map((item, index) => ({ item, index }))
+                .filter(({ item }) => item?.type !== 'usinagem-screen');
+            if (!regularUrls.length) {
                 const empty = document.createElement('div');
                 empty.className = 'station-empty-note';
-                empty.textContent = 'Nenhum dashboard cadastrado. Adicione os links e escolha a área de destino.';
+                empty.textContent = urls.length
+                    ? 'Os dashboards próprios da Usinagem são gerenciados no quadro acima.'
+                    : 'Nenhum dashboard cadastrado. Adicione os links e escolha a área de destino.';
                 urlList.appendChild(empty);
-                return;
             }
 
-            urls.forEach((item, index) => {
+            regularUrls.forEach(({ item, index }) => {
                 const row = document.createElement('div');
                 row.className = 'url-item';
                 row.dataset.dashboardIndex = String(index);
@@ -8582,6 +8678,7 @@
                 row.append(orderControl, content, actions);
                 urlList.appendChild(row);
             });
+            renderUsinagemTvScreenList();
         }
 
         function defaultPprRules() {
@@ -9657,7 +9754,9 @@
         function getVisibleDashboards() {
             ensureAreaSystem();
             const areaId = getCurrentAreaId();
-            return urls.filter(item => dashboardBelongsToArea(item));
+            return urls
+                .filter(item => item?.enabled !== false)
+                .filter(item => dashboardBelongsToArea(item));
         }
 
         function getActiveAlerts() {
