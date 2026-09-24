@@ -10581,12 +10581,20 @@
                     const databaseMissing =
                         error.code === 'PGRST205' ||
                         error.code === '42P01';
+                    const projectRestricted =
+                        error.code === 'SUPABASE_PROJECT_RESTRICTED' ||
+                        /exceed_cached_egress_quota|project is restricted/i.test(
+                            String(error.error || error.message || '')
+                        );
                     const cloudError = new Error(
-                        databaseMissing
+                        projectRestricted
+                            ? 'O banco central está temporariamente bloqueado pelo limite de tráfego do Supabase. Remova o limite de gastos ou atualize o plano do projeto.'
+                            : databaseMissing
                             ? 'A tabela central ainda não foi criada.'
                             : error.message || `Falha na leitura (${response.status}).`
                     );
                     cloudError.databaseMissing = databaseMissing;
+                    cloudError.projectRestricted = projectRestricted;
                     throw cloudError;
                 }
 
@@ -10808,11 +10816,15 @@
                     console.error('Erro ao iniciar sincronização central:', error);
                     cloudReady = false;
                     setCloudStatus(
-                        error.databaseMissing ? 'error' : 'offline',
-                        error.databaseMissing
+                        error.databaseMissing || error.projectRestricted ? 'error' : 'offline',
+                        error.projectRestricted
+                            ? 'Banco central bloqueado por limite do Supabase'
+                            : error.databaseMissing
                             ? 'Base central ainda não configurada'
                             : 'Usando configuração local',
-                        error.databaseMissing
+                        error.projectRestricted
+                            ? 'A TV e esta Central continuam usando a última configuração local. Libere o limite no Supabase para sincronizar novamente.'
+                            : error.databaseMissing
                             ? 'Execute o arquivo supabase/setup.sql no projeto.'
                             : 'A conexão será tentada novamente ao sincronizar.'
                     );

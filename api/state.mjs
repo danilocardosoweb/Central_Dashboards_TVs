@@ -42,6 +42,11 @@ function requestBody(request) {
   return request.body;
 }
 
+function isSupabaseProjectRestricted(error) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /exceed_cached_egress_quota|project is restricted/i.test(message);
+}
+
 function createStateClient() {
   const config = readConfiguration(process.env, []);
   const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
@@ -262,14 +267,19 @@ export default async function handler(request, response) {
     response.setHeader('Allow', 'GET, PUT, POST, OPTIONS');
     return json(response, 405, { ok: false, error: 'Método não permitido.' }, traceId);
   } catch (error) {
+    const projectRestricted = isSupabaseProjectRestricted(error);
     logEvent('state-api', 'request.failed', {
       traceId,
       method: request.method,
-      error: errorDetails(error)
+      error: errorDetails(error),
+      reason: projectRestricted ? 'supabase-project-restricted' : undefined
     }, 'error');
-    return json(response, 500, {
+    return json(response, projectRestricted ? 503 : 500, {
       ok: false,
-      error: error instanceof Error ? error.message : String(error)
+      code: projectRestricted ? 'SUPABASE_PROJECT_RESTRICTED' : 'STATE_READ_FAILED',
+      error: projectRestricted
+        ? 'O banco central está temporariamente bloqueado pelo limite de tráfego do Supabase. Remova o limite de gastos ou atualize o plano do projeto para restabelecer a sincronização.'
+        : error instanceof Error ? error.message : String(error)
     }, traceId);
   }
 }
