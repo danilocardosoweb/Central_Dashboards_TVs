@@ -40,7 +40,11 @@ test('carregamento de imagem possui watchdog e não força quadro incompleto', (
   assert.match(scene, /roku_retry=/);
   assert.match(scene, /sub showImageLoadFailure\(slide as dynamic\)/);
   assert.match(scene, /renderDashboardLoadFailure\(slide\)/);
+  assert.match(scene, /sub renderConnectionWaiting\(slide as object\)/);
+  assert.match(scene, /m\.connectionRetryTimer\.control = "start"/);
+  assert.match(scene, /sub onConnectionRetryTimer\(\)/);
   assert.match(xml, /id="imageLoadTimer" duration="8"/);
+  assert.match(xml, /id="connectionRetryTimer" duration="15" repeat="true"/);
   assert.doesNotMatch(scene, /if target\.loadStatus = "ready" then beginImageTransition\(\)/);
 });
 
@@ -124,7 +128,7 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V37/);
+  assert.match(scene, /Build: V41/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {

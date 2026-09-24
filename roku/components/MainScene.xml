@@ -267,6 +267,7 @@
             <Timer id="heartbeatTimer" duration="60" repeat="true" />
             <Timer id="transitionTimer" repeat="false" />
             <Timer id="imageLoadTimer" duration="8" repeat="false" />
+            <Timer id="connectionRetryTimer" duration="15" repeat="true" />
             <Timer id="introFallbackTimer" duration="12" repeat="false" />
             <Timer id="fetchWatchdogTimer" duration="20" repeat="false" />
             <!-- Confere se o temporizador de troca continua ativo. Ele só atua

@@ -82,6 +82,7 @@ sub init()
     m.heartbeatTimer = m.top.FindNode("heartbeatTimer")
     m.transitionTimer = m.top.FindNode("transitionTimer")
     m.imageLoadTimer = m.top.FindNode("imageLoadTimer")
+    m.connectionRetryTimer = m.top.FindNode("connectionRetryTimer")
     m.introGroup = m.top.FindNode("introGroup")
     m.introVideo = m.top.FindNode("introVideo")
     m.introFallbackTimer = m.top.FindNode("introFallbackTimer")
@@ -115,6 +116,7 @@ sub init()
     m.heartbeatTimer.ObserveField("fire", "onHeartbeatTimer")
     m.transitionTimer.ObserveField("fire", "onTransitionTimer")
     m.imageLoadTimer.ObserveField("fire", "onImageLoadTimer")
+    m.connectionRetryTimer.ObserveField("fire", "onConnectionRetryTimer")
     m.introVideo.ObserveField("state", "onIntroVideoState")
     m.introVideo.ObserveField("position", "onIntroVideoPosition")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
@@ -150,6 +152,7 @@ sub init()
     m.pendingImageUri = ""
     m.pendingSlide = invalid
     m.pendingImageAttempts = 0
+    m.connectionWaiting = false
     m.videoPlaying = false
     m.videoSlide = invalid
     m.introPlaying = false
@@ -173,7 +176,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 37, endpoint: m.endpoint })
+    logEvent("app-start", { build: 41, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -328,7 +331,13 @@ sub onFetchError()
     m.loading.visible = false
 
     if m.state = invalid
-        showError(errorMessage)
+        hideDashboardImages()
+        m.pprPanel.visible = false
+        m.messagePanel.visible = true
+        renderConnectionWaiting(invalid)
+        m.connectionWaiting = true
+        m.contentGroup.opacity = 1.0
+        updateDiagnostics()
     end if
 end sub
 
@@ -665,6 +674,8 @@ end sub
 
 sub renderSlide(slide as object)
     cancelPendingImage()
+    m.connectionRetryTimer.control = "stop"
+    m.connectionWaiting = false
     stopAlertVideo()
     m.slideTimer.control = "stop"
     logEvent("slide-start", {
@@ -830,6 +841,7 @@ end sub
 ' quando a tela atual já excedeu o próprio tempo de exibição com margem segura.
 sub onPlaybackWatchdogTimer()
     if m.paused or m.introPlaying or m.stationOverlay.visible then return
+    if m.connectionWaiting then return
     if m.activeTemporaryAlert <> invalid then return
     if m.videoPlaying then return
     if m.slides.Count() = 0 then return
@@ -889,26 +901,54 @@ end function
 
 sub showImageLoadFailure(slide as dynamic)
     if slide = invalid then return
-    hideDashboardImages()
+    m.imageLoadTimer.control = "stop"
+    m.slideTimer.control = "stop"
+    m.countdownTimer.control = "stop"
+    m.countdownOverlay.visible = false
+    m.dashboardImageA.visible = false
+    m.dashboardImageB.visible = false
     m.pprPanel.visible = false
     m.messagePanel.visible = true
-    if valueOr(slide, "kind", "dashboard") = "alert"
-        renderAlertSlide(slide)
-    else
-        renderDashboardLoadFailure(slide)
-    end if
-    m.contentGroup.opacity = 0.0
-    m.fadeIn.control = "start"
+    ' Mantém a rotina legada disponível para diagnósticos; a tela exibida
+    ' abaixo é a espera persistente com nova tentativa automática.
+    renderDashboardLoadFailure(slide)
+    renderConnectionWaiting(slide)
+    m.connectionWaiting = true
+    m.connectionRetryTimer.control = "start"
+    m.contentGroup.opacity = 1.0
     updateSlideStatus()
-    startSlideTimer(slide)
     m.lastError = "Falha ao carregar imagem " + valueOr(slide, "id", "")
     logEvent("image-contingency", { id: valueOr(slide, "id", ""), kind: valueOr(slide, "kind", "") })
+    logEvent("connection-wait-start", { id: valueOr(slide, "id", ""), retrySeconds: 15 })
     updateDiagnostics()
+end sub
+
+sub onConnectionRetryTimer()
+    if not m.connectionWaiting or m.pendingSlide = invalid or m.pendingImageUri = "" then return
+    slide = m.pendingSlide
+    imageUri = m.pendingImageUri
+    m.connectionWaiting = false
+    m.connectionRetryTimer.control = "stop"
+    logEvent("connection-wait-retry", { id: valueOr(slide, "id", "") })
+    queueImageSlide(slide, imageUri)
+end sub
+
+sub renderConnectionWaiting(slide as object)
+    m.accent.color = "0xF59E0BFF"
+    m.kicker.color = "0xFBBF24FF"
+    m.kicker.text = "AGUARDANDO CONEXÃO"
+    m.headline.text = "Reconectando a TV"
+    m.body.text = "A tela será retomada automaticamente assim que a conexão for normalizada."
+    m.actionBackground.visible = true
+    m.action.text = "Tentativa automática a cada 15 segundos."
+    m.meta.text = "A programação permanece pausada para evitar exibir uma tela incompleta."
 end sub
 
 sub beginImageTransition()
     if m.pendingImageName = "" or m.pendingSlide = invalid then return
     m.imageLoadTimer.control = "stop"
+    m.connectionRetryTimer.control = "stop"
+    m.connectionWaiting = false
 
     target = posterFor(m.pendingImageName)
     m.messagePanel.visible = false
@@ -2039,6 +2079,7 @@ end sub
 sub updateSlideStatus()
     stateText = "reproduzindo"
     if m.paused then stateText = "pausado"
+    if m.connectionWaiting then stateText = "aguardando conexão"
     m.syncLabel.text = (m.slideIndex + 1).ToStr() + " de " + m.slides.Count().ToStr() + " • " + stateText + " • " + currentClock()
 end sub
 
@@ -2063,7 +2104,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V37 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V41 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -2076,7 +2117,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 37
+        build: 41
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId
