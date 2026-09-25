@@ -38,7 +38,7 @@ $title.Location = New-Object System.Drawing.Point(28, 20)
 $header.Controls.Add($title)
 
 $subtitle = New-Object System.Windows.Forms.Label
-$subtitle.Text = 'Gere as imagens no computador e envie diretamente para o Supabase.'
+$subtitle.Text = 'Gere imagens no computador e envie ao Supabase. Para mídia local das TVs, use o Monitor das TVs.'
 $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(198, 214, 240)
 $subtitle.AutoSize = $true
 $subtitle.Location = New-Object System.Drawing.Point(31, 68)

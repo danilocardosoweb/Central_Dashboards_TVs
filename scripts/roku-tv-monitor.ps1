@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ConfigFile = (Join-Path $PSScriptRoot "roku-tv-monitor.config.json"),
     [switch]$SelfTest
 )
@@ -153,7 +153,7 @@ $form.Font = New-Object System.Drawing.Font("Segoe UI", 10)
 
 $header = New-Object System.Windows.Forms.Panel
 $header.Dock = [System.Windows.Forms.DockStyle]::Top
-$header.Height = 142
+$header.Height = 162
 $header.BackColor = $colors.Surface
 $form.Controls.Add($header)
 
@@ -172,23 +172,29 @@ $refreshButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Wi
 $refreshButton.Location = New-Object System.Drawing.Point(870, 26)
 $header.Controls.Add($refreshButton)
 
-$emergencyButton = New-Button "Iniciar emergencia" $colors.Yellow
-$emergencyButton.Size = New-Object System.Drawing.Size(160, 34)
-$emergencyButton.Location = New-Object System.Drawing.Point(430, 89)
+$emergencyButton = New-Button "Iniciar emergência" $colors.Yellow
+$emergencyButton.Size = New-Object System.Drawing.Size(130, 34)
+$emergencyButton.Location = New-Object System.Drawing.Point(400, 89)
 $emergencyButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
 $header.Controls.Add($emergencyButton)
 
+$emergencyMediaButton = New-Button "Adicionar mídia" $colors.Blue
+$emergencyMediaButton.Size = New-Object System.Drawing.Size(140, 34)
+$emergencyMediaButton.Location = New-Object System.Drawing.Point(535, 89)
+$emergencyMediaButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
+$header.Controls.Add($emergencyMediaButton)
+
 $emergencyFolderButton = New-Button "Abrir pasta de mídia" $colors.SurfaceAlt
-$emergencyFolderButton.Size = New-Object System.Drawing.Size(160, 34)
-$emergencyFolderButton.Location = New-Object System.Drawing.Point(595, 89)
+$emergencyFolderButton.Size = New-Object System.Drawing.Size(150, 34)
+$emergencyFolderButton.Location = New-Object System.Drawing.Point(680, 89)
 $emergencyFolderButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
 $header.Controls.Add($emergencyFolderButton)
 
 $emergencyStatus = New-Label "Emergência local parada" 8
 $emergencyStatus.ForeColor = $colors.Muted
-$emergencyStatus.Location = New-Object System.Drawing.Point(765, 99)
+$emergencyStatus.Location = New-Object System.Drawing.Point(400, 126)
 $emergencyStatus.AutoSize = $false
-$emergencyStatus.Size = New-Object System.Drawing.Size(240, 22)
+$emergencyStatus.Size = New-Object System.Drawing.Size(600, 22)
 $header.Controls.Add($emergencyStatus)
 
 $lastUpdate = New-Label "Aguardando primeira leitura..." 9
@@ -393,9 +399,62 @@ function Stop-EmergencyServer {
     Write-MonitorLog "Servidor emergencial local parado."
 }
 
+function Add-EmergencyMedia {
+    if (-not (Test-Path -LiteralPath $emergencyMediaRoot)) {
+        New-Item -ItemType Directory -Path $emergencyMediaRoot -Force | Out-Null
+    }
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Title = "Adicionar mídia para as TVs"
+    $dialog.Filter = "Mídia compatível|*.mp4;*.png;*.jpg;*.jpeg;*.webp|Vídeos|*.mp4|Imagens|*.png;*.jpg;*.jpeg;*.webp"
+    $dialog.Multiselect = $true
+    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+    $playlistPath = Join-Path $emergencyMediaRoot "playlist.json"
+    $playlist = [pscustomobject]@{ items = @() }
+    if (Test-Path -LiteralPath $playlistPath) {
+        try {
+            $loaded = Get-Content -LiteralPath $playlistPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($null -ne $loaded -and $loaded.PSObject.Properties.Name -contains "items") { $playlist = $loaded }
+        } catch {
+            Write-MonitorLog "Playlist local inválida; uma nova será criada."
+        }
+    }
+    $items = @($playlist.items)
+    $added = 0
+    foreach ($source in $dialog.FileNames) {
+        try {
+            $fullSource = [IO.Path]::GetFullPath($source)
+            $destination = Join-Path $emergencyMediaRoot ([IO.Path]::GetFileName($source))
+            $fullDestination = [IO.Path]::GetFullPath($destination)
+            if ($fullSource -ne $fullDestination) { Copy-Item -LiteralPath $source -Destination $destination -Force }
+            $extension = [IO.Path]::GetExtension($destination).ToLowerInvariant()
+            $type = if ($extension -eq ".mp4") { "video" } else { "image" }
+            $duration = if ($type -eq "video") { 45 } else { 20 }
+            $items = @($items | Where-Object { $_.file -ne ([IO.Path]::GetFileName($destination)) })
+            $items += [pscustomobject]@{
+                file = [IO.Path]::GetFileName($destination)
+                title = [IO.Path]::GetFileNameWithoutExtension($destination)
+                duration = $duration
+                type = $type
+            }
+            $added++
+        } catch {
+            Write-MonitorLog "Falha ao adicionar mídia: $($_.Exception.Message)"
+        }
+    }
+    $playlist = [pscustomobject]@{ items = @($items) }
+    $playlist | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $playlistPath -Encoding UTF8
+    if ($added -gt 0) {
+        Set-EmergencyStatus "$added mídia(s) adicionada(s) à emergência local" $colors.Green
+        Write-MonitorLog "$added mídia(s) adicionada(s) à playlist local."
+        if ($null -eq $script:emergencyProcess -or $script:emergencyProcess.HasExited) { Start-EmergencyServer }
+    }
+}
+
 $emergencyButton.Add_Click({
     if ($null -ne $script:emergencyProcess -and -not $script:emergencyProcess.HasExited) { Stop-EmergencyServer } else { Start-EmergencyServer }
 })
+$emergencyMediaButton.Add_Click({ Add-EmergencyMedia })
 $emergencyFolderButton.Add_Click({
     if (-not (Test-Path -LiteralPath $emergencyMediaRoot)) { New-Item -ItemType Directory -Path $emergencyMediaRoot -Force | Out-Null }
     Start-Process explorer.exe -ArgumentList "`"$emergencyMediaRoot`""
