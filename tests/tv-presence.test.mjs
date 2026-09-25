@@ -31,6 +31,10 @@ test('monitor local permite controlar reabertura por TV e modo minimalista', () 
   assert.match(monitor, /Modo minimalista/);
   assert.match(monitor, /Save-MonitorConfig/);
   assert.match(monitor, /stationRecoveryEnabled/);
+  assert.match(monitor, /Iniciar emergência/);
+  assert.match(monitor, /Start-EmergencyServer/);
+  assert.match(monitor, /emergency-media/);
+  assert.match(monitor, /emergencyServerScript/);
   assert.match(config, /"autoRecovery"\s*:\s*false/);
   assert.match(config, /"minimal"\s*:\s*(true|false)/);
 });

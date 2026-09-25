@@ -11,6 +11,9 @@ if (-not (Test-Path -LiteralPath $ConfigFile)) {
 
 $configJson = Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8
 $config = $configJson | ConvertFrom-Json
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$emergencyServerScript = Join-Path $PSScriptRoot "emergency-server.mjs"
+$emergencyMediaRoot = Join-Path $projectRoot "emergency-media"
 
 $probeSource = @'
 param([string]$ConfigurationJson)
@@ -164,6 +167,25 @@ $refreshButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Wi
 $refreshButton.Location = New-Object System.Drawing.Point(870, 26)
 $header.Controls.Add($refreshButton)
 
+$emergencyButton = New-Button "Iniciar emergencia" $colors.Yellow
+$emergencyButton.Size = New-Object System.Drawing.Size(160, 34)
+$emergencyButton.Location = New-Object System.Drawing.Point(430, 89)
+$emergencyButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
+$header.Controls.Add($emergencyButton)
+
+$emergencyFolderButton = New-Button "Abrir pasta de mídia" $colors.SurfaceAlt
+$emergencyFolderButton.Size = New-Object System.Drawing.Size(160, 34)
+$emergencyFolderButton.Location = New-Object System.Drawing.Point(595, 89)
+$emergencyFolderButton.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left
+$header.Controls.Add($emergencyFolderButton)
+
+$emergencyStatus = New-Label "Emergência local parada" 8
+$emergencyStatus.ForeColor = $colors.Muted
+$emergencyStatus.Location = New-Object System.Drawing.Point(765, 99)
+$emergencyStatus.AutoSize = $false
+$emergencyStatus.Size = New-Object System.Drawing.Size(240, 22)
+$header.Controls.Add($emergencyStatus)
+
 $lastUpdate = New-Label "Aguardando primeira leitura..." 9
 $lastUpdate.ForeColor = $colors.Muted
 $lastUpdate.AutoSize = $false
@@ -267,6 +289,7 @@ $cards = @{}
 $script:lastStates = @{}
 $script:recovery = @{}
 $script:launchTasks = @()
+$script:emergencyProcess = $null
 $autoRecovery = [bool]$config.autoRecovery
 $globalRecoveryEnabled = [bool]$config.autoRecovery
 $recoveryCooldown = [Math]::Max(15, [int]$config.recoveryCooldownSeconds)
@@ -300,6 +323,72 @@ function Save-MonitorConfig {
         Write-MonitorLog "Nao foi possivel salvar as preferencias: $($_.Exception.Message)"
     }
 }
+
+function Test-EmergencyServer {
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:8787/emergency.json" -TimeoutSec 1 -UseBasicParsing
+        return $response.StatusCode -eq 200
+    } catch { return $false }
+}
+
+function Set-EmergencyStatus([string]$message, [System.Drawing.Color]$color = $colors.Muted) {
+    $emergencyStatus.Text = $message
+    $emergencyStatus.ForeColor = $color
+}
+
+function Start-EmergencyServer {
+    if (-not (Test-Path -LiteralPath $emergencyServerScript)) {
+        Set-EmergencyStatus "Servidor local não encontrado" $colors.Red
+        [System.Windows.Forms.MessageBox]::Show("O servidor emergencial não foi encontrado em $emergencyServerScript.", "Emergência local") | Out-Null
+        return
+    }
+    if (-not (Test-Path -LiteralPath $emergencyMediaRoot)) {
+        New-Item -ItemType Directory -Path $emergencyMediaRoot -Force | Out-Null
+    }
+    if (Test-EmergencyServer) {
+        $emergencyButton.Text = "Parar emergência"
+        $emergencyButton.BackColor = $colors.Red
+        Set-EmergencyStatus "Servidor local já estava ativo" $colors.Green
+        return
+    }
+    try {
+        $node = Get-Command node.exe -ErrorAction Stop
+        $script:emergencyProcess = Start-Process -FilePath $node.Source -ArgumentList @($emergencyServerScript) -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+        Start-Sleep -Milliseconds 350
+        $emergencyButton.Text = "Parar emergência"
+        $emergencyButton.BackColor = $colors.Red
+        if (Test-EmergencyServer) {
+            Set-EmergencyStatus "Servidor ativo • porta 8787" $colors.Green
+            Write-MonitorLog "Servidor emergencial local iniciado na porta 8787."
+        } else {
+            Set-EmergencyStatus "Iniciando servidor local..." $colors.Yellow
+        }
+    } catch {
+        Set-EmergencyStatus "Falha ao iniciar servidor" $colors.Red
+        [System.Windows.Forms.MessageBox]::Show("Não foi possível iniciar o servidor emergencial: $($_.Exception.Message)", "Emergência local") | Out-Null
+    }
+}
+
+function Stop-EmergencyServer {
+    if ($null -ne $script:emergencyProcess) {
+        try {
+            if (-not $script:emergencyProcess.HasExited) { Stop-Process -Id $script:emergencyProcess.Id -Force }
+        } catch {}
+        $script:emergencyProcess = $null
+    }
+    $emergencyButton.Text = "Iniciar emergência"
+    $emergencyButton.BackColor = $colors.Yellow
+    Set-EmergencyStatus "Emergência local parada" $colors.Muted
+    Write-MonitorLog "Servidor emergencial local parado."
+}
+
+$emergencyButton.Add_Click({
+    if ($null -ne $script:emergencyProcess -and -not $script:emergencyProcess.HasExited) { Stop-EmergencyServer } else { Start-EmergencyServer }
+})
+$emergencyFolderButton.Add_Click({
+    if (-not (Test-Path -LiteralPath $emergencyMediaRoot)) { New-Item -ItemType Directory -Path $emergencyMediaRoot -Force | Out-Null }
+    Start-Process explorer.exe -ArgumentList "`"$emergencyMediaRoot`""
+})
 $launchSource = @'
 param([string]$Ip, [string]$LaunchId)
 try {
@@ -596,6 +685,7 @@ $form.Add_Shown({
 
 $form.Add_FormClosed({
     $timer.Stop()
+    Stop-EmergencyServer
     if ($null -ne $script:probeTask) {
         try { $script:probeTask.PowerShell.Stop() } catch {}
         $script:probeTask.PowerShell.Dispose()

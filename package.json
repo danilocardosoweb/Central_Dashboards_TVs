@@ -22,7 +22,8 @@
     "roku:check": "bsc --project roku/bsconfig.json",
     "roku:idle-audio": "node scripts/generate-idle-audio.mjs",
     "roku:package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-roku.ps1",
-    "roku:monitor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/roku-tv-monitor.ps1"
+    "roku:monitor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/roku-tv-monitor.ps1",
+    "emergency:server": "node scripts/emergency-server.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "149.0.0",
