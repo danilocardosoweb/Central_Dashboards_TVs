@@ -5,3 +5,5 @@ dist/
 !.env.vercel.example
 !.env.capture.example
 renderer/output/
+emergency-media/*
+!emergency-media/playlist.json

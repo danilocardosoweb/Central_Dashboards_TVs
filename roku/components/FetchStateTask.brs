@@ -29,7 +29,9 @@ sub fetchState()
         return
     end if
 
-    event = Wait(15000, port)
+    timeoutSeconds = m.top.timeoutSeconds
+    if timeoutSeconds < 1 then timeoutSeconds = 15
+    event = Wait(timeoutSeconds * 1000, port)
     if event = invalid or Type(event) <> "roUrlEvent"
         transfer.AsyncCancel()
         useCachedState("Tempo esgotado ao consultar a Central.")
@@ -94,6 +96,10 @@ function extractStateRow(parsed as dynamic) as dynamic
 end function
 
 sub useCachedState(message as string)
+    if not m.top.useCache
+        m.top.error = message
+        return
+    end if
     cachedText = ReadAsciiFile("cachefs:/central-dashboard-state.json")
     if cachedText <> invalid and cachedText <> ""
         cachedRow = ParseJson(cachedText)

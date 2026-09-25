@@ -2,6 +2,8 @@
 <component name="FetchStateTask" extends="Task">
     <interface>
         <field id="endpoint" type="string" />
+        <field id="timeoutSeconds" type="integer" value="15" />
+        <field id="useCache" type="boolean" value="true" />
         <field id="result" type="assocarray" />
         <field id="error" type="string" />
         <field id="traceId" type="string" />

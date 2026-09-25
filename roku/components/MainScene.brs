@@ -1,6 +1,12 @@
 sub init()
     m.endpoint = "https://central-dashboards-t-vs.vercel.app/api/state"
     m.heartbeatEndpoint = "https://central-dashboards-t-vs.vercel.app/api/tv-status"
+    ' Servidor temporario da rede local. O primeiro endereco cobre a rede
+    ' cabeada e o segundo a rede Wi-Fi do computador que publica a emergencia.
+    m.emergencyEndpoints = [
+        "http://192.168.0.122:8787/emergency.json"
+        "http://192.168.0.159:8787/emergency.json"
+    ]
 
     m.canvas = m.top.FindNode("canvas")
     m.contentGroup = m.top.FindNode("contentGroup")
@@ -142,6 +148,8 @@ sub init()
     m.lastUpdatedAt = ""
     m.lastPlaybackSignature = ""
     m.fetching = false
+    m.emergencyAttempting = false
+    m.emergencyEndpointIndex = 0
     m.paused = false
     m.defaultDuration = 30
     m.countdownEnabled = true
@@ -176,7 +184,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 41, endpoint: m.endpoint })
+    logEvent("app-start", { build: 43, endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -255,23 +263,51 @@ end sub
 sub fetchCentralState()
     if m.fetching then return
     m.fetching = true
+    m.emergencyAttempting = false
+    m.emergencyEndpointIndex = 0
     m.fetchWatchdogTimer.control = "start"
     logEvent("fetch-start", { endpoint: m.endpoint })
 
     task = CreateObject("roSGNode", "FetchStateTask")
     task.endpoint = m.endpoint
+    task.timeoutSeconds = 15
     task.ObserveField("result", "onFetchResult")
     task.ObserveField("error", "onFetchError")
     m.fetchTask = task
     task.control = "run"
 end sub
 
+function tryEmergencyState() as boolean
+    endpoints = arrayOrEmpty(m.emergencyEndpoints)
+    if endpoints.Count() = 0 then return false
+    if m.emergencyEndpointIndex >= endpoints.Count() then return false
+
+    endpoint = endpoints[m.emergencyEndpointIndex]
+    m.emergencyEndpointIndex = m.emergencyEndpointIndex + 1
+    m.emergencyAttempting = true
+    logEvent("emergency-fetch-start", { endpoint: endpoint })
+    task = CreateObject("roSGNode", "FetchStateTask")
+    task.endpoint = endpoint
+    task.timeoutSeconds = 5
+    task.useCache = false
+    task.ObserveField("result", "onFetchResult")
+    task.ObserveField("error", "onFetchError")
+    m.fetchTask = task
+    task.control = "run"
+    return true
+end function
+
 sub onFetchResult()
     row = m.fetchTask.result
     m.fetching = false
     m.fetchWatchdogTimer.control = "stop"
     m.lastTraceId = m.fetchTask.traceId
-    if m.fetchTask.fromCache
+    usingEmergency = m.emergencyAttempting
+    m.emergencyAttempting = false
+    if usingEmergency
+        m.stateSource = "emergency-local"
+        m.lastError = "Servidor principal indisponível; usando mídia local."
+    else if m.fetchTask.fromCache
         m.stateSource = "cache"
         m.lastError = m.fetchTask.warning
     else
@@ -291,6 +327,7 @@ sub onFetchResult()
         traceId: m.lastTraceId
         source: m.stateSource
         statusCode: m.fetchTask.statusCode
+        emergency: usingEmergency
     })
 
     if revision = m.lastRevision and updatedAt = m.lastUpdatedAt and m.state <> invalid
@@ -329,6 +366,8 @@ sub onFetchError()
     m.syncLabel.text = "Sem sincronização • nova tentativa em 60s"
     m.loading.control = "stop"
     m.loading.visible = false
+
+    if tryEmergencyState() then return
 
     if m.state = invalid
         hideDashboardImages()
@@ -2104,7 +2143,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V41 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: V43 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -2117,7 +2156,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 41
+        build: 43
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId

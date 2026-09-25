@@ -43,6 +43,8 @@ test('carregamento de imagem possui watchdog e não força quadro incompleto', (
   assert.match(scene, /sub renderConnectionWaiting\(slide as object\)/);
   assert.match(scene, /m\.connectionRetryTimer\.control = "start"/);
   assert.match(scene, /sub onConnectionRetryTimer\(\)/);
+  assert.match(scene, /emergencyEndpoints =/);
+  assert.match(scene, /function tryEmergencyState\(\) as boolean/);
   assert.match(xml, /id="imageLoadTimer" duration="8"/);
   assert.match(xml, /id="connectionRetryTimer" duration="15" repeat="true"/);
   assert.doesNotMatch(scene, /if target\.loadStatus = "ready" then beginImageTransition\(\)/);
@@ -114,7 +116,9 @@ test('Roku consulta atualizacoes sem intervalo agressivo', () => {
 
 test('consulta de estado possui timeout, cache local e retomada do ciclo', () => {
   assert.match(fetchTask, /AsyncGetToString\(\)/);
-  assert.match(fetchTask, /Wait\(15000, port\)/);
+  assert.match(fetchTask, /Wait\(timeoutSeconds \* 1000, port\)/);
+  assert.match(fetchTask, /timeoutSeconds = m\.top\.timeoutSeconds/);
+  assert.match(fetchTask, /if not m\.top\.useCache/);
   assert.match(fetchTask, /cachefs:\/central-dashboard-state\.json/);
   assert.match(fetchTask, /useCachedState/);
   assert.doesNotMatch(fetchTask, /transfer\.GetToString\(\)/);
@@ -128,7 +132,7 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V41/);
+  assert.match(scene, /Build: V43/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {
