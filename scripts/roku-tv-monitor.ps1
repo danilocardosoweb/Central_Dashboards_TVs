@@ -14,7 +14,11 @@ $config = $configJson | ConvertFrom-Json
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $emergencyServerScript = Join-Path $PSScriptRoot "emergency-server.mjs"
 $preferredEmergencyMediaRoot = Join-Path $env:USERPROFILE "Desktop\apps\Central_Dashboards_TVs-ppr-fix\emergency-media"
-$emergencyMediaRoot = if (Test-Path -LiteralPath $preferredEmergencyMediaRoot) { $preferredEmergencyMediaRoot } else { Join-Path $projectRoot "emergency-media" }
+$preferredHasMedia = (Test-Path -LiteralPath $preferredEmergencyMediaRoot) -and @(
+    Get-ChildItem -LiteralPath $preferredEmergencyMediaRoot -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension -match '^\.(mp4|png|jpe?g|webp)$' }
+).Count -gt 0
+$emergencyMediaRoot = if ($preferredHasMedia) { $preferredEmergencyMediaRoot } else { Join-Path $projectRoot "emergency-media" }
 
 $probeSource = @'
 param([string]$ConfigurationJson)
