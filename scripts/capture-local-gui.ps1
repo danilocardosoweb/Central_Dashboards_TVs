@@ -226,10 +226,21 @@ $pollTimer.Add_Tick({
         ) | Out-Null
     }
     else {
-        Set-IdleState $false 'Consulte o acompanhamento abaixo para identificar o painel com erro.'
+        $failureMessage = 'Consulte o acompanhamento abaixo para identificar o painel com erro.'
+        $failureLog = if (Test-Path -LiteralPath $captureLogPath) { Get-Content -LiteralPath $captureLogPath -Raw -Encoding UTF8 } else { '' }
+        if ($failureLog -match 'exceed_cached_egress_quota') {
+            $failureMessage = 'O Supabase bloqueou a captura por excesso de cota. Verifique o plano ou o limite de gastos do projeto.'
+        }
+        Set-IdleState $false $failureMessage
+        $failureTitle = 'Falha na captura'
+        $failureDetail = "A captura terminou com erro (código $exitCode). Consulte o acompanhamento na janela."
+        if ($failureLog -match 'exceed_cached_egress_quota') {
+            $failureTitle = 'Cota do Supabase excedida'
+            $failureDetail = 'O Supabase bloqueou temporariamente o acesso por excesso de cota de tráfego em cache. É necessário aguardar a renovação da cota, ajustar o limite de gastos ou mudar o plano.'
+        }
         [System.Windows.Forms.MessageBox]::Show(
-            "A captura terminou com erro (código $exitCode). Consulte o acompanhamento na janela.",
-            'Falha na captura', 'OK', 'Error'
+            $failureDetail,
+            $failureTitle, 'OK', 'Error'
         ) | Out-Null
     }
 })
