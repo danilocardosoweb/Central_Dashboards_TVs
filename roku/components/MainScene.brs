@@ -163,6 +163,9 @@ sub init()
     m.connectionWaiting = false
     m.videoPlaying = false
     m.videoSlide = invalid
+    ' Modo temporario para manter a comunicacao local enquanto a Central esta indisponivel.
+    m.forceBundledEmergency = true
+    m.bundledEmergencyStarted = false
     m.introPlaying = false
     m.introRemoved = false
     m.preservePlaybackOnBuild = false
@@ -237,6 +240,10 @@ sub finishIntroVideo()
         m.introRemoved = true
     end if
 
+    if m.forceBundledEmergency and not m.bundledEmergencyStarted
+        startBundledEmergency()
+    end if
+
     if m.stationOverlay.visible
         m.stationList.SetFocus(true)
     else
@@ -304,6 +311,9 @@ sub onFetchResult()
     m.lastTraceId = m.fetchTask.traceId
     usingEmergency = m.emergencyAttempting
     m.emergencyAttempting = false
+    if m.forceBundledEmergency
+        return
+    end if
     if usingEmergency
         m.stateSource = "emergency-local"
         m.lastError = "Servidor principal indisponível; usando mídia local."
@@ -375,6 +385,8 @@ sub onFetchError()
 end sub
 
 sub startBundledEmergency()
+    if m.bundledEmergencyStarted then return
+    m.bundledEmergencyStarted = true
     m.stateSource = "local-package"
     m.lastError = "Sem conexão com a Central; reproduzindo mídia local do aplicativo."
     m.stations = [{ id: "station-default", name: "Esta TV", areaId: "geral" }]
