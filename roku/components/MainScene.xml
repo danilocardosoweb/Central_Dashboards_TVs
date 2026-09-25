@@ -245,6 +245,15 @@
                     enableUI="false" />
             </Group>
 
+            <Video
+                id="mediaVideo"
+                width="1920"
+                height="1080"
+                visible="false"
+                loop="false"
+                enableUI="false"
+                notificationInterval="1" />
+
             <!--
                 Protecao em duas camadas contra EXIT_IDLE_AUTO_EXIT: o Video
                 bloqueia explicitamente o protetor de tela e o Audio mantem

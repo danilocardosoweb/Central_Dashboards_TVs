@@ -83,6 +83,7 @@ sub init()
     m.imageLoadTimer = m.top.FindNode("imageLoadTimer")
     m.introGroup = m.top.FindNode("introGroup")
     m.introVideo = m.top.FindNode("introVideo")
+    m.mediaVideo = m.top.FindNode("mediaVideo")
     m.idleGuardVideo = m.top.FindNode("idleGuardVideo")
     m.idleGuardAudio = m.top.FindNode("idleGuardAudio")
     m.introFallbackTimer = m.top.FindNode("introFallbackTimer")
@@ -118,6 +119,7 @@ sub init()
     m.imageLoadTimer.ObserveField("fire", "onImageLoadTimer")
     m.introVideo.ObserveField("state", "onIntroVideoState")
     m.introVideo.ObserveField("position", "onIntroVideoPosition")
+    m.mediaVideo.ObserveField("state", "onMediaVideoState")
     m.introFallbackTimer.ObserveField("fire", "onIntroFallbackTimer")
     m.idleGuardAudio.ObserveField("state", "onIdleGuardState")
     m.fetchWatchdogTimer.ObserveField("fire", "onFetchWatchdogTimer")
@@ -721,6 +723,8 @@ sub buildPlaylist()
                         title: valueOr(alert, "title", "Comunicado")
                         body: valueOr(alert, "body", "")
                         imageUrl: alertImageUrl
+                        mediaType: mediaType
+                        mediaUrl: valueOr(alert, "mediaUrl", "")
                         duration: valueOr(alert, "duration", 20)
                     })
                 end if
@@ -804,6 +808,11 @@ end sub
 sub renderSlide(slide as object)
     cancelPendingImage()
     m.slideTimer.control = "stop"
+    if m.mediaVideo <> invalid
+        m.mediaVideo.control = "stop"
+        m.mediaVideo.visible = false
+        m.mediaVideo.content = invalid
+    end if
     logEvent("slide-start", {
         index: m.slideIndex
         total: m.slides.Count()
@@ -813,6 +822,23 @@ sub renderSlide(slide as object)
     })
     updateDiagnostics()
     imageUrl = valueOr(slide, "imageUrl", "")
+
+    if LCase(valueOr(slide, "mediaType", "")) = "video"
+        videoUrl = valueOr(slide, "mediaUrl", "")
+        if videoUrl <> ""
+            hideDashboardImages()
+            m.messagePanel.visible = false
+            m.pprPanel.visible = false
+            content = CreateObject("roSGNode", "ContentNode")
+            content.url = videoUrl
+            content.streamFormat = "mp4"
+            m.mediaVideo.content = content
+            m.mediaVideo.visible = true
+            m.mediaVideo.control = "play"
+            logEvent("video-load-start", { id: valueOr(slide, "id", ""), url: videoUrl })
+            return
+        end if
+    end if
 
     if imageUrl <> ""
         queueImageSlide(slide, imageUrl)
@@ -903,6 +929,21 @@ sub onFetchWatchdogTimer()
     logEvent("fetch-watchdog", { error: m.lastError })
     releaseFetchTask()
     if m.state = invalid then showError(m.lastError)
+end sub
+
+sub onMediaVideoState()
+    if m.mediaVideo = invalid or not m.mediaVideo.visible then return
+    state = m.mediaVideo.state
+    logEvent("video-state", { state: state })
+    if state = "finished" or state = "error" or state = "stopped"
+        m.mediaVideo.visible = false
+        m.mediaVideo.control = "stop"
+        m.mediaVideo.content = invalid
+        if state = "error"
+            logEvent("video-failed", { id: valueOr(m.slides[m.slideIndex], "id", "") })
+        end if
+        showNextSlide()
+    end if
 end sub
 
 ' Recuperação de último nível para timers/interpolações que deixaram de disparar.
