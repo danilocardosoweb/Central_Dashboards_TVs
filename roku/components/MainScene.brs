@@ -729,7 +729,7 @@ sub renderSlide(slide as object)
     mediaType = LCase(valueOr(slide, "mediaType", ""))
     mediaUrl = valueOr(slide, "mediaUrl", "")
 
-    if mediaType = "video" and Left(LCase(mediaUrl), 8) = "https://"
+    if mediaType = "video" and (Left(LCase(mediaUrl), 8) = "https://" or Left(LCase(mediaUrl), 7) = "http://")
         startAlertVideo(slide, mediaUrl)
         return
     end if
@@ -2274,7 +2274,7 @@ function dashboardImageUrl(dashboard as dynamic) as string
     keys = ["rokuImageUrl", "snapshotUrl", "imageUrl", "rokuImage"]
     for each key in keys
         candidate = valueOr(dashboard, key, "")
-        if Left(LCase(candidate), 8) = "https://" then return candidate
+        if Left(LCase(candidate), 8) = "https://" or Left(LCase(candidate), 7) = "http://" then return candidate
     end for
     return ""
 end function
