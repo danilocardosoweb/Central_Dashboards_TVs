@@ -163,9 +163,6 @@ sub init()
     m.connectionWaiting = false
     m.videoPlaying = false
     m.videoSlide = invalid
-    ' Modo temporario para manter a comunicacao local enquanto a Central esta indisponivel.
-    m.forceBundledEmergency = true
-    m.bundledEmergencyStarted = false
     m.introPlaying = false
     m.introRemoved = false
     m.preservePlaybackOnBuild = false
@@ -240,10 +237,6 @@ sub finishIntroVideo()
         m.introRemoved = true
     end if
 
-    if m.forceBundledEmergency and not m.bundledEmergencyStarted
-        startBundledEmergency()
-    end if
-
     if m.stationOverlay.visible
         m.stationList.SetFocus(true)
     else
@@ -311,9 +304,6 @@ sub onFetchResult()
     m.lastTraceId = m.fetchTask.traceId
     usingEmergency = m.emergencyAttempting
     m.emergencyAttempting = false
-    if m.forceBundledEmergency
-        return
-    end if
     if usingEmergency
         m.stateSource = "emergency-local"
         m.lastError = "Servidor principal indisponível; usando mídia local."
@@ -380,38 +370,14 @@ sub onFetchError()
     if tryEmergencyState() then return
 
     if m.state = invalid
-        startBundledEmergency()
+        hideDashboardImages()
+        m.pprPanel.visible = false
+        m.messagePanel.visible = true
+        renderConnectionWaiting(invalid)
+        m.connectionWaiting = true
+        m.contentGroup.opacity = 1.0
+        updateDiagnostics()
     end if
-end sub
-
-sub startBundledEmergency()
-    if m.bundledEmergencyStarted then return
-    m.bundledEmergencyStarted = true
-    m.stateSource = "local-package"
-    m.lastError = "Sem conexão com a Central; reproduzindo mídia local do aplicativo."
-    m.stations = [{ id: "station-default", name: "Esta TV", areaId: "geral" }]
-    m.state = {
-        urls: []
-        areas: []
-        stations: m.stations
-        alerts: [{
-            id: "bundled-emergency-video"
-            title: "Comunicado local"
-            body: ""
-            mediaType: "video"
-            mediaUrl: "pkg:/videos/emergency.mp4"
-            enabled: true
-            duration: 45
-            targetStations: ["*"]
-            targetAreas: ["*"]
-        }]
-        ppr: { enabled: false }
-        settings: { transitionTime: 45000, transitionEffect: "fade", transitionDuration: 800, countdownEnabled: false }
-    }
-    m.lastRevision = 1
-    m.lastUpdatedAt = CreateObject("roDateTime").ToISOString()
-    chooseOrRestoreStation()
-    logEvent("bundled-emergency-start", { mediaUrl: "pkg:/videos/emergency.mp4" })
 end sub
 
 sub configureDefaultDuration(payload as object)
@@ -763,7 +729,7 @@ sub renderSlide(slide as object)
     mediaType = LCase(valueOr(slide, "mediaType", ""))
     mediaUrl = valueOr(slide, "mediaUrl", "")
 
-    if mediaType = "video" and (Left(LCase(mediaUrl), 8) = "https://" or Left(LCase(mediaUrl), 7) = "http://" or Left(LCase(mediaUrl), 6) = "pkg:/")
+    if mediaType = "video" and (Left(LCase(mediaUrl), 8) = "https://" or Left(LCase(mediaUrl), 7) = "http://")
         startAlertVideo(slide, mediaUrl)
         return
     end if
@@ -2308,7 +2274,7 @@ function dashboardImageUrl(dashboard as dynamic) as string
     keys = ["rokuImageUrl", "snapshotUrl", "imageUrl", "rokuImage"]
     for each key in keys
         candidate = valueOr(dashboard, key, "")
-        if Left(LCase(candidate), 8) = "https://" or Left(LCase(candidate), 7) = "http://" or Left(LCase(candidate), 6) = "pkg:/" then return candidate
+        if Left(LCase(candidate), 8) = "https://" or Left(LCase(candidate), 7) = "http://" then return candidate
     end for
     return ""
 end function
@@ -2317,7 +2283,7 @@ function remoteAlertImage(alert as dynamic) as string
     keys = ["rokuImageUrl", "imageUrl", "mediaUrl", "attachmentUrl", "fileUrl", "url"]
     for each key in keys
         candidate = valueOr(alert, key, "")
-        if Left(LCase(candidate), 8) = "https://" then return candidate
+        if Left(LCase(candidate), 8) = "https://" or Left(LCase(candidate), 7) = "http://" then return candidate
     end for
     return ""
 end function
