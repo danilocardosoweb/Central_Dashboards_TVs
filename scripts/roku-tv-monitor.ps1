@@ -13,7 +13,8 @@ $configJson = Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8
 $config = $configJson | ConvertFrom-Json
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $emergencyServerScript = Join-Path $PSScriptRoot "emergency-server.mjs"
-$emergencyMediaRoot = Join-Path $projectRoot "emergency-media"
+$preferredEmergencyMediaRoot = Join-Path $env:USERPROFILE "Desktop\apps\Central_Dashboards_TVs-ppr-fix\emergency-media"
+$emergencyMediaRoot = if (Test-Path -LiteralPath $preferredEmergencyMediaRoot) { $preferredEmergencyMediaRoot } else { Join-Path $projectRoot "emergency-media" }
 
 $probeSource = @'
 param([string]$ConfigurationJson)
@@ -353,7 +354,13 @@ function Start-EmergencyServer {
     }
     try {
         $node = Get-Command node.exe -ErrorAction Stop
-        $script:emergencyProcess = Start-Process -FilePath $node.Source -ArgumentList @($emergencyServerScript) -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+        $previousEmergencyRoot = $env:EMERGENCY_MEDIA_ROOT
+        $env:EMERGENCY_MEDIA_ROOT = $emergencyMediaRoot
+        try {
+            $script:emergencyProcess = Start-Process -FilePath $node.Source -ArgumentList @($emergencyServerScript) -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+        } finally {
+            if ($null -eq $previousEmergencyRoot) { Remove-Item Env:EMERGENCY_MEDIA_ROOT -ErrorAction SilentlyContinue } else { $env:EMERGENCY_MEDIA_ROOT = $previousEmergencyRoot }
+        }
         Start-Sleep -Milliseconds 350
         $emergencyButton.Text = "Parar emergência"
         $emergencyButton.BackColor = $colors.Red

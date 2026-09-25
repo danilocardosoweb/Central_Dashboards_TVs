@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { promises as fs } from 'node:fs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(scriptDir, '..', 'emergency-media');
+const root = path.resolve(process.env.EMERGENCY_MEDIA_ROOT || path.join(scriptDir, '..', 'emergency-media'));
 const port = Number(process.env.EMERGENCY_PORT || 8787);
 const advertise = process.env.EMERGENCY_HOST || '192.168.0.122';
 const playlistPath = path.join(root, 'playlist.json');
@@ -24,6 +24,20 @@ function safeName(value) {
   return name;
 }
 
+async function resolveMediaFile(value) {
+  const requested = safeName(value);
+  try {
+    await fs.access(path.join(root, requested));
+    return requested;
+  } catch {
+    if (!['video.mp4', 'imagem.png', 'image.png'].includes(requested.toLowerCase())) throw new Error(`Arquivo não encontrado: ${requested}`);
+    const names = await fs.readdir(root);
+    const fallback = names.find(name => /\.(mp4|png|jpe?g|webp)$/i.test(name));
+    if (!fallback) throw new Error(`Nenhuma mídia encontrada para substituir ${requested}.`);
+    return fallback;
+  }
+}
+
 async function emergencyState() {
   const raw = await fs.readFile(playlistPath, 'utf8');
   const playlist = JSON.parse(raw);
@@ -31,7 +45,7 @@ async function emergencyState() {
   const urls = [];
   const alerts = [];
   for (const [index, item] of items.entries()) {
-    const file = safeName(item.file);
+    const file = await resolveMediaFile(item.file);
     const url = `http://${advertise}:${port}/media/${encodeURIComponent(file)}`;
     const duration = Math.max(5, Number(item.duration) || 20);
     if (String(item.type || '').toLowerCase() === 'video' || file.toLowerCase().endsWith('.mp4')) {
@@ -75,15 +89,16 @@ async function emergencyState() {
 
 const server = http.createServer(async (request, response) => {
   try {
-    if (request.url === '/emergency.json') {
+    const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+    if (requestUrl.pathname === '/emergency.json') {
       const body = JSON.stringify(await emergencyState());
       response.writeHead(200, { 'Content-Type': contentTypes['.json'], 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
       response.end(body);
       return;
     }
-    if (request.url?.startsWith('/media/')) {
-      const name = decodeURIComponent(request.url.slice('/media/'.length));
-      const file = safeName(name);
+    if (requestUrl.pathname.startsWith('/media/')) {
+      const name = decodeURIComponent(requestUrl.pathname.slice('/media/'.length));
+      const file = await resolveMediaFile(name);
       const body = await fs.readFile(path.join(root, file));
       const ext = path.extname(file).toLowerCase();
       response.writeHead(200, { 'Content-Type': contentTypes[ext] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
