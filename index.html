@@ -5549,10 +5549,27 @@
             }
         }
 
+        function formatUiError(value, fallback = 'Ocorreu um erro inesperado.') {
+            if (value instanceof Error && value.message) return value.message;
+            if (typeof value === 'string' && value.trim()) return value.trim();
+            if (value && typeof value === 'object') {
+                const nested = [value.message, value.error, value.details, value.hint]
+                    .find(item => item !== undefined && item !== null && item !== '');
+                if (nested !== undefined) return formatUiError(nested, fallback);
+                try {
+                    const serialized = JSON.stringify(value);
+                    if (serialized && serialized !== '{}') return serialized;
+                } catch (error) {
+                    // Keep the generic message when an external error object cannot be serialized.
+                }
+            }
+            return fallback;
+        }
+
         // Mostrar notificação toast
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
-            toast.textContent = message;
+            toast.textContent = formatUiError(message);
             toast.className = `toast ${type}`;
             toast.style.display = 'block';
             
@@ -10005,6 +10022,7 @@
             let cloudPlaybackSignature = '';
             let cloudPollTimer = null;
             let captureWorkerRunning = false;
+            let captureRetryTimer = null;
             const cloudDirtySections = new Set();
 
             function cloudSectionForStorageKey(key) {
@@ -10389,7 +10407,12 @@
                         if (!response.ok) {
                             const error = await response.json().catch(() => ({}));
                             if (response.status === 409) continue;
-                            throw new Error(error.message || `Falha ao solicitar (${response.status}).`);
+                            throw new Error(
+                                formatUiError(
+                                    error.error || error.message,
+                                    `Falha ao solicitar (${response.status}).`
+                                )
+                            );
                         }
                         const saved = await response.json();
                         if (!saved) continue;
@@ -10430,7 +10453,10 @@
                         const result = await response.json().catch(() => ({}));
                         if (!response.ok) {
                             throw new Error(
-                                result.error || `Falha na captura (${response.status}).`
+                                formatUiError(
+                                    result.error || result.message,
+                                    `Falha na captura (${response.status}).`
+                                )
                             );
                         }
 
@@ -10444,10 +10470,22 @@
                     }
                 } catch (error) {
                     console.error('Erro ao processar a fila de capturas:', error);
-                    showToast(
-                        error instanceof Error ? error.message : String(error),
-                        'error'
+                    const message = formatUiError(error);
+                    showToast(message, 'error');
+                    setCloudStatus(
+                        'error',
+                        'Falha na captura dos dashboards',
+                        `${message} Nova tentativa automática em alguns segundos.`
                     );
+                    if (!captureRetryTimer) {
+                        captureRetryTimer = setTimeout(async () => {
+                            captureRetryTimer = null;
+                            const latest = await readCloudRow().catch(() => null);
+                            if (captureQueueProgress(latest?.payload?.capture).active) {
+                                processCaptureQueue();
+                            }
+                        }, 5000);
+                    }
                 } finally {
                     captureWorkerRunning = false;
                     const row = await readCloudRow().catch(() => null);

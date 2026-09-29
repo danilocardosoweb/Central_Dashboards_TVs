@@ -40,3 +40,9 @@ test('captura começa pelo clique e recupera automaticamente somente a fila inic
   assert.match(manualCaptureSql, /drop trigger if exists tv_app_state_capture_request/);
   assert.doesNotMatch(manualCaptureSql, /cron\.schedule\(/);
 });
+
+test('fila mostra erros estruturados e tenta novamente após falha transitória', () => {
+  assert.match(html, /function formatUiError\(value, fallback/);
+  assert.match(html, /JSON\.stringify\(value\)/);
+  assert.match(html, /Nova tentativa automática em alguns segundos/);
+});
