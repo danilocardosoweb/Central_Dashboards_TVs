@@ -16,9 +16,9 @@ import {
 } from './state-store.mjs';
 import { logEvent } from './telemetry.mjs';
 
-const DEFAULT_SUPABASE_URL = 'https://ypwpumtzbdraldccctfd.supabase.co';
+const DEFAULT_SUPABASE_URL = 'https://fmxjvbwjnttamfnlghev.supabase.co';
 const DEFAULT_PUBLISHABLE_KEY =
-  'sb_publishable_rtGvHhP6FGA4snm_aDDUgA_vZWnEhFv';
+  'sb_publishable_Ek9jUZ2j6srCk3oEOo3QtQ_M8tX5X4f';
 
 export function readConfiguration(env = process.env, argv = process.argv.slice(2)) {
   const watch = argv.includes('--watch');

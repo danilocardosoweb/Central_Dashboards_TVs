@@ -21,7 +21,7 @@ Se uma captura falhar, a imagem anterior é preservada.
 
 ## Preparar o Supabase para o teste sem login
 
-Abra o SQL Editor do projeto `ypwpumtzbdraldccctfd` e execute:
+Abra o SQL Editor do projeto `fmxjvbwjnttamfnlghev` e execute:
 
 ```text
 supabase/roku_snapshots.sql
