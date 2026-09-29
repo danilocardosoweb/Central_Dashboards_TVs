@@ -42,29 +42,36 @@ function safeStationKey(stationId) {
   return safeText(stationId, 120).replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
+function heartbeatField(input, name) {
+  return input?.[name] ?? input?.[name.toLowerCase()];
+}
+
 export function normalizeHeartbeat(input = {}, now = new Date()) {
   if (!input || typeof input !== 'object') return null;
-  const stationId = safeText(input.stationId, 120);
+  // BrightScript associative arrays are case-insensitive and FormatJson emits
+  // their keys in lowercase. Keep camelCase support for browsers and accept
+  // the lowercase wire format sent by every installed Roku version.
+  const stationId = safeText(heartbeatField(input, 'stationId'), 120);
   if (!stationId) return null;
   return {
     stationId,
-    stationName: safeText(input.stationName, 120),
-    areaId: safeText(input.areaId, 120),
-    selectionKind: safeText(input.selectionKind, 24) || 'station',
-    installationId: safeText(input.installationId, 120),
-    sessionId: safeText(input.sessionId, 120),
-    appVersion: safeText(input.appVersion, 32),
-    currentIndex: Math.max(0, Number(input.currentIndex) || 0),
-    playlistCount: Math.max(0, Number(input.playlistCount) || 0),
-    currentType: safeText(input.currentType, 40),
-    currentTitle: safeText(input.currentTitle, 160),
-    stateRevision: Math.max(0, Number(input.stateRevision) || 0),
-    stateSource: safeText(input.stateSource, 32),
-    lastError: safeText(input.lastError, 300),
-    uptimeSeconds: Math.max(0, Number(input.uptimeSeconds) || 0),
-    playbackAgeSeconds: Math.max(0, Number(input.playbackAgeSeconds) || 0),
-    recoveryCount: Math.max(0, Number(input.recoveryCount) || 0),
-    playerState: safeText(input.playerState, 40),
+    stationName: safeText(heartbeatField(input, 'stationName'), 120),
+    areaId: safeText(heartbeatField(input, 'areaId'), 120),
+    selectionKind: safeText(heartbeatField(input, 'selectionKind'), 24) || 'station',
+    installationId: safeText(heartbeatField(input, 'installationId'), 120),
+    sessionId: safeText(heartbeatField(input, 'sessionId'), 120),
+    appVersion: safeText(heartbeatField(input, 'appVersion'), 32),
+    currentIndex: Math.max(0, Number(heartbeatField(input, 'currentIndex')) || 0),
+    playlistCount: Math.max(0, Number(heartbeatField(input, 'playlistCount')) || 0),
+    currentType: safeText(heartbeatField(input, 'currentType'), 40),
+    currentTitle: safeText(heartbeatField(input, 'currentTitle'), 160),
+    stateRevision: Math.max(0, Number(heartbeatField(input, 'stateRevision')) || 0),
+    stateSource: safeText(heartbeatField(input, 'stateSource'), 32),
+    lastError: safeText(heartbeatField(input, 'lastError'), 300),
+    uptimeSeconds: Math.max(0, Number(heartbeatField(input, 'uptimeSeconds')) || 0),
+    playbackAgeSeconds: Math.max(0, Number(heartbeatField(input, 'playbackAgeSeconds')) || 0),
+    recoveryCount: Math.max(0, Number(heartbeatField(input, 'recoveryCount')) || 0),
+    playerState: safeText(heartbeatField(input, 'playerState'), 40),
     receivedAt: now.toISOString()
   };
 }
