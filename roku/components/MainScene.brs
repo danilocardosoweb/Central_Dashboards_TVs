@@ -1,6 +1,13 @@
 sub init()
     m.endpoint = "https://central-dashboards-t-vs.vercel.app/api/state"
     m.heartbeatEndpoint = "https://central-dashboards-t-vs.vercel.app/api/tv-status"
+    appInfo = CreateObject("roAppInfo")
+    m.appBuild = "0"
+    if appInfo <> invalid
+        manifestBuild = appInfo.GetValue("build_version")
+        if manifestBuild <> invalid and manifestBuild <> "" then m.appBuild = manifestBuild.ToStr()
+    end if
+    m.appVersion = "V_" + m.appBuild
     ' Servidor temporario da rede local. O primeiro endereco cobre a rede
     ' cabeada e o segundo a rede Wi-Fi do computador que publica a emergencia.
     m.emergencyEndpoints = [
@@ -184,7 +191,7 @@ sub init()
 
     applyResolutionScale()
     startIntroVideo()
-    logEvent("app-start", { build: 43, endpoint: m.endpoint })
+    logEvent("app-start", { endpoint: m.endpoint })
     showLoading("Conectando à Central...")
     fetchCentralState()
     m.syncTimer.control = "start"
@@ -522,7 +529,7 @@ sub sendHeartbeat()
         selectionKind: valueOr(m.currentStation, "kind", "station")
         installationId: m.installationId
         sessionId: m.sessionId
-        appVersion: "V_34"
+        appVersion: m.appVersion
         currentIndex: currentIndex
         playlistCount: m.slides.Count()
         currentType: currentType
@@ -944,21 +951,20 @@ sub showImageLoadFailure(slide as dynamic)
     m.slideTimer.control = "stop"
     m.countdownTimer.control = "stop"
     m.countdownOverlay.visible = false
-    m.dashboardImageA.visible = false
-    m.dashboardImageB.visible = false
+    m.connectionRetryTimer.control = "stop"
+    m.connectionWaiting = false
+    hideDashboardImages()
     m.pprPanel.visible = false
     m.messagePanel.visible = true
-    ' Mantém a rotina legada disponível para diagnósticos; a tela exibida
-    ' abaixo é a espera persistente com nova tentativa automática.
     renderDashboardLoadFailure(slide)
-    renderConnectionWaiting(slide)
-    m.connectionWaiting = true
-    m.connectionRetryTimer.control = "start"
     m.contentGroup.opacity = 1.0
     updateSlideStatus()
     m.lastError = "Falha ao carregar imagem " + valueOr(slide, "id", "")
     logEvent("image-contingency", { id: valueOr(slide, "id", ""), kind: valueOr(slide, "kind", "") })
-    logEvent("connection-wait-start", { id: valueOr(slide, "id", ""), retrySeconds: 15 })
+    logEvent("image-skipped", { id: valueOr(slide, "id", ""), nextSlideSeconds: 5 })
+    m.lastSlideStartedAt = m.sessionUptime.TotalSeconds()
+    m.slideTimer.duration = 5
+    if not m.paused then m.slideTimer.control = "start"
     updateDiagnostics()
 end sub
 
@@ -1224,20 +1230,26 @@ end function
 function buildPprSlides(ppr as dynamic) as object
     result = []
     renderedSlides = arrayOrEmpty(valueOr(ppr, "renderedSlides", []))
+    renderStatus = LCase(valueOr(ppr, "renderStatus", ""))
+    useRenderedSlides = renderStatus = "" or renderStatus = "ready" or renderStatus = "complete" or renderStatus = "ok"
     indicators = activePprIndicators(ppr)
     duration = valueOr(ppr, "duration", 30)
-    for each rendered in renderedSlides
-        imageUrl = valueOr(rendered, "imageUrl", "")
-        if Left(LCase(imageUrl), 8) = "https://"
-            result.Push({
-                id: valueOr(rendered, "id", "ppr-image")
-                kind: "ppr-image"
-                title: valueOr(rendered, "title", "Indicador do PPR")
-                imageUrl: imageUrl
-                duration: valueOr(rendered, "duration", duration)
-            })
-        end if
-    end for
+    if useRenderedSlides
+        for each rendered in renderedSlides
+            imageUrl = valueOr(rendered, "imageUrl", "")
+            if Left(LCase(imageUrl), 8) = "https://"
+                result.Push({
+                    id: valueOr(rendered, "id", "ppr-image")
+                    kind: "ppr-image"
+                    title: valueOr(rendered, "title", "Indicador do PPR")
+                    imageUrl: imageUrl
+                    duration: valueOr(rendered, "duration", duration)
+                })
+            end if
+        end for
+    else if renderedSlides.Count() > 0
+        logEvent("ppr-render-fallback", { renderStatus: renderStatus, renderedSlides: renderedSlides.Count() })
+    end if
     ' O painel nativo permanece apenas como contingência quando ainda não
     ' existe um conjunto de imagens publicado pela Central.
     if result.Count() > 0 then return result
@@ -2143,7 +2155,7 @@ sub updateDiagnostics()
     end if
     activeAlertId = "-"
     if m.activeTemporaryAlert <> invalid then activeAlertId = valueOr(m.activeTemporaryAlert, "id", "-")
-    textValue = "Build: V43 | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
+    textValue = "Build: " + m.appVersion + " | Sessao: " + m.sessionId + " | Fonte: " + m.stateSource
     textValue = textValue + Chr(10) + "Revisao: " + m.lastRevision.ToStr() + " | Trace: " + m.lastTraceId + " | Estacao: " + stationId
     textValue = textValue + Chr(10) + "Slides: " + m.slides.Count().ToStr() + " | Atual: " + (m.slideIndex + 1).ToStr() + " | Tipo: " + currentKind + " | ID: " + currentId
     textValue = textValue + Chr(10) + "Tempo na tela: " + currentPlaybackAge().ToStr() + "s | Recuperacoes: " + m.recoveryCount.ToStr()
@@ -2156,7 +2168,7 @@ sub logEvent(eventName as string, fields as dynamic)
     record = {
         scope: "central-tv"
         event: eventName
-        build: 43
+        build: m.appBuild
         sessionId: m.sessionId
         revision: m.lastRevision
         traceId: m.lastTraceId

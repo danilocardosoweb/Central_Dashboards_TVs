@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { classifyPresence, normalizeHeartbeat, resolveHeartbeatStation } from './tv-status.mjs';
+import { bodyFromRequest, classifyPresence, normalizeHeartbeat, resolveHeartbeatStation } from './tv-status.mjs';
+
+test('lê o JSON enviado pelo Roku quando a plataforma entrega um Buffer', () => {
+  const body = bodyFromRequest({
+    body: Buffer.from(JSON.stringify({ stationId: 'station-default', appVersion: 'V_48' }), 'utf8')
+  });
+  assert.equal(body.stationId, 'station-default');
+  assert.equal(body.appVersion, 'V_48');
+});
 
 test('normaliza heartbeat sem aceitar campos arbitrários', () => {
   const heartbeat = normalizeHeartbeat({

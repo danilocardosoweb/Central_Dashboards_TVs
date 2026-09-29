@@ -40,8 +40,9 @@ test('carregamento de imagem possui watchdog e não força quadro incompleto', (
   assert.match(scene, /roku_retry=/);
   assert.match(scene, /sub showImageLoadFailure\(slide as dynamic\)/);
   assert.match(scene, /renderDashboardLoadFailure\(slide\)/);
+  assert.match(scene, /logEvent\("image-skipped"/);
+  assert.match(scene, /m\.slideTimer\.duration = 5/);
   assert.match(scene, /sub renderConnectionWaiting\(slide as object\)/);
-  assert.match(scene, /m\.connectionRetryTimer\.control = "start"/);
   assert.match(scene, /sub onConnectionRetryTimer\(\)/);
   assert.match(scene, /emergencyEndpoints =/);
   assert.match(scene, /function tryEmergencyState\(\) as boolean/);
@@ -75,6 +76,8 @@ test('sincroniza quando updated_at muda mesmo sem nova revisao', () => {
 test('PPR usa imagens publicadas e mantém o desenho nativo como contingência', () => {
   assert.match(scene, /renderedSlides = arrayOrEmpty\(valueOr\(ppr, "renderedSlides", \[\]\)\)/);
   assert.match(scene, /kind: "ppr-image"/);
+  assert.match(scene, /renderStatus = LCase\(valueOr\(ppr, "renderStatus", ""\)\)/);
+  assert.match(scene, /ppr-render-fallback/);
   assert.match(scene, /if result\.Count\(\) > 0 then return result/);
   assert.match(scene, /O painel nativo permanece apenas como contingência/);
 });
@@ -132,7 +135,9 @@ test('player registra a playlist e oferece diagnostico pelo controle', () => {
   assert.match(scene, /logEvent\("image-failed"/);
   assert.match(xml, /id="diagnosticsOverlay"/);
   assert.match(scene, /key = "up"/);
-  assert.match(scene, /Build: V43/);
+  assert.match(scene, /Build: " \+ m\.appVersion/);
+  assert.match(scene, /appVersion: m\.appVersion/);
+  assert.doesNotMatch(scene, /appVersion: "V_34"/);
 });
 
 test('player recupera o carrossel se o temporizador da tela parar', () => {

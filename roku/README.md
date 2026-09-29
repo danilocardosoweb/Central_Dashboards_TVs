@@ -1,4 +1,4 @@
-# Player Roku V24
+# Player Roku V48
 
 Aplicativo nativo Roku que consulta a API central da Vercel e monta uma unica
 lista com dashboards, avisos em tela cheia e telas do PPR. Itens desativados e
@@ -58,10 +58,10 @@ npm.cmd run roku:check
 npm.cmd run roku:package
 ```
 
-O V24 e gerado como:
+O V48 e gerado como:
 
 ```text
-dist/Central_Dashboard_TVs_Roku_V_26.zip
+dist/Central_Dashboard_TVs_Roku_V_48.zip
 ```
 
 O gerador recusa substituir um ZIP existente. Para uma nova entrega, incremente

@@ -51,7 +51,8 @@ try {
                 "splash_hd.png",
                 "splash_fhd.png",
                 "splash_hd.jpg",
-                "splash_fhd.jpg"
+                "splash_fhd.jpg",
+                "emergency.mp4"
             )
         }
 

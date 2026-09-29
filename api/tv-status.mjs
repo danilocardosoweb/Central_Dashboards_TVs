@@ -23,8 +23,11 @@ function sendJson(response, status, payload, traceId = '') {
   response.end(JSON.stringify(traceId ? { ...payload, traceId } : payload));
 }
 
-function bodyFromRequest(request) {
+export function bodyFromRequest(request) {
   if (!request.body) return {};
+  if (Buffer.isBuffer(request.body) || ArrayBuffer.isView(request.body)) {
+    try { return JSON.parse(Buffer.from(request.body).toString('utf8')); } catch { return {}; }
+  }
   if (typeof request.body === 'string') {
     try { return JSON.parse(request.body); } catch { return {}; }
   }
