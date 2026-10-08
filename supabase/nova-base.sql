@@ -1,6 +1,6 @@
--- Banco novo da Central de Dashboards para TVs
--- Projeto: fmxjvbwjnttamfnlghev
--- Execute todo este arquivo uma vez no SQL Editor do novo projeto.
+-- Esquema da Central de Dashboards para TVs
+-- Projeto original: ypwpumtzbdraldccctfd
+-- Execute este arquivo no SQL Editor somente depois de confirmar o estado atual.
 --
 -- A chave sb_publishable pode ser usada no navegador. A API de estado e o
 -- capturador devem usar uma chave secreta sb_secret_ somente na Vercel/PC.

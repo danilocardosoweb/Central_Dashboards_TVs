@@ -4587,10 +4587,31 @@
         let alertEditorImageName = '';
         let alertEditorMediaType = 'image';
         let alertEditorMediaMime = '';
-        const ALERT_STORAGE_PROJECT_URL = 'https://fmxjvbwjnttamfnlghev.supabase.co';
-        const ALERT_STORAGE_PUBLISHABLE_KEY =
-            'sb_publishable_Ek9jUZ2j6srCk3oEOo3QtQ_M8tX5X4f';
+        let ALERT_STORAGE_PROJECT_URL = '';
+        let ALERT_STORAGE_PUBLISHABLE_KEY = '';
         const ALERT_STORAGE_BUCKET = 'alert-assets';
+        let alertStorageConfigPromise = null;
+
+        async function ensureAlertStorageConfig() {
+            if (ALERT_STORAGE_PROJECT_URL && ALERT_STORAGE_PUBLISHABLE_KEY) return;
+            if (!alertStorageConfigPromise) {
+                alertStorageConfigPromise = fetch('/api/supabase-config', { cache: 'no-store' })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Configuração do Supabase indisponível.');
+                        return response.json();
+                    })
+                    .then(config => {
+                        if (!config.configured) throw new Error(config.error || 'Supabase não configurado.');
+                        ALERT_STORAGE_PROJECT_URL = String(config.url || '').replace(/\/$/, '');
+                        ALERT_STORAGE_PUBLISHABLE_KEY = String(config.publishableKey || '');
+                    })
+                    .catch(error => {
+                        alertStorageConfigPromise = null;
+                        throw error;
+                    });
+            }
+            await alertStorageConfigPromise;
+        }
         let alertEditorLayout = null;
         let selectedAlertElementKey = null;
         let alertDragState = null;
@@ -7242,6 +7263,7 @@
         }
 
         async function uploadAlertAsset(blob, mimeType = 'image/png', extension = 'png') {
+            await ensureAlertStorageConfig();
             const objectPath = `alerts/${Date.now()}-${Math.random().toString(16).slice(2)}.${extension}`;
             const response = await fetch(
                 `${ALERT_STORAGE_PROJECT_URL}/storage/v1/object/${ALERT_STORAGE_BUCKET}/${objectPath}`,
