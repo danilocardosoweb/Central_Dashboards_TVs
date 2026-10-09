@@ -6624,7 +6624,7 @@
             if (!alert || typeof alert !== 'object') return alert;
             const mediaUrl = alert.mediaUrl || alert.imageUrl || alert.rokuImageUrl || alert.attachmentUrl || alert.fileUrl || '';
             const mediaType = normalizeAlertMediaType(
-                alert.mediaType || (alert.contentType === 'image' ? 'image' : ''),
+                alert.mediaType || '',
                 alert.mediaMime,
                 alert.imageName || alert.originalFileName,
                 mediaUrl
@@ -7151,7 +7151,7 @@
             alertEditorImageUrl = alert.mediaUrl || alert.imageUrl || alert.attachmentUrl || '';
             alertEditorImageName = alert.originalFileName || alert.imageName || '';
             alertEditorMediaType = normalizeAlertMediaType(
-                alert.mediaType || (alert.contentType === 'image' ? 'image' : ''),
+                alert.mediaType || '',
                 alert.mediaMime,
                 alertEditorImageName,
                 alertEditorImageUrl
