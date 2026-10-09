@@ -615,7 +615,21 @@ sub buildPlaylist()
                 mediaType = LCase(valueOr(alert, "mediaType", "image"))
                 alertImageUrl = remoteAlertImage(alert)
                 if mediaType = "pdf" then
-                    logEvent("alert-skipped-pdf", { id: valueOr(alert, "id", "") })
+                    mediaUrl = valueOr(alert, "mediaUrl", "")
+                    if alertImageUrl <> "" and alertImageUrl <> mediaUrl then
+                        alertSlides.Push({
+                            id: valueOr(alert, "id", "")
+                            kind: "alert"
+                            source: alert
+                            title: valueOr(alert, "title", "PDF")
+                            body: valueOr(alert, "body", "")
+                            imageUrl: alertImageUrl
+                            duration: valueOr(alert, "duration", 20)
+                        })
+                        logEvent("alert-pdf-first-page", { id: valueOr(alert, "id", "") })
+                    else
+                        logEvent("alert-skipped-pdf", { id: valueOr(alert, "id", "") })
+                    end if
                 else if mediaType = "video" then
                     alertSlides.Push({
                         id: valueOr(alert, "id", "")

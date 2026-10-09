@@ -27,6 +27,17 @@ test('editor oferece aviso somente por imagem', () => {
     assert.match(web, /1080 \/ image\.naturalHeight/);
 });
 
+test('editor aceita imagem, PDF e vídeo com pré-visualização própria', () => {
+    assert.match(web, /application\/pdf,video\/mp4,video\/webm,video\/quicktime/);
+    assert.match(web, /function normalizeAlertMediaType\(/);
+    assert.match(web, /visual\.className = 'alert-image-only alert-pdf-preview'/);
+    assert.match(web, /pdf\.worker\.min\.js/);
+    assert.match(web, /async function renderPdfFirstPage\(/);
+    assert.match(web, /rokuImageUrl: alertEditorRokuImageUrl/);
+    assert.match(web, /mediaType === 'pdf'/);
+    assert.match(web, /mediaType === 'video'/);
+});
+
 test('imagens são publicadas em bucket próprio do Supabase', () => {
     assert.match(web, /ALERT_STORAGE_BUCKET = 'alert-assets'/);
     assert.match(web, /\/storage\/v1\/object\/public\//);
@@ -43,6 +54,13 @@ test('Roku continua consumindo a URL remota do aviso', () => {
     assert.match(roku, /"imageUrl"/);
     assert.match(roku, /"mediaUrl"/);
     assert.match(roku, /"attachmentUrl"/);
+});
+
+test('Roku usa a primeira página do PDF e mantém vídeo separado', () => {
+    assert.match(roku, /mediaType = "pdf"/);
+    assert.match(roku, /alert-pdf-first-page/);
+    assert.match(roku, /mediaType: "video"/);
+    assert.match(roku, /content\.streamFormat = "mp4"/);
 });
 
 test('a Central exige uma URL HTTPS para imagens que serão exibidas na TV', () => {

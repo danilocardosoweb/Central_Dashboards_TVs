@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
             --primary-color: #3b82f6;
@@ -1724,7 +1725,10 @@
         }
 
         .alert-image-only { position: relative; width: 100%; height: 100%; display: grid; place-items: center; overflow: hidden; background: #000; }
-        .alert-image-only img { width: 100%; height: 100%; display: block; }
+        .alert-image-only img,
+        .alert-image-only video,
+        .alert-image-only iframe { width: 100%; height: 100%; display: block; border: 0; }
+        .alert-pdf-preview { background: #fff; }
         .alert-image-only-placeholder { color: #cbd5e1; font-size: clamp(1rem, 2.2vw, 2rem); font-weight: 700; }
         .alert-image-options { margin-top: 0.7rem; padding: 0.8rem; border: 1px solid #bfdbfe; border-radius: 0.75rem; background: #eff6ff; }
 
@@ -4424,9 +4428,9 @@
                     </div>
                 </div>
 
-                <label for="alertImage">Arquivo opcional</label>
+                <label for="alertImage">Arquivo do aviso (imagem, PDF ou vídeo)</label>
                 <input type="file" id="alertImage" class="input-field"
-                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,application/pdf,video/mp4"
+                       accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,application/pdf,video/mp4,video/webm,video/quicktime"
                        onchange="handleAlertImage(event)">
                 <button type="button" id="removeAlertImageButton" class="btn btn-outline"
                         style="display: none;" onclick="removeAlertImage()">
@@ -4587,6 +4591,7 @@
         let alertEditorImageName = '';
         let alertEditorMediaType = 'image';
         let alertEditorMediaMime = '';
+        let alertEditorRokuImageUrl = '';
         let ALERT_STORAGE_PROJECT_URL = '';
         let ALERT_STORAGE_PUBLISHABLE_KEY = '';
         const ALERT_STORAGE_BUCKET = 'alert-assets';
@@ -5917,8 +5922,19 @@
             return element;
         }
 
+        function normalizeAlertMediaType(mediaType, mediaMime = '', fileName = '', mediaUrl = '') {
+            const explicit = String(mediaType || '').toLowerCase();
+            if (['image', 'pdf', 'video'].includes(explicit)) return explicit;
+            const mime = String(mediaMime || '').toLowerCase();
+            const source = `${fileName || ''} ${mediaUrl || ''}`.toLowerCase();
+            if (mime === 'application/pdf' || /\.pdf(?:$|[?#])/.test(source)) return 'pdf';
+            if (mime.startsWith('video/') || /\.(mp4|webm|mov|m4v)(?:$|[?#])/.test(source)) return 'video';
+            return 'image';
+        }
+
         function buildAlertVisual(alert) {
-            if (alert.mediaType === 'video') {
+            const mediaType = normalizeAlertMediaType(alert.mediaType, alert.mediaMime, alert.imageName, alert.mediaUrl || alert.imageUrl || alert.attachmentUrl);
+            if (mediaType === 'video') {
                 const visual = document.createElement('div');
                 visual.className = 'alert-image-only';
                 visual.style.background = alert.imageBackground || '#000000';
@@ -5937,6 +5953,21 @@
                     visual.appendChild(video);
                 } else {
                     visual.appendChild(createTextElement('div', 'alert-image-only-placeholder', 'Selecione um vídeo para visualizar'));
+                }
+                return visual;
+            }
+            if (mediaType === 'pdf') {
+                const visual = document.createElement('div');
+                visual.className = 'alert-image-only alert-pdf-preview';
+                const pdfSource = alert.mediaUrl || alert.attachmentUrl || alert.fileUrl;
+                if (pdfSource) {
+                    const frame = document.createElement('iframe');
+                    frame.src = `${pdfSource}#toolbar=0&navpanes=0&view=FitH`;
+                    frame.title = alert.title || alert.imageName || 'PDF do aviso';
+                    frame.loading = 'lazy';
+                    visual.appendChild(frame);
+                } else {
+                    visual.appendChild(createTextElement('div', 'alert-image-only-placeholder', 'Selecione um PDF para visualizar'));
                 }
                 return visual;
             }
@@ -6592,7 +6623,12 @@
         function normalizeAlertRecord(alert) {
             if (!alert || typeof alert !== 'object') return alert;
             const mediaUrl = alert.mediaUrl || alert.imageUrl || alert.rokuImageUrl || alert.attachmentUrl || alert.fileUrl || '';
-            const mediaType = alert.mediaType || (alert.contentType === 'image' ? 'image' : '');
+            const mediaType = normalizeAlertMediaType(
+                alert.mediaType || (alert.contentType === 'image' ? 'image' : ''),
+                alert.mediaMime,
+                alert.imageName || alert.originalFileName,
+                mediaUrl
+            );
             return {
                 ...alert,
                 mediaType,
@@ -6600,6 +6636,7 @@
                 mediaUrl,
                 attachmentUrl: alert.attachmentUrl || mediaUrl,
                 imageUrl: alert.imageUrl || (mediaType === 'image' ? mediaUrl : ''),
+                rokuImageUrl: alert.rokuImageUrl || (mediaType === 'image' ? mediaUrl : ''),
                 start: toUtcDateTimeValue(alert.start),
                 end: toUtcDateTimeValue(alert.end),
                 bannerSize: normalizeBannerSize(alert.bannerSize),
@@ -6644,6 +6681,7 @@
             alertEditorImageName = '';
             alertEditorMediaType = 'image';
             alertEditorMediaMime = '';
+            alertEditorRokuImageUrl = '';
             alertEditorLayout = getDefaultAlertLayout();
             selectedAlertElementKey = null;
             document.getElementById('removeAlertImageButton').style.display = 'none';
@@ -6666,6 +6704,14 @@
             const contentType = document.getElementById('alertContentType').value || 'message';
             const targetType = document.getElementById('alertTargetType').value || 'all';
             const targetId = document.getElementById('alertAreaTarget').value || '*';
+            const mediaType = normalizeAlertMediaType(
+                alertEditorMediaType || 'image',
+                alertEditorMediaMime,
+                alertEditorImageName,
+                alertEditorImageUrl
+            );
+            const mediaUrl = alertEditorImageUrl;
+            const imageUrl = mediaType === 'image' ? mediaUrl : '';
             return {
                 contentType,
                 category: document.getElementById('alertCategory').value,
@@ -6691,12 +6737,13 @@
                 emphasisEffect: normalizeAlertOption(document.getElementById('alertEmphasisEffect').value, ['none', 'pulse', 'blink'], 'none'),
                 dashboardTreatment: normalizeAlertOption(document.getElementById('alertDashboardTreatment').value, ['shrink', 'dim', 'unchanged'], 'shrink'),
                 imageData: alertEditorImageData,
-                imageUrl: alertEditorImageUrl,
+                imageUrl,
                 imageName: alertEditorImageName,
-                mediaType: alertEditorMediaType || 'image',
+                mediaType,
                 mediaMime: alertEditorMediaMime || '',
-                mediaUrl: alertEditorImageUrl,
-                attachmentUrl: alertEditorImageUrl,
+                mediaUrl,
+                attachmentUrl: mediaUrl,
+                rokuImageUrl: alertEditorRokuImageUrl || (mediaType === 'image' ? mediaUrl : ''),
                 originalFileName: alertEditorImageName,
                 imageFit: document.getElementById('alertImageFit').value || 'contain',
                 imageBackground: document.getElementById('alertImageBackground').value || '#000000',
@@ -6747,7 +6794,7 @@
             if (isImageOnly) displayMode.value = 'fullscreen';
             displayMode.disabled = isImageOnly;
             document.querySelector('label[for="alertImage"]').textContent =
-                isImageOnly ? 'Imagem do aviso *' : 'Arquivo opcional';
+                isImageOnly ? 'Arquivo do aviso * (imagem, PDF ou vídeo)' : 'Arquivo opcional (imagem, PDF ou vídeo)';
         }
 
         function handleAlertLayoutModeChange() {
@@ -6979,13 +7026,13 @@
         async function saveAlert() {
         const draft = getAlertDraft();
         const isImageOnly = draft.contentType === 'image';
-        const isVideo = draft.mediaType === 'video';
-        const mediaUrl = draft.imageUrl || draft.mediaUrl || draft.attachmentUrl || '';
-        if (isImageOnly && draft.mediaType && !['image', 'video'].includes(draft.mediaType)) {
-            showToast('Avisos em tela cheia aceitam imagens ou vídeos MP4 compatíveis.', 'error');
+        const mediaUrl = draft.mediaUrl || draft.imageUrl || draft.attachmentUrl || '';
+        const isMedia = Boolean(mediaUrl) && ['image', 'pdf', 'video'].includes(draft.mediaType);
+        if (isImageOnly && draft.mediaType && !['image', 'pdf', 'video'].includes(draft.mediaType)) {
+            showToast('Avisos em tela cheia aceitam imagens, PDFs ou vídeos.', 'error');
             return;
         }
-        if ((isImageOnly || isVideo) && !/^https:\/\//i.test(mediaUrl)) {
+        if ((isImageOnly || isMedia) && !/^https:\/\//i.test(mediaUrl)) {
             showToast('Envie o arquivo antes de salvar. Ele precisa gerar um link HTTPS.', 'error');
             return;
         }
@@ -7012,7 +7059,7 @@
                 draft.displayMode = 'fullscreen';
                 draft.layoutMode = 'automatic';
             }
-            if (isVideo) {
+            if (isMedia && draft.mediaType === 'video') {
                 draft.displayMode = 'fullscreen';
                 draft.layoutMode = 'automatic';
                 draft.body = '';
@@ -7103,8 +7150,18 @@
             alertEditorImageData = alert.imageData || null;
             alertEditorImageUrl = alert.mediaUrl || alert.imageUrl || alert.attachmentUrl || '';
             alertEditorImageName = alert.originalFileName || alert.imageName || '';
-            alertEditorMediaType = alert.mediaType || (alert.contentType === 'image' ? 'image' : '');
-            alertEditorMediaMime = alert.mediaMime || '';
+            alertEditorMediaType = normalizeAlertMediaType(
+                alert.mediaType || (alert.contentType === 'image' ? 'image' : ''),
+                alert.mediaMime,
+                alertEditorImageName,
+                alertEditorImageUrl
+            );
+            alertEditorMediaMime = alert.mediaMime || (
+                alertEditorMediaType === 'pdf' ? 'application/pdf' : ''
+            );
+            alertEditorRokuImageUrl = alert.rokuImageUrl || (
+                alertEditorMediaType === 'image' ? alertEditorImageUrl : ''
+            );
             alertEditorLayout = normalizeAlertLayout(alert.layout);
             selectedAlertElementKey = null;
             document.getElementById('removeAlertImageButton').style.display =
@@ -7124,6 +7181,7 @@
             alertEditorImageName = '';
             alertEditorMediaType = 'image';
             alertEditorMediaMime = '';
+            alertEditorRokuImageUrl = '';
             alertEditorLayout = null;
             selectedAlertElementKey = null;
             alertDragState = null;
@@ -7262,6 +7320,25 @@
             };
         }
 
+        async function renderPdfFirstPage(file) {
+            if (!window.pdfjsLib) throw new Error('Visualizador de PDF indisponível');
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+            const page = await pdf.getPage(1);
+            const baseViewport = page.getViewport({ scale: 1 });
+            const scale = Math.min(1, 1920 / baseViewport.width, 1080 / baseViewport.height);
+            const viewport = page.getViewport({ scale: Math.max(0.1, scale) });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.ceil(viewport.width));
+            canvas.height = Math.max(1, Math.ceil(viewport.height));
+            const context = canvas.getContext('2d', { alpha: false });
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            await page.render({ canvasContext: context, viewport }).promise;
+            return uploadAlertAsset(await canvasToBlob(canvas, 'image/png', 0.92), 'image/png', 'png');
+        }
+
         async function uploadAlertAsset(blob, mimeType = 'image/png', extension = 'png') {
             await ensureAlertStorageConfig();
             const objectPath = `alerts/${Date.now()}-${Math.random().toString(16).slice(2)}.${extension}`;
@@ -7290,10 +7367,13 @@
             if (!file) return;
 
             const allowedImageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp'];
-            const supportedVideoTypes = ['video/mp4'];
+            const imageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'];
+            const supportedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+            const videoExtensions = ['mp4', 'webm', 'mov', 'm4v'];
+            const extension = (file.name.split('.').pop() || '').toLowerCase();
             const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-            const isVideo = supportedVideoTypes.includes(file.type) || (!file.type && /\.mp4$/i.test(file.name));
-            const isImage = allowedImageTypes.includes(file.type);
+            const isVideo = supportedVideoTypes.includes(file.type) || videoExtensions.includes(extension);
+            const isImage = allowedImageTypes.includes(file.type) || imageExtensions.includes(extension);
 
             if (!isImage && !isPdf && !isVideo) {
                 showToast('Use imagem, PDF ou vídeo em formato compatível.', 'error');
@@ -7309,14 +7389,19 @@
             alertEditorImageName = file.name;
             alertEditorImageData = null;
             alertEditorImageUrl = '';
+            alertEditorRokuImageUrl = '';
             alertEditorMediaType = isPdf ? 'pdf' : (isVideo ? 'video' : 'image');
-            alertEditorMediaMime = file.type || (isPdf ? 'application/pdf' : '');
+            alertEditorMediaMime = file.type || (
+                isPdf ? 'application/pdf' : isVideo ? (
+                    extension === 'webm' ? 'video/webm' : extension === 'mov' || extension === 'm4v' ? 'video/quicktime' : 'video/mp4'
+                ) : 'image/' + (extension === 'jpg' ? 'jpeg' : extension)
+            );
             showToast(isImage ? 'Preparando e enviando a imagem...' : 'Enviando anexo...', 'success');
             try {
                 let asset = {
                     blob: file,
-                    mimeType: alertEditorMediaMime || (isVideo ? 'video/mp4' : 'application/octet-stream'),
-                    extension: (file.name.split('.').pop() || 'bin').toLowerCase()
+                    mimeType: alertEditorMediaMime || 'application/octet-stream',
+                    extension: extension || 'bin'
                 };
                 if (isImage) asset = await optimizeAlertImage(file);
                 alertEditorImageUrl = await uploadAlertAsset(asset.blob, asset.mimeType, asset.extension);
@@ -7324,20 +7409,38 @@
                     alertEditorMediaType = 'image';
                     alertEditorMediaMime = asset.mimeType;
                 }
+                if (isPdf) {
+                    try {
+                        alertEditorRokuImageUrl = await renderPdfFirstPage(file);
+                    } catch (pdfError) {
+                        console.warn('PDF salvo sem imagem de apoio para Roku:', pdfError);
+                    }
+                }
                 document.getElementById('removeAlertImageButton').style.display = 'block';
                 updateAlertPreview();
                 if (isImage) {
                     showToast('Imagem pronta para navegador e Roku.', 'success');
                 } else if (isPdf) {
-                    showToast('PDF salvo como anexo. Para exibi-lo na TV, publique as páginas como imagens.', 'success');
+                    showToast(
+                        alertEditorRokuImageUrl
+                            ? 'PDF pronto para visualização e para a TV.'
+                            : 'PDF salvo para visualização. A primeira página não pôde ser preparada para a TV.',
+                        alertEditorRokuImageUrl ? 'success' : 'error'
+                    );
                 } else {
-                    showToast('Vídeo salvo como anexo. A reprodução no Roku será habilitada apenas para MP4 compatível.', 'success');
+                    showToast(
+                        alertEditorMediaMime === 'video/mp4'
+                            ? 'Vídeo pronto para navegador e Roku.'
+                            : 'Vídeo salvo para navegador. No Roku, use MP4.',
+                        'success'
+                    );
                 }
             } catch (error) {
                 console.error('Erro ao enviar anexo do aviso:', error);
                 event.target.value = '';
                 alertEditorImageData = null;
                 alertEditorImageUrl = '';
+                alertEditorRokuImageUrl = '';
                 alertEditorImageName = '';
                 alertEditorMediaType = 'image';
                 alertEditorMediaMime = '';
@@ -7350,6 +7453,7 @@
         function removeAlertImage() {
             alertEditorImageData = null;
             alertEditorImageUrl = '';
+            alertEditorRokuImageUrl = '';
             alertEditorImageName = '';
             alertEditorMediaType = 'image';
             alertEditorMediaMime = '';
