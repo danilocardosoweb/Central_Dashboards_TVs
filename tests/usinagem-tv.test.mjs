@@ -29,3 +29,12 @@ test('prévia administrativa preserva a leitura em formato compacto', () => {
   assert.match(html, /usinagem-tv-screen-preview[^}]*aspect-ratio:\s*16\s*\/\s*9/);
   assert.match(css, /\.preview-mode \.panel-grid/);
 });
+
+test('telas da TV usam os últimos 30 dias por padrão', () => {
+  const screen = fs.readFileSync(new URL('../dashboards/usinagem-tv.mjs', import.meta.url), 'utf8');
+  assert.match(screen, /const DEFAULT_LOOKBACK_DAYS = 30/);
+  assert.match(screen, /Indicadores dos últimos \$\{lookbackDays\} dias/);
+  assert.match(screen, /now\.getTime\(\) - lookbackDays \* 24 \* 3600000/);
+  assert.doesNotMatch(screen, /Indicadores dos últimos 7 dias/);
+  assert.doesNotMatch(screen, /7 \* 24 \* 3600000/);
+});

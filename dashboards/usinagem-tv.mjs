@@ -2,8 +2,15 @@ import { supabaseUsinagem, loadUsinagem } from '../services/usinagem-service.mjs
 
 const app = document.getElementById('app');
 const screenNames = { resumo: 'Resumo operacional', producao: 'Produção por máquina', qualidade: 'Qualidade e refugo', paradas: 'Paradas e ordens' };
-const requestedScreen = new URLSearchParams(window.location.search).get('screen') || 'auto';
-const previewMode = new URLSearchParams(window.location.search).get('preview') === '1';
+const searchParams = new URLSearchParams(window.location.search);
+const requestedScreen = searchParams.get('screen') || 'auto';
+const previewMode = searchParams.get('preview') === '1';
+const DEFAULT_LOOKBACK_DAYS = 30;
+const MAX_LOOKBACK_DAYS = 90;
+const requestedLookbackDays = Number(searchParams.get('days'));
+const lookbackDays = Number.isInteger(requestedLookbackDays) && requestedLookbackDays >= 1 && requestedLookbackDays <= MAX_LOOKBACK_DAYS
+  ? requestedLookbackDays
+  : DEFAULT_LOOKBACK_DAYS;
 const screenKeys = Object.keys(screenNames);
 let data = null;
 let screenIndex = 0;
@@ -102,7 +109,7 @@ function render() {
   const key = requestedScreen === 'auto' ? screenKeys[screenIndex % screenKeys.length] : (screenNames[requestedScreen] ? requestedScreen : 'resumo');
   const summary = summaryData();
   const active = screenKeys.indexOf(key);
-  app.innerHTML = `<header><div><div class="eyebrow">TECNOPERFIL · USINAGEM</div><h1>${esc(screenNames[key])}</h1><div class="stamp">Indicadores dos últimos 7 dias · atualização automática</div></div><div class="header-meta"><span class="live-dot"></span><span>Atualizado ${new Date().toLocaleTimeString('pt-BR')}</span></div></header><main class="screen-content">${screenBody(key, summary)}</main><footer><span>🏭 Central de Indicadores da Usinagem</span><span class="screen-dots">${screenKeys.map((item, index) => `<i class="${index === active ? 'active' : ''}" title="${esc(screenNames[item])}"></i>`).join('')}</span><span>${requestedScreen === 'auto' ? 'Rotação automática' : `Tela fixa · ${esc(screenNames[key])}`}</span></footer>`;
+  app.innerHTML = `<header><div><div class="eyebrow">TECNOPERFIL · USINAGEM</div><h1>${esc(screenNames[key])}</h1><div class="stamp">Indicadores dos últimos ${lookbackDays} dias · atualização automática</div></div><div class="header-meta"><span class="live-dot"></span><span>Atualizado ${new Date().toLocaleTimeString('pt-BR')}</span></div></header><main class="screen-content">${screenBody(key, summary)}</main><footer><span>🏭 Central de Indicadores da Usinagem</span><span class="screen-dots">${screenKeys.map((item, index) => `<i class="${index === active ? 'active' : ''}" title="${esc(screenNames[item])}"></i>`).join('')}</span><span>${requestedScreen === 'auto' ? 'Rotação automática' : `Tela fixa · ${esc(screenNames[key])}`}</span></footer>`;
 }
 
 async function configure() {
@@ -122,7 +129,7 @@ async function refresh() {
   try {
     if (!await configure()) { app.innerHTML = '<p class="state">Fonte de dados da Usinagem ainda não configurada.</p>'; return; }
     const now = new Date();
-    data = await loadUsinagem({ from: new Date(now.getTime() - 7 * 24 * 3600000), to: now });
+    data = await loadUsinagem({ from: new Date(now.getTime() - lookbackDays * 24 * 3600000), to: now });
     render();
   } catch (error) {
     app.innerHTML = `<p class="state">${esc(error.message || 'Não foi possível carregar os indicadores.')}</p>`;
