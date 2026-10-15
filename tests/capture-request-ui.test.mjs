@@ -20,6 +20,7 @@ test('visao geral oferece captura manual com progresso', () => {
 
 test('solicitacao preserva o payload central e cria fila para todos os dashboards', () => {
   assert.match(html, /const payload = \{ \.\.\.\(row\.payload \|\| \{\}\), capture \}/);
+  assert.match(html, /item\?\.type === 'usinagem-screen'/);
   assert.match(html, /queue: dashboards\.map/);
   assert.match(html, /status: 'pending'/);
 });

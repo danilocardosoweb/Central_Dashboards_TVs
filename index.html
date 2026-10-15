@@ -10484,11 +10484,11 @@
 
                         const dashboards = (Array.isArray(row.payload?.urls) ? row.payload.urls : [])
                             .filter(item => item?.id != null)
-                            .filter(item => /powerbi\.com/i.test(String(
+                            .filter(item => item?.type === 'usinagem-screen' || /powerbi\.com/i.test(String(
                                 item.combined || item.public || item.url || ''
                             )));
                         if (!dashboards.length) {
-                    throw new Error('Nenhum dashboard do Power BI está configurado.');
+                    throw new Error('Nenhum painel compatível está configurado.');
                         }
 
                         const requestedAt = new Date().toISOString();
